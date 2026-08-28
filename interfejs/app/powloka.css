@@ -1,0 +1,78 @@
+/* Powloka wspolna. Barwy WYLACZNIE ze zmiennych z paleta.css — zadnej
+   wartosci szesnastkowej w tym pliku, bo to byłby drugi nosnik palety.
+
+   TYPOGRAFIA: minimalny rozmiar tekstu to 11 pt (bramka PRD §12.2, prog ze
+   standardu). Poprzedni projekt mial caly tekst na 13 px = 9,75 pt, czyli
+   PONIZEJ progu — znalezisko Z-4, odlozone z jawnym progiem "przy pierwszej
+   zmianie skali typograficznej". Ta zmiana wlasnie nastapila, wiec podstawa
+   idzie na 15 px = 11,25 pt.
+
+   KRÓJ WRACA DO RAMKI (D-53, decyzja Darka 2026-08-29 g. 00:55: „sama
+   wielkość tekstu może być 15 px, reszta zostaje bez zmian"). Szeryfowy
+   `ui-serif Georgia` był dodatkiem wykonawcy, nie decyzją, i schodzi.
+   Krój jest ten sam, co w `makiety/*.dc.html`, bo ramka jest wiążącą
+   specyfikacją wyglądu (CLAUDE.md §3.6), a bramka odwzorowania mierzy
+   zgodność z nią maszynowo. ROZMIAR 15 px ZOSTAJE — bramka „≥ 11 pt"
+   z PRD §12.2 jest nim spełniona i pozostaje w mocy. */
+
+:root { color-scheme: light dark; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--atrament);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;  /* kwoty maja stac w kolumnie */
+}
+
+.naglowek {
+  border-bottom: 1px solid var(--liniatura-wierszy);
+  padding: 16px 32px 0;
+}
+
+.znak { display: flex; align-items: baseline; gap: 20px; }
+.znak-slowny { font-size: 24px; letter-spacing: 0.02em; }
+
+/* Cel klikalny >= 44x44 px — prog podwyzszony z bramki PRD §12.2. */
+.akcja,
+.pasek a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--atrament-cichy);
+  text-decoration: none;
+}
+
+.akcja {
+  color: var(--atrament);
+  border: 1px solid var(--obrys-kontrolki);
+  background: var(--pole-kontrolki);
+}
+
+.pasek { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.pasek a[aria-current="page"] {
+  color: var(--atrament);
+  box-shadow: inset 0 -2px 0 var(--atrament);
+}
+
+main { padding: 24px 32px 48px; }
+
+.straznik {
+  border-top: 1px solid var(--liniatura-wierszy);
+  padding: 12px 32px;
+  color: var(--atrament-cichy);
+  font-size: 13px;
+}
+
+/* Barwa NIGDY nie jest jedynym nosnikiem znaczenia (bramka PRD §12.2).
+   Zielen dobrana pod rowna wage z czerwienia ma po odbarwieniu roznice 0,00 —
+   ratuje to WYLACZNIE znak "+"/"-" przy kwocie. Znak jest wiec WYMOGIEM,
+   nie ozdoba; usuniecie go lamie te bramke. */
+.kwota-ujemna { color: var(--saldo-ujemne); }
+.kwota-dodatnia { color: var(--saldo-dodatnie); }
+.kwota-ujemna::before { content: "−"; }
+.kwota-dodatnia::before { content: "+"; }

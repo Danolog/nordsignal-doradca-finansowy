@@ -1,0 +1,28 @@
+# środowisko
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+.next/
+out/
+# wytwory budowania i bramki odwzorowania
+*.tsbuildinfo
+interfejs/zrzuty/
+
+# sekrety — NIGDY do repozytorium
+.env
+.env.local
+.env.prod
+*.pem
+
+# dane
+*.db
+*.db-*
+*.sqlite
+kopie/
+
+# system
+.DS_Store
+.remember/
+.playwright-mcp/

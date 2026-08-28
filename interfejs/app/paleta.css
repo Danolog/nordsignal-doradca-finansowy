@@ -1,0 +1,25 @@
+/* WYGENEROWANE z makiety/paleta.json (wersja 1.0, 2026-08-28).
+   NIE EDYTUJ RECZNIE — zmiana ginie przy najblizszym przebiegu generatora.
+   Zrodlem barwy jest paleta.json; ten plik ja WOLA. */
+
+:root {
+  --papier: #FBECD5;
+  --pole-kontrolki: #FFF5E1;
+  --liniatura-wierszy: #E2D1B3;
+  --atrament: #02143C;
+  --atrament-cichy: #4A5267;
+  --saldo-ujemne: #791B1B;
+  --obrys-kontrolki: #696C7A;
+  --saldo-dodatnie: #234017;
+}
+
+[data-motyw="ciemny"] {
+  --tlo: #1E1B15;
+  --pole-kontrolki: #262218;
+  --liniatura-wierszy: #3C362B;
+  --atrament: #E5E5FC;
+  --atrament-cichy: #9F9DAA;
+  --obrys-kontrolki: #737177;
+  --saldo-ujemne: #E0887C;
+  --saldo-dodatnie: #88A976;
+}
