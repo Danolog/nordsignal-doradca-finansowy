@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from pomocnicze import kod_pythona_bez_prozy
+
 from silnik.rdzen import budzet
 from silnik.rdzen import prezentacja
 
@@ -187,13 +189,17 @@ def test_regula_formatowania_kwoty_ma_JEDEN_nosnik_w_calym_projekcie():
              + sorted(KATALOG.glob("wiedza/**/*.py")))
     assert len(pliki) >= 20, f"straznik widzi tylko {len(pliki)} plikow"
 
+    # Kod, nie proza — patrz `kod_pythona_bez_prozy`. Bez tego strażnik
+    # czerwieni się na dokumentacji, która cytuje zakazany kształt.
     z_formatem = [p for p in pliki
-                  if ":,.2f" in p.read_text(encoding="utf-8")]
+                  if ":,.2f" in kod_pythona_bez_prozy(
+                      p.read_text(encoding="utf-8"))]
     assert [p.name for p in z_formatem] == ["prezentacja.py"], \
         f"format kwoty przepisany zamiast zawolany: {[p.name for p in z_formatem]}"
 
     ze_stala = [p for p in pliki
-                if "SEPARATOR_TYSIECY = " in p.read_text(encoding="utf-8")]
+                if "SEPARATOR_TYSIECY = " in kod_pythona_bez_prozy(
+                    p.read_text(encoding="utf-8"))]
     assert [p.name for p in ze_stala] == ["prezentacja.py"], \
         f"separator ma wiecej niz jeden nosnik: {[p.name for p in ze_stala]}"
 

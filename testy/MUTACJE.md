@@ -850,3 +850,63 @@ Kontrola po cofnięciu mutacji: `895 passed, 3 deselected`. Data: 2026-08-29.
 3. **`silnik/rdzen/narzedzia.py:238`** (`f"{...:.0f}"`) — zaokrąglenie **procentu**,
    nie kwoty; świadomie poza wzorcem nowego strażnika. Niepilnowane: że ten procent
    zaokrągla się tą samą regułą co reszta aplikacji.
+
+---
+
+## Przebieg 2026-08-29 — sprostowania po przeglądzie Z10 (Ethan)
+
+Kopia drzewa poza repozytorium (`scratchpad/mut-z10`), `__pycache__` czyszczony przed **każdym**
+przebiegiem. Kontrola bazowa kopii: **896 passed, 3 deselected**.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-L7** *(powtórzona za Leo, po mojej naprawie)* | drugi nośnik zaokrąglenia przez opis formatu w `prognoza_plynnosci.py:409` | `test_grosze_nie_sa_zaokraglane_OPISEM_FORMATU_poza_jednym_wyjatkiem` | **czerwony** |
+| **M-L8** | zdjęte wołanie `pieniadz.do_groszy` z `prezentacja.liczba` — naprawa cofnięta | `test_ekran_i_silnik_zaokraglaja_TAK_SAMO` | **czerwony** |
+| **M-L9** | `kod_pythona_bez_prozy` przestaje cokolwiek zdejmować | `test_regula_formatowania_kwoty_ma_JEDEN_nosnik_w_calym_projekcie` · `test_grosze_nie_sa_zaokraglane_OPISEM_FORMATU_poza_jednym_wyjatkiem` | **czerwony** |
+
+Kontrola po cofnięciu wszystkich trzech: **896 passed, 3 deselected**.
+
+### M-L7 — strażnik Leo nie stracił zębów po naprawie
+
+To jest pytanie, które trzeba było zadać: naprawa mogła sprawić, że strażnik przechodzi
+**„bo nie ma czego złapać"**. Nie przechodzi:
+
+```
+E  AssertionError: zaokraglanie kwot opisem formatu poza jedynym nosnikiem:
+   ['prezentacja.py', 'prognoza_plynnosci.py']
+```
+
+Wyjątek `prezentacja.py` **został na liście** — i to jest właściwe zachowanie, bo `:,.2f` nadal
+tam stoi, tylko **nie zaokrągla już niczego**: wartość dociera zaokrąglona. Drugi plik na liście
+jest wadą i strażnik go widzi.
+
+### M-L8 — kontrola odwrotna do zdjętego testu przypinającego
+
+Leo przypiął **rozjazd**, żeby jego naprawa nie przeszła po cichu. Naprawa nastąpiła, więc test
+przypinający zdjąłem — dokładnie tak, jak żądał jego własny docstring — i w jego miejsce postawiłem
+kontrolę **zgodności**. M-L8 dowodzi, że nowa kontrola nie jest tautologią:
+
+```
+E  AssertionError: ekran i silnik znowu zaokraglaja inaczej: ['0.145', '0.005', '12.345']
+```
+
+Trzy te same wartości, które Leo zmierzył jako rozjeżdżone. Zamiana testu na „słabszy przy okazji
+naprawy" byłaby tu najłatwiejszym błędem i tego właśnie ta mutacja pilnuje.
+
+### M-L9 — nowy skaner robi robotę, a nie tylko ucisza
+
+`kod_pythona_bez_prozy` powstał, bo mój nagłówek `pieniadz.py` **cytuje** zakazany kształt
+`f"{x:,.2f}"`, żeby wyjaśnić, dlaczego jest zakazany — i zaczerwienił dwa strażniki naraz.
+To trzecie trafienie tego wzorca w tym projekcie (M3 w Z1, M-Z7-1c w Z7).
+
+Skaner mógłby uciszyć strażników przez oślepienie ich. **Nie oślepia** — dowód jest dwustronny:
+M-L7 pokazuje, że prawdziwą wadę w kodzie nadal łapie; M-L9 pokazuje, że bez skanera guardy
+czerwienią się na samej prozie. Granica: **proza wyjaśniająca regułę nie jest jej złamaniem;
+napis, którego program używa, jest.**
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano granicy typu** (`prezentacja` przyjmuje `float`). Naprawy nie było — to dług
+  z progiem, opisany w nagłówku `silnik/pieniadz.py`.
+- **Nie mutowano `podatki.zaplaty_podatkowe`.** Filtr okresu nie istnieje, więc nie ma czego
+  mutować; dług z progiem, opisany w `silnik/pieniadz.py` i w `docs/PRD.md` §17 poz. 18.

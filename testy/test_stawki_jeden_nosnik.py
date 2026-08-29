@@ -180,6 +180,11 @@ def test_zaokraglenie_ma_JEDEN_nosnik_i_jest_nim_pieniadz():
     ZACHOWANIE, ktorego kopia nie ma: `pieniadz.zabron_float` ODMAWIA przyjecia
     liczby zmiennoprzecinkowej, a poprzednia wersja `stawki.do_groszy`
     konwertowala ja po cichu przez `Decimal(x)`.
+
+    ZAKRES: ten test mowi o `stawki.do_groszy` i `stawki.do_zlotych`, NIE
+    o calej aplikacji. Zdanie „zaokraglenie ma jeden nosnik w calym
+    projekcie" nie ma pokrycia w tym pliku — patrz sprostowanie przy
+    `test_kwota_nie_jest_liczona_wlasnym_quantize_poza_pieniadzem` nizej.
     """
     from silnik import pieniadz
 
@@ -194,8 +199,24 @@ def test_zaokraglenie_ma_JEDEN_nosnik_i_jest_nim_pieniadz():
 
 
 def test_kwota_nie_jest_liczona_wlasnym_quantize_poza_pieniadzem():
-    """Kontrola zrodlowa obok behawioralnej: `quantize` na groszach i zlotych
-    wolno wolac wylacznie w `silnik/pieniadz.py`.
+    """Kontrola zrodlowa: wywolanie `quantize` na groszach i zlotych wolno
+    postawic wylacznie w `silnik/pieniadz.py`.
+
+    CZEGO TEN TEST NIE DOWODZI — sprostowanie po przegladzie Z10 (Leo,
+    2026-08-29). Do tego dnia byl przywolywany jako dowod, ze zaokraglenie
+    kwoty ma JEDEN NOSNIK. **Nie jest takim dowodem i nigdy nie byl.**
+
+    Szuka wylacznie KSZTALTU `quantize(...)`. Python zaokragla takze przez
+    OPIS FORMATU — `f"{x:,.2f}"` — i tego ksztaltu ten wzorzec nie widzi.
+    Zmierzone mutacja M-L7: podstawienie drugiego nosnika zaokraglenia przez
+    opis formatu w `prognoza_plynnosci.py` dalo `892 passed, 3 deselected` —
+    ANI JEDNEJ CZERWIENI. Ten test przeszedl mutacje, ktora lamala regule,
+    o ktorej pilnowanie byl podejrzewany.
+
+    ZAKRES, PO SPROSTOWANIU: „nikt nie wola `quantize` poza `pieniadz.py`".
+    Tyle i tylko tyle. Drugiego ksztaltu — opisu formatu — pilnuje OSOBNY
+    plik `testy/test_zaokraglenie_ekranu.py`, dopisany przez Leo w tym samym
+    przegladzie; tam jest tez mutacja, ktora go czerwieni.
 
     Wyjatek nazwany: `budzet.py` zaokragla PROCENTY do jednego miejsca
     (`_DZIESIETNA`), a to nie jest kwota. Straznik pyta o kwotowe kwantyzatory

@@ -14,6 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from silnik import pieniadz
 from silnik.rdzen import budzet
 
 if TYPE_CHECKING:                      # tylko dla typow
@@ -53,7 +54,27 @@ def liczba(x: Decimal | float | int) -> str:
     („Jestes X zl od progu Y zl") i do Z51 mialo z tego powodu wlasna kopie
     calej reguly razem z wlasna stala separatora.
     """
-    sformatowana = (f"{Decimal(str(x)):,.2f}"
+    # ZAOKRAGLENIE WOLANE Z JEDYNEGO NOSNIKA, nie robione opisem formatu
+    # (przeglad Z10, Leo — prog konsolidacji z `testy/test_zaokraglenie_ekranu.py`
+    # zadzialal: „przy pierwszej zmianie `prezentacja.liczba`").
+    #
+    # Do tej zmiany zaokraglenie zapadalo TUTAJ, przez `f"{x:,.2f}"`, czyli
+    # regula ROUND_HALF_EVEN z domyslnego kontekstu dziesietnego — a silnik
+    # liczy ROUND_HALF_UP. Zmierzone 2026-08-29, trzy z szesciu wartosci
+    # dawaly INNY GROSZ:
+    #     0.145  -> silnik 0,15   ekran 0,14
+    #     0.005  -> silnik 0,01   ekran 0,00
+    #    12.345  -> silnik 12,35  ekran 12,34
+    # W aplikacji podatkowej znaczylo to, ze ekran i przelew moga sie roznic
+    # groszem — i ze roznica jest niewidoczna, bo obie liczby wygladaja
+    # poprawnie.
+    #
+    # `Decimal(str(x))` PRZED wolaniem jest SWIADOME i wezsze niz mogloby byc:
+    # `pieniadz.do_groszy` odmawia liczby zmiennoprzecinkowej, a ta funkcja
+    # ma w sygnaturze `float` i dzis go przyjmuje. To osobna wada, opisana
+    # jako dlug z progiem w naglowku tego pliku — naprawiam REGULE
+    # ZAOKRAGLENIA, nie przy okazji granice typu.
+    sformatowana = (f"{pieniadz.do_groszy(Decimal(str(x))):,.2f}"
                     .replace(",", SEPARATOR_TYSIECY).replace(".", ","))
     # Minus TYLKO na poczatku — D-58. Zamiana globalna byla by szersza niz
     # regula: dywiz wystepuje takze w datach ISO, ktore przechodza przez

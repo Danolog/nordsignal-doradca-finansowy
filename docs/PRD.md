@@ -1,6 +1,54 @@
 # Doradca Finansowy — dokument wymagań produktu (PRD)
 
-**Wersja:** v1.5 · 2026-08-29 · autor: Ethan (CTO) · bump: Sophia (Product Owner) · **status: do sign-offu Darka**
+**Wersja:** v1.6 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
+
+**Changelog v1.5 → v1.6 — jedno sprostowanie jawne. Zero zmian zakresu.**
+Rozdział 5 twierdził rzecz, która nie zachodzi. Nie „jeszcze nie", tylko
+**nie zachodzi i nie ma czym zajść** — a zdanie z tabeli źródeł prawdy zostałoby
+później zacytowane jako ustalenie faktu.
+
+**Stare brzmienie, zacytowane dosłownie** (rozdział 5, pierwszy wiersz tabeli):
+
+> | Stawka podatku, składki, próg ustawowy | tabela `rejestr_stawek` (rozdz. 7) | silnik, interfejs, model językowy |
+
+**Pomiar, 2026-08-29 (znalezisko Leo, przegląd Z10; powtórzone przeze mnie):**
+
+```
+grep -rn "^from wiedza\|^import wiedza\|from wiedza import" silnik/ api/ | wc -l
+0
+grep -c "rejestr_stawek" silnik/rdzen/magazyn.py
+0
+grep -cE 'Decimal\("[0-9]' silnik/rdzen/stawki.py
+28
+```
+
+**Trzy zdania stanu faktycznego.** (1) Tabela `rejestr_stawek` **nie istnieje
+w schemacie bazy** — `magazyn.py` nie wspomina jej ani razu, a schemat ma
+14 poleceń `CREATE TABLE`. (2) `silnik/` i `api/` **nie importują pakietu
+`wiedza/` ani razu**. (3) Wszystkie stawki ustawowe, których aplikacja
+faktycznie używa, są **literałami w `silnik/rdzen/stawki.py` — 28 sztuk**:
+`PROG_SKALI`, `STAWKA_SKALI_PIERWSZA/DRUGA`, `PODSTAWA_SPOLECZNYCH`,
+`STAWKI_SPOLECZNYCH`, `PROGI_ZDROWOTNEJ`, `PRZECIETNE_WYNAGRODZENIE_IV_KW`.
+
+**Co z tego wynika — i to jest cięższe niż sam nieprawdziwy wiersz.**
+Zatwierdzenie stawki przez Darka w rejestrze (`CLAUDE.md` §3.4, „automat
+proponuje, człowiek zatwierdza") **nie zmienia dziś żadnej liczby na ekranie**.
+Czujka aktów prawnych, odczyt stron, podstawy prawne, daty odczytu i podpisy
+zatwierdzającego działają — nad **pustym miejscem**. To jest system równoległy
+bez konsumenta, a jego istnienie sprawia, że wygląda na działający.
+**Zaufanie do liczby (rozdz. 12.5) opiera się dziś na literale w kodzie.**
+
+**Czego ta wersja NIE robi.** Nie podpina rejestru do silnika — to osobne
+zadanie, o innej wadze niż sprostowanie zdania, i wymaga migracji schematu.
+Pozycja wchodzi do rozdziału 17 jako **niezweryfikowana obietnica, nie luka
+do zamknięcia po drodze**.
+
+**Dwie pozycje z tego samego pomiaru, dopisane do rozdziału 17.** Trzy kolumny
+opisane w rozdziale 6.3 jako „nowe" — `wpisy_budzetu.zrodlo`,
+`kategorie.niezbedna`, `przychody_jdg.data_obowiazku_vat` — **nie istnieją
+w schemacie** (`0` trafień w 14 poleceniach `CREATE TABLE`). Pierwsza z nich
+jest warunkiem poprawności rezerwy podatkowej; szczegóły przy pozycji 18.
+
 
 **Changelog v1.4 → v1.5 — pięć decyzji odblokowujących cel nocy. Jedna z nich niczego nie
 rozstrzyga: potwierdza regułę, która stała już w czterech nośnikach, w tym w dwóch rozdziałach
@@ -212,7 +260,7 @@ Zasada: **jedna liczba ma jedno miejsce pochodzenia.** Poniższa tabela jest jej
 
 | Rodzaj liczby | Skąd pochodzi | Kto nie ma prawa jej wytworzyć |
 |---|---|---|
-| Stawka podatku, składki, próg ustawowy | tabela `rejestr_stawek` (rozdz. 7) | silnik, interfejs, model językowy |
+| Stawka podatku, składki, próg ustawowy | **dziś: literały w `silnik/rdzen/stawki.py` — 28 sztuk.** Docelowo tabela `rejestr_stawek` (rozdz. 7), która **nie istnieje w schemacie i nie ma ani jednego konsumenta w silniku** (pomiar 2026-08-29, changelog v1.6) | silnik, interfejs, model językowy |
 | Kwota wyliczona (zaliczka, składka, VAT) | `silnik/podatki.py` | trasa HTTP, interfejs, model językowy |
 | Saldo prognozy, dzień pod kreską | `silnik/prognoza_plynnosci.py` | jak wyżej |
 | Wykonanie planu, odchylenie | `silnik/budzet.py` | jak wyżej |
@@ -1354,6 +1402,33 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
     Liczba pochodzi z `plan-implementacji-v1.0.md` krok 1.2 (Ethan, 2026-08-28) i jest tu
     **cytowana, nie potwierdzona**. Przed wdrożeniem Ethan powtarza pomiar na przeniesionym
     silniku — po Z4 układ plików jest inny niż w chwili tamtego liczenia.
+    **ZAMKNIĘTE 2026-08-29 (Z7b):** pomiar powtórzony — **167 funkcji testowych w 10 plikach**,
+    z tego 148 w 8 plikach przed dopisaniem 19 nowych. Liczba 154 pochodziła z poprzedniego
+    projektu i **nie zgadza się** z tym.
+
+16. **Rejestr stawek nie ma ani jednego konsumenta — obietnica, nie luka do zamknięcia po drodze.**
+    Zmierzone 2026-08-29 (Leo, przegląd Z10; powtórzone przez Ethana): `rejestr_stawek` **nie
+    istnieje w schemacie** (`grep -c rejestr_stawek silnik/rdzen/magazyn.py` → `0`, przy 14
+    poleceniach `CREATE TABLE`), `silnik/` i `api/` **nie importują `wiedza/` ani razu**
+    (→ `0`), a wszystkie stawki ustawowe są literałami w `silnik/rdzen/stawki.py` (**28**).
+    **Skutek:** zatwierdzenie stawki przez Darka (`CLAUDE.md` §3.4) nie zmienia żadnej liczby
+    na ekranie; rozdział 7 opisuje procedurę nad pustym miejscem. **Nie wolno cytować rozdziału 7
+    jako opisu działającego mechanizmu.** Podpięcie wymaga migracji schematu i jest osobnym
+    zadaniem — nie „drobiazgiem do zrobienia przy okazji".
+
+17. **Trzy kolumny opisane w rozdziale 6.3 jako „nowe" nie istnieją w schemacie.**
+    `wpisy_budzetu.zrodlo`, `kategorie.niezbedna`, `przychody_jdg.data_obowiazku_vat` — każda
+    daje `0` trafień w 14 poleceniach `CREATE TABLE` (pomiar 2026-08-29). Rozdział 6.3 opisuje
+    je w czasie teraźniejszym; **są projektem, nie stanem.**
+
+18. **Rezerwa podatkowa sumuje zapłaty ze wszystkich lat przeciw zobowiązaniu jednego roku.**
+    `podatki.zaplaty_podatkowe` nie filtruje okresu, a kolumna, która to zamyka
+    (`wpisy_budzetu.zrodlo`, pozycja 17), nie istnieje. **Wielkość skutku dziś: 0,00 zł** — baza
+    wzorcowa nie ma ani jednego wpisu w kategorii „Podatki i ZUS". **Po pierwszym takim wpisie:**
+    pełna kwota tego wpisu, odjęta od rezerwy niezależnie od roku, którego dotyczyła — a kierunek
+    błędu jest **niekorzystny**, bo rezerwa wychodzi **zaniżona**, czyli obraz poprawia się
+    względem prawdy. **Próg:** pierwszy wpis w kategorii „Podatki i ZUS" albo migracja dokładająca
+    `wpisy_budzetu.zrodlo` — co nastąpi pierwsze. Nośnik szczegółów: nagłówek `silnik/pieniadz.py`.
 
 ---
 
