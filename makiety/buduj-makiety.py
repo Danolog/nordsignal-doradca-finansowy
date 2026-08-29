@@ -544,6 +544,52 @@ PLIKI = (
     ("Main-Papier-Jasny.dc.html", ODRZ_JASNY),
 )
 
+
+def _kontrola_wszystkich_plikow_dc():
+    """Kontrola NIE ograniczona do PLIKI generowanych przez ten skrypt.
+
+    Znalezisko Sophii (recenzja Z3, commit 264afa0): `--kontrola` sprawdzala
+    WYLACZNIE 21 plikow z krotki `PLIKI` — nie widziala `CoMamZrobic.dc.html`
+    (plik rowny, ale hand-authored, poza generatorem) ani zadnego z pieciu
+    plikow archiwalnych (Os/Waga/Zdanie/Main-Reka/Main-Reka-Papier). Sprawdzenie,
+    do ktorego nic nie dociera, melduje sukces (CLAUDE.md §8, "kontrola licznosci
+    obok mutacji"). Ta funkcja przegląda KAZDY plik `*.dc.html` w katalogu —
+    liczba jest WYNIKIEM `glob`, nie stala wpisana z gory, wiec cichy ubytek
+    pliku (np. skasowanie `CoMamZrobic.dc.html`) obnizy ja i będzie widoczny.
+    """
+    pliki = sorted(KAT.glob("*.dc.html"))
+    assert (KAT / "CoMamZrobic.dc.html") in pliki, \
+        "CoMamZrobic.dc.html zniknal z katalogu makiet"
+    # D-55 dotyczy EKRANU ZYWEGO, nie sladu historycznego. Zrodlo zamrozone
+    # (`Main-zrodlo-zamrozony.dc.html`) i jego pochodne ("kierunki odrzucone":
+    # Main-B, Main-Papier*) maja odtwarzac stan SPRZED POLUDNIA 2026-08-28
+    # co do bajta — a element „ile moge jeszcze rozdysponowac” byl tam
+    # PRAWDZIWY w tamtej chwili; D-16 (uchylajaca D-10) zapadla dopiero
+    # o 16:50, czyli PO zamrozeniu. Usuniecie go stamtad fałszowałoby historie,
+    # ktora ten plik ma jedyny obowiazek wiernie pokazywac. Main-Reka* to
+    # ten sam rodzaj sladu (naglowek sprzed Z-17/Z-18) — wylaczone z tego
+    # samego powodu, nie przez przeoczenie.
+    ARCHIWALNE_WYLACZONE_Z_D55 = {
+        "Main-zrodlo-zamrozony.dc.html", "Main-B.dc.html", "Main-Papier.dc.html",
+        "Main-Papier-Granat.dc.html", "Main-Papier-Jasny.dc.html",
+        "Main-Reka.dc.html", "Main-Reka-Papier.dc.html",
+    }
+    zly_znak, zly_element = [], []
+    for plik in pliki:
+        tresc = plik.read_text(encoding="utf-8")
+        if "AI CFO" in tresc:
+            zly_znak.append(plik.name)
+        if (plik.name.startswith("Main") and "rozdysponow" in tresc.lower()
+                and plik.name not in ARCHIWALNE_WYLACZONE_Z_D55):
+            zly_element.append(plik.name)
+    print(f"\nKontrola WSZYSTKICH plikow .dc.html w katalogu: {len(pliki)} sprawdzonych.")
+    for n in zly_znak:
+        print(f"  ZOSTAL STARY ZNAK SLOWNY „AI CFO”: {n}")
+    for n in zly_element:
+        print(f"  WROCIL ELEMENT „rozdysponowac” (D-55, ma byc na Budzecie, nie na Main*): {n}")
+    return len(pliki), len(zly_znak) + len(zly_element)
+
+
 if __name__ == "__main__":
     if "--kontrola" in sys.argv:
         rozne = 0
@@ -552,7 +598,10 @@ if __name__ == "__main__":
             zgodne = plik.exists() and plik.read_text(encoding="utf-8") == tresc
             rozne += 0 if zgodne else 1
             print(f"{nazwa:32s} {'zgodny z repo' if zgodne else 'ROZNI SIE OD REPO'}")
-        print(f"\nROZBIEZNOSCI: {rozne}")
+        ile_sprawdzonych, rozne_wszystkie = _kontrola_wszystkich_plikow_dc()
+        rozne += rozne_wszystkie
+        print(f"\nPLIKOW .DC.HTML SPRAWDZONYCH LACZNIE: {ile_sprawdzonych}")
+        print(f"ROZBIEZNOSCI: {rozne}")
         sys.exit(1 if rozne else 0)
     for nazwa, tresc in PLIKI:
         (KAT / nazwa).write_text(tresc, encoding="utf-8")

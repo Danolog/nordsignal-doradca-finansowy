@@ -126,6 +126,25 @@ UZYTKOWE = ()
 WYPELNIENIE_KONTROLKI = 2 * 16  # padding: 0 16px, jak w `Main.dc.html`
 ODSTEP_LINII = 16               # gap w linii naglowka
 
+#: NAPRAWA (2026-08-29, recenzja Sophii, commit 264afa0). Do tej pory ten plik
+#: NIE liczyl wskaznika daty (Z-29, `buduj-makiety.py::wskaznik_daty`) w ogole —
+#: powstal PRZED nim i nikt go tu nie dopisal. Skutek: „obie w jednej linii”
+#: drukowalo zapas 213,8 px (potem 200,6 po zmianie znaku), a realny zapas po
+#: doliczeniu wskaznika to ok. 45 px — narzedzie mierzylo wlasna, niepelna
+#: definicje wiersza, nie prawdziwy uklad. Wskaznik NIE jest „kontrolka
+#: uzytkowa” (`UZYTKOWE`) — jest zwyklym tekstem — dlatego dostaje wlasna
+#: stala, a nie wchodzi do tamtej krotki.
+WSKAZNIK_DATY_PRZYKLAD = "6 października 2026 · 09:40"
+#: Pasek nawigacji niesie WLASNY `margin-left: 8px` (`buduj-makiety.py::
+#: pasek_nawigacji`), NIEZALEZNY od `gap: 16px` rodzica — obie wartosci licza
+#: sie osobno, sumuja.
+MARGIN_PASEK = 8
+#: Piec dzieci w wierszu naglowka (znak, ksiegowanie, pasek, dystans, wskaznik)
+#: daje CZTERY odstepy `gap: 16px` rodzica — flex `gap` dziala MIEDZY kazda
+#: para dzieci, WLACZNIE z tymi po obu stronach elementu `flex: 1`, ktory sam
+#: nie zajmuje miejsca, ale odstepow wokol siebie nie kasuje.
+LICZBA_DZIECI_NAGLOWKA = 5
+
 
 def _pozycja(napis):
     return szerokosc(napis, STOPIEN_POZYCJI, swiatlo=SWIATLO_POZYCJI,
@@ -152,6 +171,23 @@ def linia_pierwsza():
     return razem
 
 
+def wiersz_naglowka(znak_slowny=ZNAK_SLOWNY):
+    """Cala szerokosc wiersza naglowka NAPRAWDE, wliczajac wskaznik daty.
+
+    Zastepuje dawne `pasek() + linia_pierwsza() + ODSTEP_LINII`, ktore
+    pomijaly wskaznik i liczyly jeden odstep zamiast czterech + marginesu
+    paska. Rozklad zgodny z `buduj-makiety.py::z_paskiem`:
+      [znak] [ksiegowanie] [pasek margin-left:8] [dystans flex:1] [wskaznik]
+    """
+    tekst, stopien, swiatlo, waga, wielkie = znak_slowny
+    znak_w = szerokosc(tekst, stopien, swiatlo=swiatlo, waga=waga, wielkie=wielkie)
+    ksiegowanie_w = szerokosc(KSIEGOWANIE, 15) + WYPELNIENIE_KONTROLKI + IKONA_KSIEGOWANIA
+    pasek_w = pasek()
+    wskaznik_w = szerokosc(WSKAZNIK_DATY_PRZYKLAD, 13)
+    gapy = ODSTEP_LINII * (LICZBA_DZIECI_NAGLOWKA - 1)
+    return znak_w + ksiegowanie_w + pasek_w + wskaznik_w + gapy + MARGIN_PASEK
+
+
 def _werdykt(ile, prog):
     return "MIESCI SIE" if ile <= prog else "NIE MIESCI SIE"
 
@@ -169,15 +205,18 @@ if __name__ == "__main__":
         print(wiersz)
 
     p, l = pasek(), linia_pierwsza()
-    print(f"\n  pasek osmiu pozycji razem   {p:7.1f} px")
-    print(f"  linia znak+ksiegowanie+2    {l:7.1f} px")
-    print(f"  obie w JEDNEJ linii         {p + l + ODSTEP_LINII:7.1f} px "
-          f"prog {DOSTEPNE} px  {_werdykt(p + l + ODSTEP_LINII, DOSTEPNE)}")
-    print(f"  pasek w linii OSOBNEJ       {p:7.1f} px "
-          f"prog {DOSTEPNE} px  {_werdykt(p, DOSTEPNE)}")
-    print(f"  linia pierwsza osobno       {l:7.1f} px "
-          f"prog {DOSTEPNE} px  {_werdykt(l, DOSTEPNE)}")
-    print(f"  ZAPAS w jednej linii        {DOSTEPNE - (p + l + ODSTEP_LINII):7.1f} px")
+    print(f"\n  pasek dziewieciu pozycji razem  {p:7.1f} px")
+    print(f"  linia znak+ksiegowanie+2        {l:7.1f} px  (BEZ wskaznika daty — "
+          f"patrz niżej)")
+
+    print("\n  CALY WIERSZ NAGLOWKA, naprawione (ze wskaznikiem daty, marginesem")
+    print("  paska i CZTEREMA odstepami — nie jednym):")
+    for opis, znak in (("„FINANSE” (obowiazujacy, D-47/D-57)", ZNAK_SLOWNY),
+                       ("„Doradca Finansowy” (odrzucony w Z3)",
+                        ("Doradca Finansowy", 15, 0.12, "gruba", True))):
+        w = wiersz_naglowka(znak)
+        print(f"    {opis:42s} {w:7.1f} px  prog {DOSTEPNE} px  "
+              f"{_werdykt(w, DOSTEPNE)}  (zapas {DOSTEPNE - w:+.1f} px)")
 
     # WARIANT ODRZUCONY, ZMIERZONY: ksiegowanie jako DZIEWIATA POZYCJA paska,
     # bez kontrolki o obrysie. Mierzymy go, zeby rozstrzygniecie „zostaje
@@ -187,19 +226,25 @@ if __name__ == "__main__":
     znak = szerokosc(ZNAK_SLOWNY[0], ZNAK_SLOWNY[1], swiatlo=ZNAK_SLOWNY[2],
                      waga=ZNAK_SLOWNY[3], wielkie=ZNAK_SLOWNY[4])
     dziewiata = _pozycja(KSIEGOWANIE)
-    razem9 = znak + ODSTEP_LINII + p + ODSTEP_POZYCJI + dziewiata
-    print("\n  WARIANT ODRZUCONY — ksiegowanie jako 9. pozycja paska")
+    pasek_rozszerzony = p + ODSTEP_POZYCJI + dziewiata
+    wskaznik_w = szerokosc(WSKAZNIK_DATY_PRZYKLAD, 13)
+    # 4 dzieci w tym ukladzie (znak, pasek rozszerzony, dystans, wskaznik) -> 3 odstepy.
+    razem9 = znak + pasek_rozszerzony + wskaznik_w + ODSTEP_LINII * 3 + MARGIN_PASEK
+    print("\n  WARIANT ODRZUCONY — ksiegowanie jako 10. pozycja paska (ze wskaznikiem daty)")
     print(f"  pozycja ksiegowania w pasku {dziewiata:7.1f} px")
-    print(f"  znak + dziewiec pozycji     {razem9:7.1f} px "
+    print(f"  znak + dziesiec pozycji + wskaznik  {razem9:7.1f} px "
           f"prog {DOSTEPNE} px  {_werdykt(razem9, DOSTEPNE)}")
-    print(f"  ZAPAS wariantu odrzuconego  {DOSTEPNE - razem9:7.1f} px")
+    print(f"  ZAPAS wariantu odrzuconego          {DOSTEPNE - razem9:7.1f} px")
 
     # Prog konsolidacji, jawnie: zapas mniejszy niz najwezsza pozycja paska
-    # znaczy, ze KAZDA zmiana nazwy wymaga ponownego pomiaru.
+    # znaczy, ze KAZDA zmiana nazwy wymaga ponownego pomiaru. Liczony wobec
+    # PRAWDZIWEGO wiersza (`wiersz_naglowka`), nie wobec niepelnej sumy sprzed
+    # naprawy.
     najwezsza = min(_pozycja(n) for n in POZYCJE)
-    zapas = DOSTEPNE - (p + l + ODSTEP_LINII)
-    print(f"  najwezsza pozycja paska     {najwezsza:7.1f} px  -> zapas "
-          f"{'mniejszy' if zapas < najwezsza else 'wiekszy'} niz jedna pozycja")
+    zapas = DOSTEPNE - wiersz_naglowka()
+    print(f"  najwezsza pozycja paska     {najwezsza:7.1f} px  -> zapas prawdziwego "
+          f"wiersza ({zapas:.1f} px) jest "
+          f"{'MNIEJSZY' if zapas < najwezsza else 'wiekszy'} niz jedna pozycja paska")
 
     # Kontrola narzedzia na wartosci znanej: napis pusty ma miec zero, a napis
     # dwa razy dluzszy ma byc szerszy. Bez tego nie wiadomo, czy funkcja

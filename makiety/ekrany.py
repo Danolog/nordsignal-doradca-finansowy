@@ -70,11 +70,11 @@ class Ekran:
 #: (nastawy aplikacji). Trzy pierwsze pozycje to pieniadze w czasie —
 #: przyszlosc, biezacy miesiac, postanowienia.
 PASEK = (
-    #: Wysokosc 1070 px (nie 900) od Z3 (2026-08-29) — karta „Co mam zrobic"
+    #: Wysokosc 1025 px (nie 900) od Z3 (2026-08-29) — karta „Co mam zrobic"
     #: dolozona miedzy werdyktem a przyciskiem „Co mnie czeka" (`render.py`,
-    #: pomiar po zbudowaniu: `{"doc": 1070, ...}`).
+    #: pomiar po zbudowaniu, po recenzji Sophii/D-55: `{"doc": 1025, ...}`).
     Ekran("plynnosc", "Płynność",
-          "Czy dam radę do końca okresu?", "Main.dc.html", 1070),
+          "Czy dam radę do końca okresu?", "Main.dc.html", 1025),
     Ekran("miesiac", "Miesiąc",
           "Jak mi poszło w tym miesiącu?", "Miesiac.dc.html", 900),
     Ekran("budzet", "Budżet",
