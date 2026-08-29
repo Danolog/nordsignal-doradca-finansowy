@@ -59,6 +59,26 @@ RODZAJ_PLAN = "plan"
 RODZAJ_DANINA = "danina"
 RODZAJ_ZALEGLOSC = "zaleglosc"
 RODZAJ_PRZYCHOD_JDG = "przychod_jdg"
+#: Wpis faktyczny — to, co sie WYDARZYLO. Osobny rodzaj od `plan`, bo
+#: prognoza musi umiec powiedziec, ktora czesc osi jest realizacja,
+#: a ktora przewidywaniem (D-20).
+RODZAJ_WPIS = "wpis"
+
+#: PODZIAL RODZAJOW NA WPLYWY I WYPLYWY — JEDEN NOSNIK, od Z7b tutaj.
+#:
+#: Do Z7b podzial stal w `co_mnie_czeka.py` jako SWIADOMY drugi nosnik,
+#: z jawnym progiem konsolidacji: *„PIERWSZY NOWY RODZAJ ZDARZENIA
+#: w `prognoza_plynnosci`. Wtedy podzial przenosi sie do nosnika prognozy,
+#: a tutaj zostaje wolanie."* `RODZAJ_WPIS` (D-20) jest tym pierwszym nowym
+#: rodzajem, wiec **prog zadzialal i dlug zostaje splacony**, a nie przesuniety.
+#: Wykryl to straznik `test_RODZAJE_WYPLYWU_pokrywaja_KOMPLET_rodzajow_prognozy`,
+#: nie czujnosc autora.
+#:
+#: `RODZAJ_WPIS` jest po stronie WYPLYWOW, mimo ze wpis bywa przychodem:
+#: znak rozstrzyga wolajacy osobno (`if kwota >= 0: continue`), a ta krotka
+#: odpowiada wylacznie na pytanie „czy ten rodzaj W OGOLE moze byc wyplywem".
+RODZAJE_WYPLYWU = (RODZAJ_DANINA, RODZAJ_ZALEGLOSC, RODZAJ_PLAN, RODZAJ_WPIS)
+RODZAJE_WPLYWU = (RODZAJ_PRZYCHOD_JDG,)
 
 #: Kody zastrzezen — ekran renderuje `tekst` od silnika bez przeredagowania,
 #: a `kod` sluzy do rozpoznania rodzaju bez parsowania zdania.
@@ -253,12 +273,156 @@ def _nazwa_podatku(forma: magazyn.FormaRoku) -> str:
 
 # --- rdzen ---------------------------------------------------------------
 
+@dataclass(frozen=True)
+class PozycjaOsi:
+    """Jedna pozycja gotowa do wstawienia na os — plan albo wpis."""
+
+    dzien: date
+    nazwa: str
+    kwota: Decimal          # ZE ZNAKIEM: wydatek ujemny, przychod dodatni
+    rodzaj: str
+    domniemany: bool = False
+
+
+def podziel_os(*, pozycje_planu, wpisy, dzis: date) -> tuple[PozycjaOsi, ...]:
+    """JEDEN NOSNIK REGULY PODZIALU OSI — D-20 i D-61 razem.
+
+    D-20 (decyzja Darka 2026-08-28, g. 18:04): **dni minione licza sie
+    z rzeczywistych wpisow, dni przyszle z planu.** Darek odrzucil proste
+    odejmowanie wydanego od planu, bo *„dziala tylko w jedna strone i grozi
+    podwojnym liczeniem"*. Os ma DWA ZRODLA, nie jedno zrodlo z korekta.
+
+    Bez tej reguly kto wydal ponad plan, widzi sytuacje LEPSZA, niz jest:
+    plan mowi, ze wyda 330 zl, wiec os odejmuje 330 zl — niezaleznie od tego,
+    czy wydal 274 zl, 500 zl, czy nic.
+
+    D-61 (Sophia, 2026-08-29) domyka jedyna luke, ktorej D-20 nie zamykala:
+    **co z pozycja planu na dzien PRZYSZLY w kategorii, w ktorej wydatek juz
+    padl.** Bez niej podwojne liczenie wchodzi innymi drzwiami — nie przez
+    odejmowanie, lecz przez pozycje planu, ktora nie wie, ze zostala
+    zaplacona. Zmierzone na bazie-wzorcu: plan X 2026 ma „Energia
+    Elektryczna" 330,00 zl na 20 X; wpis 274,06 zl pada 6 X; bez reguly os
+    policzylaby **604,06 zl za prad w jednym miesiacu**.
+
+    **Regula: wpis konsumuje pozycje planu tej samej kategorii w tym samym
+    miesiacu, az do zera, w kolejnosci dat. Nadwyzka ponad plan obciaza os
+    w calosci i bez kompensaty** — to asymetria D-9 przeniesiona z kafelka
+    na os: nadwyzka wydatku pogarsza obraz, nadwyzka przychodu go nie
+    poprawia.
+
+    KONSUMPCJA DOTYCZY WYLACZNIE POZYCJI, KTORE ZOSTAJA NA OSI (dzien > dzis).
+    Pozycja planu na dzien miniony znika niezaleznie od wpisow — przeszlosc
+    opisuja wpisy, nie zamiary. To jest literalne czytanie slowa „pozostale"
+    z D-61 i **jedyna niejednoznacznosc tej reguly**: gdy kategoria ma w tym
+    samym miesiacu pozycje planu i minione, i przyszle, wpis konsumuje
+    przyszla, a miniona i tak odpada. Nazwane wprost, zeby nastepny wykonawca
+    nie musial tego odgadywac z kodu.
+
+    KLUCZ KONSUMPCJI TO (typ, kategoria), nie sama kategoria. Wpis
+    przychodowy nie ma konsumowac planu wydatku o tej samej nazwie —
+    to bylaby kompensata, ktorej D-9 zabrania.
+
+    Zwraca pozycje gotowe na os. NIE dotyka bazy, nie zna kotwicy ani
+    horyzontu — obciecie do okna robi wolajacy.
+    """
+    wpisy = tuple(wpisy or ())
+    plan = tuple(pozycje_planu or ())
+
+    # KROK 1 (D-20): plan opisuje wylacznie PRZYSZLOSC.
+    przyszly_plan = sorted((p for p in plan if p.dzien > dzis),
+                           key=lambda p: (p.dzien, p.nazwa))
+
+    # KROK 2 (D-61): ile kazda para (typ, kategoria) juz skonsumowala.
+    do_skonsumowania: dict[tuple[str, str], Decimal] = {}
+    for w in wpisy:
+        klucz = (w.rodzaj_typ, w.kategoria)
+        do_skonsumowania[klucz] = (do_skonsumowania.get(klucz, Decimal("0"))
+                                   + abs(w.kwota))
+
+    # KROK 3: konsumpcja w kolejnosci dat, az do zera.
+    zostaje: list[PozycjaOsi] = []
+    for p in przyszly_plan:
+        klucz = (p.rodzaj_typ, p.kategoria)
+        budzet_konsumpcji = do_skonsumowania.get(klucz, Decimal("0"))
+        if budzet_konsumpcji <= 0:
+            zostaje.append(p.na_os())
+            continue
+        wartosc = abs(p.kwota)
+        zjedzone = min(wartosc, budzet_konsumpcji)
+        do_skonsumowania[klucz] = budzet_konsumpcji - zjedzone
+        reszta = wartosc - zjedzone
+        if reszta > 0:
+            znak_pozycji = -1 if p.kwota < 0 else 1
+            zostaje.append(p.na_os(kwota=znak_pozycji * reszta))
+        # reszta == 0 -> pozycja zjedzona w calosci, nie wchodzi na os
+
+    # KROK 4: wpisy wchodza W CALOSCI, na wlasnych datach.
+    zostaje.extend(w.na_os() for w in wpisy)
+    return tuple(zostaje)
+
+
+@dataclass(frozen=True)
+class _Wejscie:
+    """Pozycja przed podzialem osi — plan albo wpis, w jednym ksztalcie.
+
+    `rodzaj_typ` to typ budzetowy (`Wydatki`/`Przychody`/`Oszczednosci`),
+    a nie rodzaj zdarzenia — nazwa jest niezreczna, ale rozroznienie jest
+    konieczne: klucz konsumpcji stoi na typie budzetowym.
+    """
+
+    dzien: date
+    nazwa: str
+    kwota: Decimal
+    rodzaj: str
+    rodzaj_typ: str
+    kategoria: str
+    domniemany: bool = False
+
+    def na_os(self, kwota: "Decimal | None" = None) -> PozycjaOsi:
+        return PozycjaOsi(
+            dzien=self.dzien, nazwa=self.nazwa,
+            kwota=self.kwota if kwota is None else kwota,
+            rodzaj=self.rodzaj, domniemany=self.domniemany)
+
+
+def _wpisy_wg_miesiaca(wpisy) -> dict[tuple[int, int], tuple[_Wejscie, ...]]:
+    """Wpisy faktyczne przelozone na pozycje osi, pogrupowane po miesiacu.
+
+    DWIE KATEGORIE ODPADAJA, obie z tego samego powodu co po stronie planu
+    (`budzet.bez_podatkow`): daniny wchodza na os przez `podatki.do_zaplaty`,
+    a przychod JDG przez godziny i stawke. Wpuszczone tedy weszlyby DRUGI RAZ.
+    To jest ta sama pulapka, przed ktora broni D-20 — tylko po stronie wpisow.
+
+    ZWRACA PUSTY SLOWNIK DLA PUSTEGO WEJSCIA i to jest stan poprawny:
+    „nie zapisano niczego" znaczy, ze przeszlosc jest pusta, a nie ze mamy
+    wrocic do planu. Fallback na plan bylby cichym powrotem do zachowania
+    sprzed D-20.
+    """
+    wynik: dict[tuple[int, int], list[_Wejscie]] = {}
+    if wpisy is None or getattr(wpisy, "empty", False):
+        return {}
+    for _, w in wpisy.iterrows():
+        kategoria = str(w["kategoria"])
+        if kategoria in (budzet.KATEGORIA_PODATKI, budzet.KATEGORIA_PRZYCHOD_JDG):
+            continue
+        dzien_w = date.fromisoformat(str(w["data"]))
+        kwota = stawki.do_groszy(Decimal(str(w["kwota"])))
+        wynik.setdefault((dzien_w.year, dzien_w.month), []).append(_Wejscie(
+            dzien=dzien_w,
+            nazwa=str(w["szczegoly"] or kategoria),
+            kwota=kwota * budzet.znak(str(w["typ"])),
+            rodzaj=RODZAJ_WPIS,
+            rodzaj_typ=str(w["typ"]),
+            kategoria=kategoria))
+    return {k: tuple(v) for k, v in wynik.items()}
+
+
 def zbuduj(*, plan, kotwica: Kotwica | None, wolumen: Wolumen | None,
            forma: magazyn.FormaRoku, zaleglosci, przychod_narastajaco: Decimal,
            dzis: date, horyzont_miesiecy: int = HORYZONT_DOMYSLNY,
            dochod_narastajaco: Decimal = Decimal("0"),
            zaliczki_naliczone: Decimal = Decimal("0"),
-           zobowiazania=None) -> Prognoza:
+           zobowiazania=None, wpisy=None) -> Prognoza:
     """Saldo dzienne w dwoch liniach przez `horyzont_miesiecy`. BEZ BAZY.
 
     Trzy argumenty poza litera planu wykonawczego, wszystkie z wartoscia
@@ -270,6 +434,16 @@ def zbuduj(*, plan, kotwica: Kotwica | None, wolumen: Wolumen | None,
       w kierunku, ktory poprawia obraz — czyli w najgorszym mozliwym.
     * `zobowiazania` — wynik ma niesc ich pelna liste (`zobowiazania_spoza_
       planu`), a nie da sie jej zwrocic, nie dostawszy jej.
+    * `wpisy` (D-20, Z7b) — RZECZYWISTE wpisy budzetowe. Bez nich os biegla
+      w calosci z planu, wiec wpisanie wydatku nie zmienialo na Plynnosci
+      NICZEGO, a kto wydal ponad plan, widzial sytuacje lepsza, niz jest.
+      Wartosc domyslna `None` znaczy „nie zapisano zadnego wpisu", a nie
+      „nie stosuj reguly": plan i tak opisuje wylacznie dni przyszle.
+
+    CO PRZEZ TE ZMIANE PRZESTAJE DZIALAC, nazwane wprost: **zgodnosc liczb
+    prognozy z kazdym zrzutem sprzed D-20**. Pozycja planu na dzien miniony
+    nie obciaza juz osi — przeszlosc opisuja wpisy, nie zamiary. Skutek
+    zamierzony (plan implementacji, krok 1.2).
     """
     zastrzezenia: list[Zastrzezenie] = []
 
@@ -327,33 +501,46 @@ def zbuduj(*, plan, kotwica: Kotwica | None, wolumen: Wolumen | None,
     miesiecy_bez_planu = 0
     przychody_planu: dict[tuple[int, int], Decimal] = {}
 
+    wpisy_wg_miesiaca = _wpisy_wg_miesiaca(wpisy)
+
     for rok, miesiac in miesiace:
         wiersze = budzet.plan_na_miesiac(plan, rok, miesiac)
         # Podatki liczy silnik, przychod JDG liczą godziny — obie kategorie
         # wypadają z planu, inaczej wchodzą do salda drugi raz.
         wiersze = budzet.bez_podatkow(wiersze)
+        wejscia_planu: list[_Wejscie] = []
+        suma_przychodow = Decimal("0.00")
         if wiersze.empty:
             miesiecy_bez_planu += 1
-            przychody_planu[(rok, miesiac)] = Decimal("0.00")
-            continue
-        suma_przychodow = Decimal("0.00")
-        for _, w in wiersze.iterrows():
-            if w["kategoria"] == budzet.KATEGORIA_PRZYCHOD_JDG:
-                continue
-            kwota = stawki.do_groszy(Decimal(str(w["kwota_planowana"])))
-            ze_znakiem = kwota * budzet.znak(w["typ"])
-            dzien, domniemany = _dzien_pozycji(rok, miesiac, w)
-            if domniemany:
-                domniemane += 1
-            else:
-                bez_domniemania += 1
-            if w["typ"] == budzet.TYP_PRZYCHODY:
-                suma_przychodow += kwota
-            dodaj(dzien, Zdarzenie(
-                nazwa=str(w["opis"] or w["kategoria"]), rodzaj=RODZAJ_PLAN,
-                kwota_ostrozna=ze_znakiem, kwota_realna=ze_znakiem,
-                dzien_domniemany=domniemany))
+        else:
+            for _, w in wiersze.iterrows():
+                if w["kategoria"] == budzet.KATEGORIA_PRZYCHOD_JDG:
+                    continue
+                kwota = stawki.do_groszy(Decimal(str(w["kwota_planowana"])))
+                ze_znakiem = kwota * budzet.znak(w["typ"])
+                dzien_p, domniemany = _dzien_pozycji(rok, miesiac, w)
+                if w["typ"] == budzet.TYP_PRZYCHODY:
+                    suma_przychodow += kwota
+                wejscia_planu.append(_Wejscie(
+                    dzien=dzien_p, nazwa=str(w["opis"] or w["kategoria"]),
+                    kwota=ze_znakiem, rodzaj=RODZAJ_PLAN,
+                    rodzaj_typ=str(w["typ"]), kategoria=str(w["kategoria"]),
+                    domniemany=domniemany))
         przychody_planu[(rok, miesiac)] = suma_przychodow
+
+        # D-20 + D-61 — JEDEN NOSNIK. Tu tylko wolanie i wstawienie na os.
+        for pozycja in podziel_os(pozycje_planu=wejscia_planu,
+                                  wpisy=wpisy_wg_miesiaca.get((rok, miesiac), ()),
+                                  dzis=dzis):
+            if pozycja.rodzaj == RODZAJ_PLAN:
+                if pozycja.domniemany:
+                    domniemane += 1
+                else:
+                    bez_domniemania += 1
+            dodaj(pozycja.dzien, Zdarzenie(
+                nazwa=pozycja.nazwa, rodzaj=pozycja.rodzaj,
+                kwota_ostrozna=pozycja.kwota, kwota_realna=pozycja.kwota,
+                dzien_domniemany=pozycja.domniemany))
 
     if domniemane:
         zastrzezenia.append(Zastrzezenie(
@@ -614,4 +801,9 @@ def prognozuj(polaczenie, *, dzis: date | None = None,
         horyzont_miesiecy=horyzont_miesiecy,
         dochod_narastajaco=stan_roku.dochod_narastajaco,
         zaliczki_naliczone=stan_roku.zaliczki_przed_zaokragleniem,
-        zobowiazania=magazyn.wczytaj_zobowiazania(polaczenie))
+        zobowiazania=magazyn.wczytaj_zobowiazania(polaczenie),
+        # D-20: os dzieli sie na dniu dzisiejszym. Bez tego argumentu
+        # `zbuduj` widzi wylacznie plan, a wpis uzytkownika nie rusza
+        # Plynnosci — cala sciezka „wpisz wydatek i zobacz skutek" byla
+        # wtedy teatrem (zmierzone w Z7: 8 335,87 -> 8 335,87 -> 8 335,87).
+        wpisy=wpisy)

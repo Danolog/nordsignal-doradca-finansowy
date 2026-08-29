@@ -303,6 +303,18 @@ def _z_dolozonym_wpisem(wpisy: pd.DataFrame, *, dzien: date, typ: str,
 
 # --- caly ekran -----------------------------------------------------------
 
+def _podpis_straznika(polaczenie, dzis: date) -> "str | None":
+    """Zdanie stopki albo `None`, gdy straznik nigdy nie dzialal.
+
+    `None` znaczy „nigdy nie sprawdzal" i NIE WOLNO go zamienic na zdanie
+    o sprawdzeniu (regula D11: zero nigdy nie zastepuje braku wiedzy).
+    """
+    przebieg = magazyn.ostatni_przebieg_straznika(polaczenie)
+    if przebieg is None:
+        return None
+    return prezentacja.podpis_straznika(przebieg, dzis)
+
+
 def zbierz(polaczenie, *, dzis: date, napis_kwoty: NapisKwoty,
            typ: str = TYP_DOMYSLNY,
            kwota_podgladu: Decimal = Decimal("0.00"),
@@ -338,6 +350,16 @@ def zbierz(polaczenie, *, dzis: date, napis_kwoty: NapisKwoty,
         uporzadkowane[0] if uporzadkowane else "")
 
     return kontrakt.DaneKsiegowania(
+        # STOPKA STRAZNIKA — ten sam fakt i TEN SAM NOSNIK zdania, co na
+        # Plynnosci (`prezentacja.podpis_straznika`). Do Z7b to pole istnialo
+        # wylacznie w `DanePlynnosci`, wiec ekran Ksiegowanie mowil „nie wiem"
+        # o czyms, co aplikacja wiedziala — dwa ekrany dawaly dwie odpowiedzi
+        # na jedno pytanie „czy to, co widze, jest aktualne".
+        #
+        # ZDANIE SKLADA JEDEN NOSNIK, nie ten plik. Gdyby ekran skladal je
+        # u siebie, brzmienie stopki mialoby tyle wersji, ile ekranow — i to
+        # jest dokladnie ta wada, ktora domykamy, tylko o warstwe wyzej.
+        ostatnieSprawdzenie=_podpis_straznika(polaczenie, dzis),
         dzisiaj=dzis.isoformat(),
         typDomyslny=typ,
         kategorie=tuple(

@@ -321,14 +321,28 @@ def test_pozycja_BEZ_dnia_platnosci_ma_dzien_DOMNIEMANY_i_liczbe():
     domniemane = [z for z in wynik.zastrzezenia
                   if z.kod == prognoza_plynnosci.KOD_DZIEN_DOMNIEMANY]
     assert len(domniemane) == 1
-    assert domniemane[0].liczba == 12, \
-        f"pozycji bez dnia policzono {domniemane[0].liczba}, nie 12 (2 pozycje x 6 miesiecy)"
+    # JEDENASCIE, NIE DWANASCIE — i to jest D-20, nie regresja.
+    # `dzis` w tym tescie to 1 IX 2026, czyli dokladnie dzien, na ktory pada
+    # domniemanie wydatku we wrzesniu. Od Z7b plan opisuje wylacznie dni
+    # PRZYSZLE, wiec ta jedna pozycja odpada, a zostaje 11 z 12
+    # (2 pozycje x 6 miesiecy minus wrzesniowy wydatek na dzien dzisiejszy).
+    # Skutek zamierzony i nazwany w planie wykonawczym, krok 1.2:
+    # „co przestanie dzialac: zgodnosc liczb prognozy z kazdym zrzutem
+    # sprzed zmiany".
+    assert domniemane[0].liczba == 11, \
+        f"pozycji bez dnia policzono {domniemane[0].liczba}, nie 11 " \
+        f"(2 pozycje x 6 miesiecy minus wydatek domniemany na DZIS — D-20)"
 
     wrzesien_1 = [z.nazwa for d in wynik.dni if d.data == date(2026, 9, 1)
                   for z in d.zdarzenia]
     wrzesien_30 = [z.nazwa for d in wynik.dni if d.data == date(2026, 9, 30)
                    for z in d.zdarzenia]
-    assert "Zakupy" in wrzesien_1, "wydatek bez dnia nie trafil na 1."
+    pazdziernik_1 = [z.nazwa for d in wynik.dni if d.data == date(2026, 10, 1)
+                     for z in d.zdarzenia]
+    assert "Zakupy" not in wrzesien_1, \
+        "wydatek planu na DZIS wrocil na os — plan opisuje przyszlosc (D-20)"
+    assert "Zakupy" in pazdziernik_1, \
+        "wydatek bez dnia nie trafil na 1. w pierwszym PRZYSZLYM miesiacu"
     assert "Zwrot wydatków" in wrzesien_30, "przychod bez dnia nie trafil na ostatni"
 
 

@@ -182,8 +182,16 @@ export const NAPISY_PLYNNOSCI = {
 
   horyzont: (dni: number) => `Masz ${dni} dni.`,
 
-  coMnieCzeka: (pozycji: number, doDnia: string) =>
-    `Co mnie czeka — ${pozycji} pozycji do ${doDnia}`,
+  // `null` = NIE POLICZYLEM, `0` = policzylem i nic nie czeka (Z7b).
+  // Do Z7b kontrakt niosl tu goly `number`, wiec przy odmowie prognozy
+  // wychodzilo „Co mnie czeka — 0 pozycji", czyli DOBRA WIADOMOSC podana
+  // wtedy, gdy nie ma zadnej wiadomosci. Przyczyne odmowy niesie na tym
+  // samym ekranie `zdanieWerdyktu`, wiec ten napis jej NIE POWTARZA —
+  // powtorzony powod bylby drugim nosnikiem jednego zdania.
+  coMnieCzeka: (pozycji: number | null, doDnia: string) =>
+    pozycji === null
+      ? "Co mnie czeka — jeszcze nie policzyłem"
+      : `Co mnie czeka — ${pozycji} pozycji do ${doDnia}`,
 } as const;
 
 /* ---------- KARTA „CO MAM ZROBIC" (D-54, D-56) ---------- */

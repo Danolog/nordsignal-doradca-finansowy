@@ -408,14 +408,35 @@ def test_MINUS_jest_TEN_SAM_po_obu_stronach():
 #: ten plik ma nie przepuscic bez decyzji.
 ZMIERZONE = {
     "ksztaltow": 9,
-    "pol": 47,
+    "pol": 48,          # Z5: 47 -> Z7b: 48
     "pol_kwotowych": 7,
     "per_ksztalt": {
         "Kategoria": 3, "WpisDoZapisu": 5, "WierszSkutku": 4,
-        "PodgladSkutku": 2, "OstatniWpis": 6, "DaneKsiegowania": 8,
+        "PodgladSkutku": 2, "OstatniWpis": 6,
+        "DaneKsiegowania": 9,   # Z7b: +`ostatnieSprawdzenie` (luka kontraktu)
         "PozycjaKsiegi": 5, "PunktWykresu": 2, "DanePlynnosci": 12,
     },
 }
+
+# PROG KONSOLIDACJI ZADZIALAL W Z7b — I NIE ZOSTAL SPLACONY. Nazwane wprost.
+#
+# Naglowek tego pliku mowi: „przy pierwszym dopisaniu pola generujemy
+# `kontrakt.ts` z `kontrakt.py` i drugi nosnik znika". W Z7b dopisano pole
+# (`DaneKsiegowania.ostatnieSprawdzenie`), wiec warunek zostal spelniony.
+#
+# GENERATORA NIE ZBUDOWANO i to jest decyzja do podjecia, nie przeoczenie:
+#   * prog zapisano w Z5 z kierunkiem „`.ts` z `.py`", a Sophia i Oliver
+#     ustalili kierunek ODWROTNY (wzorcem jest `.ts`) — prog i decyzja
+#     o kierunku sa ze soba sprzeczne i nie da sie spelnic obu;
+#   * `kontrakt.py` niesie nie tylko ksztalt, ale i REGULY
+#     (`WpisDoZapisu.__post_init__`, `zbij_saldo_raz_na_dzien`), ktorych
+#     zaden generator ksztaltu nie odtworzy — wiec „generujemy" musialoby
+#     znaczyc „generujemy CZESC pliku", a to jest trzeci nosnik, nie zero.
+#
+# DO CZASU DECYZJI dlug jest pilnowany tym plikiem i opisany etykieta
+# „prog zadzialal, niesplacony" — zgodnie z `CLAUDE.md` §3.2 etykieta jest
+# dopuszczalna, udawanie splaty nie jest.
+PROG_ZADZIALAL_NIESPLACONY = "Z7b — dopisano DaneKsiegowania.ostatnieSprawdzenie"
 
 
 def test_RAPORT_ile_pol_porownano_po_kazdej_stronie():

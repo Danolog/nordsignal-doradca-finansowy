@@ -148,6 +148,12 @@ class DaneKsiegowania:
     liczbaWpisowWMiesiacu: int
     nazwaMiesiaca: str
     podglad: PodgladSkutku
+    #: Stopka straznika — TEN SAM fakt, co w `DanePlynnosci` (Z7b).
+    #: Do Z7b tylko Plynnosc niosla to pole, wiec ekran Ksiegowanie mowil
+    #: „nie wiem" o czyms, co aplikacja wiedziala. Dwa ekrany dawaly dwie
+    #: odpowiedzi na jedno pytanie „czy to, co widze, jest aktualne".
+    #: `None` = straznik nigdy nie dzialal — i tylko to.
+    ostatnieSprawdzenie: str | None
 
 
 # --- ekran Plynnosc -------------------------------------------------------
@@ -184,7 +190,11 @@ class DanePlynnosci:
     dataSaldaMinimalnego: Data | None
     zdanieWerdyktu: str
     horyzontDni: int
-    liczbaPozycjiCoMnieCzeka: int
+    #: `None` = NIE POLICZYLEM. Przy odmowie prognozy wychodzilo stad zero,
+    #: ktore czyta sie jako „policzylem i nic Cie nie czeka" — najlepsza
+    #: mozliwa odpowiedz podana wtedy, gdy nie wiadomo nic. To ta sama klasa
+    #: wady co forma opodatkowania zgadnieta wartoscia domyslna (Z7b).
+    liczbaPozycjiCoMnieCzeka: int | None
     koniecOknaCoMnieCzeka: Data
     ostatnieSprawdzenie: str | None
 

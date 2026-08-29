@@ -219,7 +219,18 @@ def zbuduj(*, prognoza: pp.Prognoza, kotwica: "pp.Kotwica | None",
         # „Masz N dni." Nigdy liczba ujemna: dzien pod kreska w przeszlosci
         # dalby „Masz -3 dni" — napis, ktorego nikt nie napisal celowo.
         horyzontDni=max((horyzont - dzis).days, 0),
-        liczbaPozycjiCoMnieCzeka=len(czeka.pozycje),
+        # `None` = NIE POLICZYLEM; `0` = policzylem i nic nie czeka (Z7b).
+        # Do Z7b przy odmowie prognozy wychodzilo stad ZERO, bo `pozycje`
+        # ma wartosc domyslna `()`. Zero czyta sie na ekranie jako DOBRA
+        # WIADOMOSC podana wtedy, gdy nie ma zadnej wiadomosci — ta sama
+        # klasa wady co forma opodatkowania zgadnieta wartoscia domyslna.
+        #
+        # ROZROZNIENIE WOLANE, NIE POWTORZONE: `CoMnieCzeka.pilnych is None`
+        # jest juz nosnikiem odpowiedzi „czy w ogole liczylem" (Z73p2,
+        # rozstrzygniecie Olivera). Wlasny warunek na `stan` bylby drugim
+        # nosnikiem tej samej reguly i rozjechalby sie przy pierwszej zmianie.
+        liczbaPozycjiCoMnieCzeka=(None if czeka.pilnych is None
+                                  else len(czeka.pozycje)),
         koniecOknaCoMnieCzeka=(dzis + timedelta(days=okno_dni)).isoformat(),
         # `None` znaczy „straznik NIGDY nie dzialal" i nie wolno go zamienic
         # na zdanie o sprawdzeniu (regula D11). Zdanie sklada jedyny nosnik:

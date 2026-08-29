@@ -30,7 +30,11 @@ export interface WierszSkutku {
   etykieta: string;
   przed: string;
   po: string | null;
-  wyjasnienie?: string;
+  // `string | null`, NIE `?`. Pole przychodzi z Pythona ZAWSZE — klucz
+  // jest w JSON, a wartoscia bywa `null`. `?` obiecywal, ze klucza moze
+  // nie byc, czyli typ mowil o kontrakcie cos, czego kontrakt nie robi.
+  // Nastepny wykonawca zbudowalby na gwarancji, ktorej nie ma (Z7b).
+  wyjasnienie: string | null;
 }
 
 export interface PodgladSkutku {
@@ -56,6 +60,12 @@ export interface DaneKsiegowania {
   liczbaWpisowWMiesiacu: number;
   nazwaMiesiaca: string;
   podglad: PodgladSkutku;
+  // STOPKA STRAZNIKA — ten sam fakt, co w `DanePlynnosci` (Z7b).
+  // Do Z7b tylko Plynnosc miala to pole, wiec Ksiegowanie mowilo „nie wiem"
+  // o czyms, co aplikacja WIEDZIALA — dwa ekrany, dwie odpowiedzi na jedno
+  // pytanie „czy to, co widze, jest aktualne". `null` = straznik nigdy nie
+  // dzialal i tylko to.
+  ostatnieSprawdzenie: string | null;
 }
 
 // Typy sa wolane z jednego miejsca takze przez trzy pozycje przelacznika —
@@ -95,7 +105,8 @@ export const DOPELNIACZ_TYPU: Readonly<Record<TypWpisu, string>> = {
 export interface PozycjaKsiegi {
   dzien: Data;
   pozycja: string;
-  dopisek?: string;          // "z odczytu 9 920,79 zl z 1 wrzesnia"
+  dopisek: string | null;    // "z odczytu 9 920,79 zl z 1 wrzesnia";
+                             // `null`, nie brak klucza — patrz WierszSkutku
   kwota: Kwota | null;       // null = wiersz otwarcia, na ekranie „—"
   saldoPoDniu: Kwota | null; // bite RAZ NA DZIEN; null dla kolejnej pozycji tego dnia
 }
@@ -119,7 +130,13 @@ export interface DanePlynnosci {
   dataSaldaMinimalnego: Data | null;
   zdanieWerdyktu: string;             // nazywa PRZYCZYNE, nie tylko fakt
   horyzontDni: number;                // „Masz 23 dni."
-  liczbaPozycjiCoMnieCzeka: number;
+  // `null` = NIE POLICZYLEM, a nie „policzylem i nie ma" (Z7b).
+  // Przy odmowie prognozy (brak kotwicy, brak wolumenu) wychodzilo stad
+  // `0`, ktore na ekranie czyta sie jako „zero pozycji Cie czeka" — czyli
+  // najlepsza mozliwa odpowiedz podana wtedy, gdy nie wiadomo nic.
+  // TO JEST TA SAMA KLASA WADY co forma opodatkowania zgadnieta wartoscia
+  // domyslna: zero i brak wiedzy wygladaja identycznie, a znacza co innego.
+  liczbaPozycjiCoMnieCzeka: number | null;
   koniecOknaCoMnieCzeka: Data;
   ostatnieSprawdzenie: string | null; // null = straznik nigdy nie dzialal
 }

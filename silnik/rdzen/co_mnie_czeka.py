@@ -50,24 +50,18 @@ PROG_PILNOSCI_DNI = 3
 #: przesunąć płatność albo zafakturować.
 PROG_UJEMNEJ_LINII_DNI = 14
 
-#: Rodzaje zdarzeń, które są WYPŁYWEM.
+#: Rodzaje zdarzeń, które są WYPŁYWEM — **WOŁANE, nie powtórzone** (Z7b).
 #:
-#: ŚWIADOMY DRUGI NOŚNIK, nazwany wprost (sprostowanie Z73p2 — poprzedni
-#: komentarz twierdził „wołane, nie powtórzone", co było nieprawdą: wołane są
-#: trzy pojedyncze stałe, ale sam PODZIAŁ rodzajów na wpływy i wypływy jest
-#: tutaj powtórzony, bo `prognoza_plynnosci` nie ma stałej zbiorczej).
+#: DŁUG SPŁACONY, NIE PRZESUNIĘTY. Do Z7b stał tu świadomy drugi nośnik
+#: z jawnym progiem konsolidacji: „PIERWSZY NOWY RODZAJ ZDARZENIA
+#: w `prognoza_plynnosci`". `RODZAJ_WPIS` (D-20) jest tym pierwszym nowym
+#: rodzajem, więc próg zadziałał i podział przeniósł się do nośnika prognozy.
+#: Tutaj zostaje jedno wołanie.
 #:
-#: v1.17 dopuszcza drugi nośnik wyłącznie z progiem I strażnikiem — oba są:
-#:   * strażnik: `test_RODZAJE_WYPLYWU_pokrywaja_KOMPLET_rodzajow_prognozy`
-#:     pada, gdy w `prognoza_plynnosci` pojawi się rodzaj nieprzypisany
-#:     do żadnej z dwóch stron;
-#:   * próg konsolidacji (z planu wykonawczego, „Świadomy dług z progiem"):
-#:     PIERWSZY NOWY RODZAJ ZDARZENIA w `prognoza_plynnosci`. Wtedy podział
-#:     przenosi się do nośnika prognozy, a tutaj zostaje wołanie.
-#:
-#: Bez strażnika dopisanie tam rodzaju bez dopisania go tutaj zostawiłoby
-#: pozycję poza osią PO CICHU — przy zielonej suicie.
-RODZAJE_WYPLYWU = (pp.RODZAJ_DANINA, pp.RODZAJ_ZALEGLOSC, pp.RODZAJ_PLAN)
+#: Wykrył to strażnik `test_RODZAJE_WYPLYWU_pokrywaja_KOMPLET_rodzajow_prognozy`,
+#: nie czujność autora — i to jest dokładnie ta praca, do której go napisano:
+#: bez niego nowy rodzaj wypadłby z osi PO CICHU, przy zielonej suicie.
+RODZAJE_WYPLYWU = pp.RODZAJE_WYPLYWU
 
 
 @dataclass(frozen=True)

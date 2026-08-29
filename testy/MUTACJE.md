@@ -546,3 +546,54 @@ napisał komentarz, który go unieważnił. Wykryła to mutacja, nie czytanie ko
 - **Nie mutowano `silnik/` poza `_alfabetycznie`** — silnik jest w tym zadaniu cudzą własnością
   (Z4/Z5/Z6); czytam go, nie piszę do niego. Jedyna mutacja tam była **odwracalna i wykonana
   w kopii**, żeby pokazać, że przerysowany strażnik pasma naprawdę mierzy regułę, a nie stałą.
+
+---
+
+## Przebieg 2026-08-29 — Z7b, prognoza czyta wpisy (D-20, D-61)
+
+Kopia drzewa poza repozytorium (`scratchpad/mut-z7b`), `__pycache__` czyszczony przed **każdym**
+przebiegiem. Kontrola bazowa kopii: **880 passed, 3 deselected** — identycznie jak w repozytorium.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-Z7b-1** | **D-20 zdjęte** — `podziel_os` przestaje filtrować plan po dacie (`p.dzien > dzis` → `True`) | `test_plan_na_dzien_MINIONY_NIE_obciaza_osi` · `test_pozycja_BEZ_dnia_platnosci_ma_dzien_DOMNIEMANY_i_liczbe` | **czerwony** |
+| **M-Z7b-2** | **D-61 zdjęte** — budżet konsumpcji zawsze zerowy, wpis nie zjada pozycji planu | `test_PODWOJNE_LICZENIE_nie_wystepuje_604_06_nie_pada` · `test_PRZYPADEK_1_wpis_MIESCI_SIE_w_planie…` · `test_PRZYPADEK_2_wpis_PRZEKRACZA_plan…` | **czerwony** |
+| **M-Z7b-3** | **Wpisy w ogóle nie wchodzą na oś** (stan sprzed Z7b) | sześć testów `test_prognoza_czyta_wpisy.py`, w tym obie bramki krok 1.2 | **czerwony** |
+| **M-Z7b-4** | Daniny i przychód JDG wchodzą na oś **drugi raz** (zdjęte odsianie kategorii) | `test_wpisy_danin_i_przychodu_JDG_NIE_wchodza_na_os_dwa_razy[Podatki i ZUS]` · `[Wynagrodzenie]` | **czerwony** |
+| **M-Z7b-5** | Klucz konsumpcji bez typu — przychód konsumuje plan wydatku | `test_wpis_PRZYCHODOWY_nie_konsumuje_planu_WYDATKU` | **czerwony** |
+| **M-Z7b-6** | `liczbaPozycjiCoMnieCzeka` wraca na `len(pozycje)` — zero zamiast „nie wiem" | `test_przy_ODMOWIE_prognozy_liczba_pozycji_to_NIE_WIEM_a_nie_zero` | **czerwony** |
+| **M-Z7b-7** | `DaneKsiegowania.ostatnieSprawdzenie` zawsze `None` — ekran znowu nie wie | `test_OBA_ekrany_mowia_o_strazniku_DOKLADNIE_to_samo` | **czerwony** |
+
+Kontrola po cofnięciu wszystkich siedmiu: **880 passed, 3 deselected**.
+
+### M-Z7b-2 — mutacja, która trafia w liczbę wymienioną w PRD po nazwisku
+
+```
+E  AssertionError: PODWOJNE LICZENIE: wpis nie skonsumowal pozycji planu
+E  assert Decimal('604.06') != Decimal('604.06')
+```
+
+**604,06 zł** to dokładnie ta liczba, którą PRD przewidziało jako skutek braku D-61:
+274,06 zł (6 X) plus 330,00 zł (20 X) za prąd w jednym miesiącu. Strażnik nie pyta „czy suma jest
+sensowna" — pyta o **tę** wartość. Test ogólny („suma nie rośnie") przeszedłby także wtedy, gdyby
+konsumpcja działała w złą stronę.
+
+### M-Z7b-1 — dlaczego czerwieni się też cudzy test
+
+Drugim czerwonym jest `test_pozycja_BEZ_dnia_platnosci_ma_dzien_DOMNIEMANY_i_liczbe` z pliku
+sprzed Z7b — bo licznik pozycji domniemanych spadł tam z 12 na 11 dokładnie z powodu D-20.
+To jest **pożądane sprzężenie**: reguła podziału osi ma widoczny skutek poza własnym plikiem
+testowym, więc jej usunięcie nie da się przemilczeć zmianą jednego testu.
+
+### M-Z7b-3 — pomiar tego, ile plasterek był wart przed tą zmianą
+
+Mutacja przywraca stan sprzed Z7b (wpisy nie docierają na oś) i czerwieni **sześć** testów, w tym
+obie bramki z kroku 1.2 planu wykonawczego. Przed Z7b te sześć testów nie istniało, a suita była
+zielona — dokładnie dlatego, że nikt nie pytał o rzecz, dla której cała ścieżka „wpisz wydatek
+i zobacz skutek" została zbudowana.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano strony TypeScriptu** (`kontrakt.ts`, `napisy.ts`). Zmiany tam są sprawdzane przez
+  `tsc --noEmit` i przez `test_kontrakt_dwa_nosniki`, ale **nie przez mutację** — etykieta jawna.
+- **Nie mutowano `zbij_saldo_raz_na_dzien`** — ma własne mutacje z przebiegu Z5.

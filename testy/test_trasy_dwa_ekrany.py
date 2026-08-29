@@ -19,11 +19,14 @@ liczby odwiedzonych lisci, a ta liczba jest ASERCJA, nie wydrukiem.
 from datetime import date
 from decimal import Decimal
 
+import dataclasses
+
 import pytest
 from fastapi.testclient import TestClient
 
 from api import kwoty
 from api.index import aplikacja
+from silnik import kontrakt
 from silnik.rdzen import magazyn
 
 #: Dzien odniesienia wszystkich przebiegow. USTALONY, nie z zegara: bramka
@@ -41,13 +44,26 @@ PROG_LISCI = 15
 #: Zmiana ktorejkolwiek z tych liczb jest SYGNALEM DO SPRAWDZENIA, nie
 #: pozycja do podbicia: albo ksztalt odpowiedzi sie zmienil (wtedy podnosi
 #: sie ja razem z powodem), albo obchod przestal gdzies docierac.
+#: PODNIESIONE W Z7b: `/api/plynnosc` i `/api/kotwica` 147 -> 152.
+#: Powod SPRAWDZONY, nie zalozony — tak, jak zada komentarz wyzej:
+#:   * roznica to dokladnie 5 lisci, a `kontrakt.PozycjaKsiegi` ma 5 pol,
+#:     wiec przybyla JEDNA POZYCJA KSIEGI, nie nowe pole;
+#:   * ksztalt odpowiedzi jest ustalony przez `kontrakt.DanePlynnosci`
+#:     (12 pol) i nie moze sie zmienic bez czerwieni
+#:     `test_kontrakt_dwa_nosniki`, ktory jest zielony;
+#:   * ta jedna pozycja to WPIS uzytkownika, ktory od D-20 wchodzi na os —
+#:     czyli dokladnie ta zmiana, po ktora bylo zadanie Z7b.
 LISCIE = {
-    "GET /api/ksiegowanie": 73,
-    "POST /api/wpisy": 83,
-    "DELETE /api/wpisy/{id}": 77,
+    # Z7b: +1 lisc na kazdej odpowiedzi niosacej `DaneKsiegowania` —
+    # nowe pole `ostatnieSprawdzenie` (domkniecie luki kontraktu). Zestaw
+    # pol sprawdza osobno `test_ksiegowanie_oddaje_ksztalt_DaneKsiegowania`,
+    # ktory czyta go z kontraktu, wiec ta liczba nie jest jedynym dowodem.
+    "GET /api/ksiegowanie": 74,
+    "POST /api/wpisy": 84,
+    "DELETE /api/wpisy/{id}": 78,
     "POST /api/wpisy/podglad": 17,
-    "GET /api/plynnosc": 147,
-    "PUT /api/kotwica": 147,
+    "GET /api/plynnosc": 152,
+    "PUT /api/kotwica": 152,
 }
 
 
@@ -92,9 +108,14 @@ def _wpis(**nadpisania) -> dict:
 
 def test_ksiegowanie_oddaje_ksztalt_DaneKsiegowania(klient):
     dane = klient.get(f"/api/ksiegowanie?dzis={DZIS}").json()
-    assert set(dane) == {
-        "dzisiaj", "typDomyslny", "kategorie", "uzasadnienieKolejnosci",
-        "ostatnieWpisy", "liczbaWpisowWMiesiacu", "nazwaMiesiaca", "podglad"}
+    # ZESTAW POL WOLANY Z KONTRAKTU, nie przepisany tutaj (Z7b).
+    # Przepisana lista byla TRZECIM nosnikiem ksztaltu — obok `kontrakt.ts`
+    # i `kontrakt.py` — i rozjechala sie przy pierwszym dopisaniu pola
+    # (`ostatnieSprawdzenie`). Zawolana rozjechac sie nie moze.
+    oczekiwane = {p.name for p in dataclasses.fields(kontrakt.DaneKsiegowania)}
+    assert len(oczekiwane) >= 8, \
+        f"kontrola licznosci: kontrakt niesie {len(oczekiwane)} pol"
+    assert set(dane) == oczekiwane
     assert dane["dzisiaj"] == DZIS
     assert dane["typDomyslny"] == "Wydatki"
     assert dane["nazwaMiesiaca"] == "październiku"
