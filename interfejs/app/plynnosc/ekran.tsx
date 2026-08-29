@@ -1,5 +1,23 @@
+"use client";
+
 // EKRAN PLYNNOSC — pierwszy, ktory Darek otwiera. Odpowiada na pytanie
 // „czy dam rade do konca okresu".
+//
+// DLACZEGO ROZDZIAL NA DWA PLIKI (W8), tak samo jak w Ksiegowaniu. Dane
+// wejsciowe sa z natury serwerowe: przychodza z `GET /api/plynnosc` i maja
+// stac w PIERWSZYM rysowaniu, a nie doczytywac sie po nim — inaczej pierwsze
+// spojrzenie pada na pustke, ktorej §3.7 zabrania wprost. Uklad od W8 jest
+// z natury kliencki: `PUT /api/kotwica` oddaje CALY nowy ekran, wiec po
+// zapisie stanu konta zmieniaja sie naraz werdykt, dzien pod kreska, saldo
+// minimalne i cala seria — a to znaczy, ze `DANE` musza byc STANEM.
+// Wejscie serwerowe zostalo w `page.tsx`; ten plik to `page.tsx` sprzed W8,
+// przeniesiony `git mv`, wiec historia pokazuje zmiane nazwy, nie nowy plik.
+//
+// DRUGIEGO ODPYTANIA PO ZAPISIE NIE MA I TO JEST DECYZJA. `router.refresh()`
+// wygladalby prosciej, ale kazalby silnikowi policzyc prognoze DRUGI RAZ dla
+// jednej chwili — a odpowiedz `PUT` juz ja niesie. Nosnik tej decyzji stoi po
+// drugiej stronie granicy: `api/trasy_plynnosc.py`, akapit „DLACZEGO ZAPIS
+// KOTWICY ODDAJE CALY EKRAN".
 //
 // KRYTERIUM ODBIORU JEST JEDNO: jesli w pierwszej sekundzie nie widac,
 // czy jest dobrze czy zle, ekran zawiodl — niezaleznie od poprawnosci
@@ -30,9 +48,10 @@
 // wylacznie sposob, w jaki `DANE` powstaja: z argumentu, a nie z importu.
 // To byla teza podejscia „frontend najpierw" i tutaj jest sprawdzana.
 
+import { useState } from "react";
 import { Powloka } from "../powloka";
-import { Awaria } from "../awaria";
-import { NAPISY_PLYNNOSCI } from "@/lib/napisy";
+import { Kotwica } from "./kotwica";
+import { NAPISY_KOTWICY, NAPISY_PLYNNOSCI } from "@/lib/napisy";
 import {
   sformatujDzien,
   sformatujDzienSlownie,
@@ -41,8 +60,6 @@ import {
   znakKwoty,
 } from "@/lib/kwota";
 import type { DanePlynnosci } from "@/lib/kontrakt";
-import { pobierzPlynnosc } from "@/lib/dane/plynnosc";
-import { BladWarstwySieciowej } from "@/lib/dane/warstwa-sieciowa";
 import { ulozKarte } from "@/lib/karta-dzialania";
 import { NAPISY_KARTY } from "@/lib/napisy";
 import {
@@ -126,35 +143,40 @@ function KartaDzialania({ DANE }: { DANE: DanePlynnosci }) {
   );
 }
 
-// PODPIECIE, KROK 7.1. Dane przychodza z trasy, a nie z importu stalej.
+// UKLAD. `poczatkowe` przychodzi z komponentu serwerowego obok; od pierwszego
+// zapisu stanu konta zrodlem jest odpowiedz `PUT /api/kotwica`.
 //
 // `dzis` przekazywany z adresu jest UMYSLNY i ma nosnik po drugiej stronie:
 // `api/wspolne.py::dzien` mowi wprost, ze parametr istnieje DLA POMIARU
-// ODBIORCZEGO — bramka Z7 wymaga ustalonego dnia, zeby jej wynik nie zalezal
-// od godziny przebiegu. Bez parametru silnik bierze dzien dzisiejszy.
-export default async function Plynnosc({
-  searchParams,
+// ODBIORCZEGO — bramka wymaga ustalonego dnia, zeby jej wynik nie zalezal od
+// godziny przebiegu. Bez parametru silnik bierze dzien dzisiejszy.
+export function Ekran({
+  poczatkowe,
+  dzis,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  poczatkowe: DanePlynnosci;
+  dzis: string | null;
 }) {
-  const parametry = (await searchParams) ?? {};
-  const dzis = typeof parametry.dzis === "string" ? parametry.dzis : null;
-
-  let DANE: DanePlynnosci;
-  try {
-    DANE = await pobierzPlynnosc(dzis);
-  } catch (blad) {
-    // Awaria do stanu uzytecznego, nie do zera (CLAUDE.md §3.7). Ekran mowi,
-    // czego brakuje i co zrobic; nie pokazuje pustej rubryki ani zera.
-    if (blad instanceof BladWarstwySieciowej) {
-      return <Awaria aktywny="plynnosc" czegoBrakuje={blad.czegoBrakuje} coZrobic={blad.coZrobic} />;
-    }
-    throw blad;
-  }
-  return <Ekran DANE={DANE} />;
+  const [DANE, setDane] = useState<DanePlynnosci>(poczatkowe);
+  return <Uklad DANE={DANE} dzis={dzis} poZapisie={setDane} />;
 }
 
-function Ekran({ DANE }: { DANE: DanePlynnosci }) {
+function Uklad({
+  DANE,
+  dzis,
+  poZapisie,
+}: {
+  DANE: DanePlynnosci;
+  dzis: string | null;
+  poZapisie: (dane: DanePlynnosci) => void;
+}) {
+  // OTWARCIE KONTROLKI STANU KONTA STOI TUTAJ, NIE W NIEJ SAMEJ — bo ma DWA
+  // wejscia stojace w dwoch miejscach ukladu: wezwanie „Podaj stan konta"
+  // (stan startowy, ramka `NieWiem.dc.html`) i DOPISEK przy wierszu otwarcia
+  // (stan z odczytem, ramka `Main.dc.html`). Stan trzymany wewnatrz kontrolki
+  // bylby niewidoczny dla drugiego z nich.
+  const [kotwicaOtwarta, setKotwicaOtwarta] = useState(false);
+
   const ksiega = DANE.ksiega;
   const tenSamDzien = (a: number, b: number) =>
     a >= 0 && b < ksiega.length && ksiega[a]?.dzien === ksiega[b]?.dzien;
@@ -236,7 +258,29 @@ function Ekran({ DANE }: { DANE: DanePlynnosci }) {
                   {w.pozycja}
                   {/* Odstep stoi PRZED znacznikiem, nie w srodku: wewnatrz mial by
                       13 px zamiast 15 px i dopisek przesuwal by sie o piksel w lewo. */}
-                  {w.dopisek && <>{" "}<span className={s.dopisek}>{w.dopisek}</span></>}
+                  {/* DOPISEK KOTWICY JEST KONTROLKA (W8) — jedyne wejscie do
+                      zmiany stanu konta, gdy odczyt juz jest. Stoi PRZY
+                      LICZBIE, ktora zmienia (§3.5), i nie kosztuje ani
+                      jednego piksela: wyglada dokladnie jak napis, ktorym
+                      byl. Osobny przycisk zepchnalby ekran o 80 px w dol —
+                      zmierzone, odwzorowanie 14,38% przy progu 2%. */}
+                  {w.dopisek &&
+                    (w.kwota === null ? (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className={s.dopiseKotwicy}
+                          onClick={() => setKotwicaOtwarta(true)}
+                          title={NAPISY_KOTWICY.zmienOdczyt}
+                          aria-label={`${w.dopisek} — ${NAPISY_KOTWICY.zmienOdczyt}`}
+                        >
+                          {w.dopisek}
+                        </button>
+                      </>
+                    ) : (
+                      <>{" "}<span className={s.dopisek}>{w.dopisek}</span></>
+                    ))}
                 </span>
                 {w.kwota === null ? (
                   <span className={s.komorkaBezKwoty}>{NAPISY_PLYNNOSCI.brakKwoty}</span>
@@ -292,6 +336,14 @@ function Ekran({ DANE }: { DANE: DanePlynnosci }) {
           <p className={s.zdanieWerdyktu}>{DANE.zdanieWerdyktu}</p>
           <p className={s.horyzont}>{NAPISY_PLYNNOSCI.horyzont(DANE.horyzontDni)}</p>
         </div>
+
+        <Kotwica
+          DANE={DANE}
+          dzis={dzis}
+          otwarta={kotwicaOtwarta}
+          ustawOtwarta={setKotwicaOtwarta}
+          poZapisie={poZapisie}
+        />
 
         <KartaDzialania DANE={DANE} />
 

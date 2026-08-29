@@ -15,8 +15,13 @@ KATALOG = pathlib.Path(__file__).resolve().parent.parent
 
 # W7: ekran przeniesiony z `app/page.tsx` pod swoj wlasny klucz, zeby
 # odsylacz paska `/plynnosc` prowadzil do niego, a nie do strony 404.
-# Straznik idzie za ekranem do jego nowego nosnika.
-EKRAN = KATALOG / "interfejs" / "app" / "plynnosc" / "page.tsx"
+# W8: uklad wyszedl z `page.tsx` do `ekran.tsx` (komponent kliencki), bo
+# zapis stanu konta przynosi CALY nowy ekran i `DANE` musialy stac sie
+# stanem; w `page.tsx` zostalo samo wejscie serwerowe. Straznik idzie za
+# ekranem do jego nowego nosnika — tak samo jak poszedl w W7.
+EKRAN = KATALOG / "interfejs" / "app" / "plynnosc" / "ekran.tsx"
+WEJSCIE = KATALOG / "interfejs" / "app" / "plynnosc" / "page.tsx"
+KOTWICA = KATALOG / "interfejs" / "app" / "plynnosc" / "kotwica.tsx"
 NAPISY = KATALOG / "interfejs" / "lib" / "napisy.ts"
 DANE = KATALOG / "interfejs" / "lib" / "dane" / "plynnosc.ts"
 WYKRES = KATALOG / "interfejs" / "lib" / "wykres.ts"
@@ -45,7 +50,7 @@ FRAZY_Z_RAMKI = (
 
 def _zrodla() -> list[pathlib.Path]:
     """Zrodla, w ktorych czegos NIE WOLNO znalezc — sam interfejs."""
-    return [EKRAN, NAPISY, DANE, WYKRES, STYL, KARTA]
+    return [EKRAN, WEJSCIE, KOTWICA, NAPISY, DANE, WYKRES, STYL, KARTA]
 
 
 def _zrodla_frazy() -> list[pathlib.Path]:
@@ -350,3 +355,171 @@ def test_element_zdjety_decyzja_D55_NIE_WRACA():
     tekst = _tekst_ekranu()
     assert "rozdysponować" not in tekst
     assert "10 131,46" not in tekst and "10131.46" not in tekst
+
+
+# --- W8: kontrolka stanu konta — wejscie do dzialania w stanie startowym ---
+
+def test_kontrolka_stanu_konta_MA_WOLAJACEGO():
+    """Do W8 `zapiszKotwice` bylo napisane i mialo ZERO wolajacych: trasa
+    stala, funkcja stala, a czlowiek nie mial gdzie wpisac stanu konta —
+    wiec `GET /api/plynnosc` oddawal `saldoMinimalne: null` i zdanie
+    „Nie policze prognozy".
+
+    To jest DOKLADNIE ta klasa wady, ktorej zielona suita nie widzi: kod
+    poprawny, testy przechodza, funkcji nikt nie wola. Straznik mierzy
+    POLACZENIE, nie istnienie."""
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+    assert "zapiszKotwice" in kotwica, (
+        "kontrolka nie wola zapisu stanu konta — warstwa nizej znow nie ma wolajacego")
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert "<Kotwica" in ekran, "ekran nie rysuje kontrolki stanu konta"
+
+
+def test_kontrolka_ODDAJE_odpowiedz_zapisu_zamiast_pytac_drugi_raz():
+    """`PUT /api/kotwica` oddaje CALY ekran, bo nowy odczyt przesuwa punkt
+    startu prognozy — zmienia naraz werdykt, dzien pod kreska, saldo minimalne
+    i cala serie. Odswiezenie strony po zapisie kazaloby silnikowi policzyc
+    prognoze DRUGI RAZ dla jednej chwili, a dwa przebiegi dla jednej chwili
+    to dwa nosniki jednej liczby."""
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+    assert "poZapisie(dane)" in kotwica, "kontrolka nie oddaje odswiezonego ekranu"
+    for zakazane in ("router.refresh", "location.reload", "pobierzPlynnosc"):
+        assert zakazane not in kotwica, (
+            f"{zakazane} w kontrolce — to drugi przebieg prognozy dla jednej chwili")
+
+
+def test_kwota_stanu_konta_NIE_STAJE_SIE_liczba():
+    """§3.1. Zmierzona awaria u poprzednika: warstwa sieciowa zamieniala
+    `Decimal` na `float`, gubila grosze i ZWRACALA 200. Wariant znaleziony
+    w tej sesji klamie nawet napisem: „8623.10" wychodzilo jako „8623.1".
+    Stan konta jest jedyna kwota, ktora czlowiek wpisuje na tym ekranie —
+    ma zostac napisem od pola do bazy."""
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+    for zakazane in ("parseFloat", "parseInt", "Number(", "toFixed", "valueAsNumber"):
+        assert zakazane not in kotwica, f"{zakazane} na sciezce kwoty stanu konta"
+
+
+def test_kwota_stanu_konta_WOLNO_miec_ujemna():
+    """Konto na debecie to realny stan konta, nie blad wpisu — i jest to
+    JEDYNE takie miejsce w aplikacji. Nosnik reguly stoi po drugiej stronie
+    granicy (`silnik/rdzen/magazyn.py::zapisz_stan_konta`); tutaj sprawdzamy,
+    ze interfejs jej nie lamie po swojemu, odrzucajac minus albo — gorzej —
+    zdejmujac go po cichu, co zamienia debet 1 240 zl w majatek 1 240 zl."""
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+    assert 'odczyt.stan === "ujemna" ? `-${odczyt.kwota}` : odczyt.kwota' in kotwica, (
+        "kontrolka nie oddaje minusa do silnika — debet zapisze sie jako majatek")
+    # Podpis pod polem MUSI mowic o znaku, i to odwrotnie niz w Ksiegowaniu.
+    napisy = bez_komentarzy(NAPISY.read_text(encoding="utf-8"))
+    assert "Ze znakiem" in napisy, "pole nie mowi, ze minus jest tu dozwolony"
+
+
+def test_zapis_stanu_konta_KOSZTUJE_NAJWYZEJ_TRZY_DOTKNIECIA():
+    """Ryzyko R2 z PRD, zmierzone: poprzedni arkusz Darka stanal 4 XII 2025
+    i milczy 266 dni. Recznie wpisywanie zamiera, gdy kosztuje wiecej niz trzy
+    dotkniecia — to wymog produktowy, nie estetyka.
+
+    Trzy warunki, kazdy zdejmuje jedno dotkniecie:
+      * kursor staje w polu kwoty sam (`autoFocus`),
+      * data jest juz wypelniona dniem, dla ktorego policzono ekran,
+      * Enter w polu zapisuje, wiec klik w przycisk jest opcja, nie wymogiem.
+    """
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+    assert "autoFocus" in kotwica, "kursor nie staje w polu kwoty — to jedno dotkniecie wiecej"
+    assert "useState(DANE.odczyt)" in kotwica, (
+        "data nie jest wypelniona z gory — to jedno dotkniecie wiecej")
+    assert 'e.key === "Enter"' in kotwica, "Enter nie zapisuje — klik przestaje byc opcja"
+
+
+def _bez_komentarzy_ekranu() -> str:
+    return bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+
+
+def test_kontrolka_MA_KOMPLET_brzmien_i_zadnego_u_siebie():
+    """Zero brzmien w komponencie: komunikat wpisany w widok rozjezdza sie
+    z komunikatem silnika po cichu. Kontrola LICZNOSCI: sprawdzenie, ktore
+    przeszlo po pustej liscie, meldowaloby sukces przy kontrolce bez ani
+    jednego napisu."""
+    napisy = bez_komentarzy(NAPISY.read_text(encoding="utf-8"))
+    kotwica = bez_komentarzy(KOTWICA.read_text(encoding="utf-8"))
+
+    klucze = ("podaj", "zmienOdczyt", "obietnica", "etykietaKwoty", "etykietaDaty",
+              "zapisz", "rezygnuje", "zeZnakiem", "kwotaPusta", "kwotaNieczytelna",
+              "dataNieczytelna")
+    brakujace = [k for k in klucze if f"{k}:" not in napisy]
+    assert brakujace == [], f"brzmienia bez nosnika: {brakujace}"
+
+    # `zmienOdczyt` wola UKLAD (dopisek przy wierszu otwarcia), reszte — kontrolka.
+    # Oba pliki razem, bo pytanie brzmi „czy ktos to pokazuje", a nie „gdzie".
+    ekran = _bez_komentarzy_ekranu()
+    razem = kotwica + "\n" + ekran
+    wolane = [k for k in klucze if f"NAPISY_KOTWICY.{k}" in razem]
+    assert len(wolane) == len(klucze), (
+        f"pokazywanych jest {len(wolane)} z {len(klucze)} brzmien; "
+        f"niewolane: {sorted(set(klucze) - set(wolane))}")
+
+
+def test_wezwanie_MA_BRZMIENIE_Z_RAMKI():
+    """§3.6: makieta jest wiazaca specyfikacja. Wezwanie stanu startowego
+    i zdanie obok niego sa przeniesione DOSLOWNIE z `NieWiem.dc.html`.
+
+    Kontrola liczności: ramka musi zostac faktycznie odczytana — porownanie
+    z ramka, ktorej nie ma, przechodzi na pustym zbiorze."""
+    napisy = NAPISY.read_text(encoding="utf-8")
+    ramka = RAMKI / "NieWiem.dc.html"
+    assert ramka.exists(), "nie ma ramki NieWiem.dc.html"
+    tresc = ramka.read_text(encoding="utf-8")
+
+    frazy = ("Podaj stan konta",
+             "To jedna liczba i jedna data — reszta policzy się sama.")
+    sprawdzonych = 0
+    for fraza in frazy:
+        assert fraza in tresc, f"ramka NieWiem.dc.html nie niesie frazy {fraza!r}"
+        assert fraza in napisy, f"nosnik brzmien nie niesie frazy z ramki: {fraza!r}"
+        sprawdzonych += 1
+    assert sprawdzonych == len(frazy), "pomiar nie objal wszystkich fraz"
+
+
+def test_wezwanie_ODSWIEZ_Z_RAMKI_NIE_MA_dzis_na_ekranie():
+    """DLUG ZAPISANY JAWNIE, ze strażnikiem i progiem — nie przemilczany.
+
+    `TrzyStany.dc.html` rysuje trzeci stan werdyktu („wiem, ale nieaktualne")
+    z wezwaniem „Odśwież stan konta". Interfejs tego stanu DZIS NIE ROZPOZNAJE:
+    silnik dokleja zdanie „Odśwież stan konta." do `zdanieWerdyktu` (kod
+    `kotwica_nieaktualna`), ale `DanePlynnosci` nie ma osobnego pola o wieku
+    odczytu. Rozpoznawanie stanu po TRESCI zdania byloby drugim nosnikiem
+    reguly swiezosci — wiec zamiast tego wezwanie nie jest osobno rysowane,
+    a zmiane odczytu otwiera dopisek przy wierszu otwarcia.
+
+    Ten straznik pilnuje, zeby zdanie wyzej pozostalo PRAWDZIWE: gdy kontrakt
+    dostanie pole stanu kotwicy, test sie zaczerwieni i kaze wezwanie
+    z ramki narysowac. PROG: pole o wieku odczytu w `DanePlynnosci`."""
+    ramka = (RAMKI / "TrzyStany.dc.html").read_text(encoding="utf-8")
+    assert "Odśwież stan konta" in ramka, (
+        "ramka TrzyStany przestala niesc trzeci stan — dlug trzeba przeliczyc")
+
+    kontrakt = bez_komentarzy(
+        (KATALOG / "interfejs" / "lib" / "kontrakt.ts").read_text(encoding="utf-8"))
+    for pole in ("kotwicaNieaktualna", "wiekOdczytu", "stanKotwicy"):
+        assert pole not in kontrakt, (
+            f"kontrakt niesie juz `{pole}` — prog dlugu osiagniety, "
+            "wezwanie „Odśwież stan konta" + '"' + " z ramki trzeba narysowac")
+
+
+def test_ZADNA_ramka_NIE_RYSUJE_pola_wpisywania():
+    """ODSTEPSTWO OD §3.6, ZAPISANE JAWNIE — nie milczaca decyzja wykonawcy.
+
+    Ramki rysuja WEZWANIE do podania stanu konta („Podaj stan konta"), ale
+    zadna nie rysuje samego pola. Uklad rozwinietej kontrolki powstal wiec bez
+    ramki i czeka na projekt Mili.
+
+    Ten straznik pilnuje PRAWDZIWOSCI tego zdania: gdy ramka z polem powstanie,
+    test sie zaczerwieni i kaze odwzorowac ja zamiast dalej improwizowac.
+    PROG: pierwsza ramka z polem wpisywania."""
+    ramki = sorted(RAMKI.glob("*.dc.html"))
+    assert len(ramki) >= 40, f"pomiar objal tylko {len(ramki)} ramek"
+    z_polem = [p.name for p in ramki
+               if "<input" in p.read_text(encoding="utf-8")
+               or "<form" in p.read_text(encoding="utf-8")]
+    assert z_polem == [], (
+        f"ramka z polem wpisywania juz istnieje: {z_polem} — "
+        "odstepstwo W8 wygaslo, kontrolke trzeba odwzorowac z ramki")

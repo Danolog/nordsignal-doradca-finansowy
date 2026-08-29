@@ -201,3 +201,39 @@ def test_ekran_NIE_MOWI_o_formie_opodatkowania():
     tekst = _tekst_ekranu()
     for slowo in ("ryczałt", "Ryczałt", "ryczalt", "skala podatkowa", "liniowy"):
         assert slowo not in tekst, f"forma opodatkowania na ekranie wpisu: {slowo}"
+
+
+# --- W8: ksztalt wpisanej kwoty ma JEDEN nosnik ---
+
+def test_ksztalt_kwoty_MA_JEDEN_nosnik():
+    """CLAUDE.md §3.2. Do W8 regula „co jest czytelna kwota" stala wylacznie
+    w tym formularzu. W8 dolozylo drugie miejsce, w ktorym czlowiek wpisuje
+    kwote — kontrolke stanu konta na ekranie Plynnosci — i kopia reguly
+    rozjechalaby sie przy pierwszej zmianie: jeden ekran przyjmowalby „1 240,5",
+    drugi nie, przy zielonej suicie po obu stronach.
+
+    Nosnikiem jest `lib/kwota.ts`. Oba ekrany go WOLAJA. Co zostaje osobne:
+    rozstrzygniecie, CO ZROBIC z kwota ujemna — tu jest pytaniem, tam zwyklym
+    odczytem. To roznica dziedzinowa, nie druga kopia odczytu.
+
+    Kontrola liczności: sprawdzamy oba wolania, nie jedno. Straznik mierzacy
+    tylko formularz przeszedlby przy kontrolce z wlasna kopia reguly."""
+    kwota_ts = KATALOG / "interfejs" / "lib" / "kwota.ts"
+    kotwica = KATALOG / "interfejs" / "app" / "plynnosc" / "kotwica.tsx"
+
+    nosnik = _bez_komentarzy(kwota_ts.read_text(encoding="utf-8"))
+    assert "export function odczytajKwote" in nosnik, (
+        "nosnik ksztaltu kwoty zniknal z lib/kwota.ts")
+    assert "export function dataJestCzytelna" in nosnik, (
+        "nosnik ksztaltu daty zniknal z lib/kwota.ts")
+
+    wolajacy = []
+    for plik in (EKRAN, kotwica):
+        assert plik.exists(), f"nie ma pliku {plik}"
+        kod = _bez_komentarzy(plik.read_text(encoding="utf-8"))
+        assert "function odczytajKwote" not in kod, (
+            f"druga kopia reguly ksztaltu kwoty w {plik.name}")
+        if "odczytajKwote(" in kod:
+            wolajacy.append(plik.name)
+    assert len(wolajacy) == 2, (
+        f"nosnik wolany z {len(wolajacy)} miejsc zamiast dwoch: {wolajacy}")

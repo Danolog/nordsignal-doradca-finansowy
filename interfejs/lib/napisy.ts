@@ -288,3 +288,56 @@ export const NAPISY_KARTY = {
     "Jeszcze nie wiem, ile możesz odłożyć — brakuje stanu konta, od którego liczy się " +
     "prognoza. Podaj go wyżej, żeby zobaczyć tę liczbę.",
 } as const;
+
+/* ---------- KONTROLKA STANU KONTA (W8) ---------- */
+
+// KOTWICA PROGNOZY — pozycja 1 z osmiu pierwszego uruchomienia i jedyne
+// wejscie do dzialania w stanie startowym (PRD §12.8). Brzmienia przeniesione
+// DOSLOWNIE z ramek: `makiety/NieWiem.dc.html` (przycisk i zdanie obok niego)
+// oraz `makiety/TrzyStany.dc.html` (trzeci stan — „Odswiez stan konta").
+//
+// CZEGO RAMKI NIE RYSUJA — nazwane, nie przemilczane. Zadna ramka nie rysuje
+// samego POLA wpisywania: rysuja wylacznie WEZWANIE do niego. Brzmienia
+// etykiet, przyciskow rozwinietej kontrolki i stanow bledu powstaly wiec
+// tutaj i sa ODSTEPSTWEM od §3.6 zgloszonym w raporcie W8, a nie milczaca
+// decyzja wykonawcy.
+//
+// KWOTA MOZE BYC UJEMNA i jest jedyna taka w tej aplikacji: konto na debecie
+// to realny stan konta, nie blad wpisu. Dlatego podpis pod polem NIE brzmi
+// „bez znaku" jak w Ksiegowaniu — brzmi odwrotnie. Dwa ekrany mowia tu co
+// innego, bo regula jest inna, a nie dlatego, ze ktos zapomnial.
+export const NAPISY_KOTWICY = {
+  // Wezwanie — `NieWiem.dc.html`, przycisk wypelniony.
+  podaj: "Podaj stan konta",
+  // Wezwanie przy dopisku wiersza otwarcia — jedyne wejscie do ZMIANY odczytu,
+  // gdy odczyt juz jest. Nie jest wypisane na ekranie: stoi jako opis dla
+  // czytnika ekranu i podpowiedz przy wskazniku, bo `Main.dc.html` w tym
+  // stanie nie rysuje zadnego przycisku, a dolozony psul odwzorowanie
+  // (zmierzone: 14,38% przy progu 2%). Brzmienie z `TrzyStany.dc.html`.
+  zmienOdczyt: "Zmień stan konta",
+  // Zdanie obok przycisku — `NieWiem.dc.html`. Mowi, ile to kosztuje,
+  // zanim czlowiek kliknie: jedna liczba i jedna data.
+  obietnica: "To jedna liczba i jedna data — reszta policzy się sama.",
+
+  etykietaKwoty: "Ile masz na koncie",
+  etykietaDaty: "Z którego dnia ten odczyt",
+  zapisz: "Zapisz stan konta",
+  rezygnuje: "Rezygnuję",
+
+  // Podpis pod polem kwoty. ODWROTNOSC podpisu z Ksiegowania i to jest
+  // celowe: tam kierunek niesie typ wpisu, tu znak jest czescia odczytu.
+  zeZnakiem: "Ze znakiem — konto na debecie wpisz z minusem.",
+
+  // Stany bledu. Kazdy ma wlasne brzmienie: wspolny komunikat „blad" dla
+  // trzech przyczyn jest tym samym, co brak komunikatu (§3.7).
+  kwotaPusta: "Nie wpisałeś kwoty — bez niej prognoza nie ma punktu startu.",
+  kwotaNieczytelna:
+    "Nie rozumiem tej kwoty. Wpisz samą liczbę, np. 9920,79 albo -1240 dla konta na debecie.",
+  dataNieczytelna: "Nie rozumiem tej daty. Podaj ją jako rok-miesiąc-dzień, np. 2026-09-01.",
+
+  // POTWIERDZENIA ZAPISU TU NIE MA I TO JEST DECYZJA. Po zapisie ekran
+  // przestaje mowic „nie policze prognozy", pokazuje serie, wiersz zamkniecia
+  // i dopisek „z odczytu 9 920,79 zl z 2 wrzesnia" — czyli te sama informacje
+  // przy samej liczbie. Osobne zdanie „Zapisane: …" byloby DRUGIM NOSNIKIEM
+  // tego faktu i pierwszym kandydatem do rozjazdu przy nastepnej zmianie.
+} as const;

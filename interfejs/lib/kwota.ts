@@ -81,3 +81,50 @@ export function sformatujOdczyt(iso: string): string {
   const [rok] = iso.split("-");
   return `${sformatujDzienSlownie(iso)} ${rok}`;
 }
+
+/* ---------- ODCZYT TEGO, CO CZLOWIEK WPISAL (W8) ---------- */
+
+// JEDEN NOSNIK KSZTALTU WPISANEJ KWOTY. Do W8 ta regula stala wylacznie
+// w `app/ksiegowanie/formularz.tsx`; kontrolka stanu konta potrzebuje jej
+// co do znaku identycznie — a druga kopia rozjechalaby sie przy pierwszej
+// zmianie (CLAUDE.md §3.2). Rozdzielone zostaje to, co NAPRAWDE rozne:
+// odczyt mowi, ze kwota jest ujemna, a KAZDY ekran sam rozstrzyga, co z tym
+// zrobic. Ksiegowanie pyta („minus jest w typie wpisu"), stan konta
+// przyjmuje bez pytania (konto na debecie to realny stan konta).
+//
+// PRACA WYLACZNIE NA NAPISIE: zdejmujemy jednostke i separatory, zamieniamy
+// przecinek na kropke i sprawdzamy KSZTALT wyrazeniem regularnym. Nigdzie
+// nie powstaje liczba, wiec nie ma gdzie zgubic groszy (CLAUDE.md §3.1).
+export type OdczytKwoty =
+  | { stan: "pusta" }
+  | { stan: "nieczytelna" }
+  | { stan: "ujemna"; kwota: string }   // kwota BEZ minusa — znak niesie `stan`
+  | { stan: "ok"; kwota: string };
+
+export function odczytajKwote(tekst: string): OdczytKwoty {
+  const oczyszczony = tekst
+    .replace(/zł/gi, "")
+    .replace(/[\s ]/g, "")
+    .replace(",", ".")
+    .trim();
+  if (oczyszczony === "") return { stan: "pusta" };
+  if (!/^-?\d+(\.\d{1,2})?$/.test(oczyszczony)) return { stan: "nieczytelna" };
+  if (oczyszczony.startsWith("-")) return { stan: "ujemna", kwota: oczyszczony.slice(1) };
+  return { stan: "ok", kwota: oczyszczony };
+}
+
+// Data budowana i czytana W CZASIE POWSZECHNYM (UTC), nigdy lokalnym.
+// Zmierzone 2026-08-29: `new Date("2026-10-06T00:00:00")` to czas LOKALNY,
+// wiec w strefie letniej Warszawy `getUTCDate()` zwracal 5, nie 6 — i poprawna
+// data 6 X 2026 wypadala jako nieczytelna, blokujac KAZDY zapis.
+export function dataJestCzytelna(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [rok, miesiac, dzien] = iso.split("-");
+  const d = new Date(Date.UTC(Number(rok), Number(miesiac) - 1, Number(dzien)));
+  return (
+    !Number.isNaN(d.getTime()) &&
+    d.getUTCFullYear() === Number(rok) &&
+    d.getUTCMonth() + 1 === Number(miesiac) &&
+    d.getUTCDate() === Number(dzien)
+  );
+}

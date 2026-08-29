@@ -1435,3 +1435,78 @@ było dotykać.
   powłokę błędu zamiast ekranu, przy kolejnych — poprawny ekran. **Na budowie produkcyjnej
   nie powtórzyło się ani razu** (trzy niezależne przebiegi strażnika, `kod wyjścia 0`).
   Przyczyny nie ustalono; zapisane, bo dotyczy tylko trybu deweloperskiego.
+
+---
+
+## Przebieg 2026-08-29 — W8, kontrolka stanu konta
+
+Kontrola przed mutacjami: **41 passed** (`testy/test_ekran_plynnosc.py` +
+`testy/test_ekran_ksiegowanie.py`) · **47 passed** (`npx vitest run`) ·
+**kod wyjścia 0** (`straznik-ekran-wobec-silnika.mjs` na czystej bazie).
+
+Kopia drzewa poza repozytorium (`scratchpad/mutacje-w8`), `PYTHONDONTWRITEBYTECODE=1`.
+Wyjątek nazwany: **M-W8-7 i M-W8-8 wykonano w drzewie roboczym**, bo wymagają zbudowanej
+wersji produkcyjnej i uruchomionego silnika, których kopia nie ma. Oba pliki po cofnięciu
+porównane `diff` z kopią sprzed mutacji — **identyczne bajt w bajt**.
+
+### Mutacje treści
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W8-1** | `kotwica.tsx`: zdjęty `autoFocus` z pola kwoty | `test_zapis_stanu_konta_KOSZTUJE_NAJWYZEJ_TRZY_DOTKNIECIA` | **czerwony** |
+| **M-W8-2** | `kotwica.tsx`: znak gubiony przy składaniu kwoty (`` `-${odczyt.kwota}` `` → `odczyt.kwota`) — debet 1 240,50 zł zapisałby się jako majątek | `test_kwota_stanu_konta_WOLNO_miec_ujemna` | **czerwony** |
+| **M-W8-3** | `kotwica.tsx`: data przestaje być wypełniona z góry (`useState(DANE.odczyt)` → `useState("")`) | `test_zapis_stanu_konta_KOSZTUJE_NAJWYZEJ_TRZY_DOTKNIECIA` | **czerwony** |
+| **M-W8-7** | `lib/kwota.ts`: `odczytajKwote` zdejmuje minus i oddaje stan `ok` zamiast `ujemna` | `odczyt-kwoty.test.ts > kwota UJEMNA jest rozpoznana, a nie odrzucona — konto na debecie` | **czerwony** |
+
+### Mutacje liczności — „ile rzeczy pomiar faktycznie widział"
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W8-4** | `kotwica.tsx`: jedno z jedenastu brzmień przestaje być pokazywane (`setBladKwoty(NAPISY_KOTWICY.kwotaPusta)` → `setBladKwoty(null)`) — pusty formularz milczy | `test_kontrolka_MA_KOMPLET_brzmien_i_zadnego_u_siebie` (`pokazywanych jest 10 z 11 brzmien`) | **czerwony** |
+| **M-W8-5** | `kotwica.tsx`: własna kopia reguły kształtu kwoty zamiast wołania `lib/kwota.ts` — nośnik wołany z jednego miejsca zamiast dwóch | `test_ksztalt_kwoty_MA_JEDEN_nosnik` | **czerwony** |
+| **M-W8-6** | `test_ekran_plynnosc.py`: lista ramek okrojona do zera (`glob("*.dc.html")` → `glob("ZadnaTakaRamka*.dc.html")`) | `test_ZADNA_ramka_NIE_RYSUJE_pola_wpisywania` (`pomiar objal tylko 0 ramek`) | **czerwony** |
+| **M-W8-8** | `kotwica.tsx`: zapis dochodzi do bazy, ale ekran nie dostaje odświeżonych danych (`poZapisie(dane)` usunięte) | `straznik-ekran-wobec-silnika.mjs`, **kod wyjścia 2**: `porównano 1 liczb, próg to 3` | **czerwony (błąd pomiaru)** |
+
+**Kontrola po cofnięciu każdej mutacji:** `41 passed`, `47 passed`, `kod wyjścia 0`
+(`Porównanych liczb: 5`, `WYNIK: zgodne`). Pliki porównane `diff` — identyczne.
+
+### Dlaczego M-W8-8 jest osobną mutacją, a nie odmianą M-W8-2
+
+M-W8-2 sprawdza, że strażnik **widzi złą liczbę**. M-W8-8 sprawdza coś innego: że strażnik
+**wie, ile liczb zobaczył**. Bez kontroli liczności ekran, który nie dostał odświeżonych danych,
+pokazuje pustą księgę i „zero rozjazdów" — czyli sprawdzenie, do którego nic nie dociera,
+melduje sukces. Dokładnie ten wzorzec zmierzono w tej sesji siedem razy.
+
+### Sprostowanie własnego pomiaru
+
+Pierwszy odczyt kodu wyjścia przy M-W8-8 zapisano jako **`KOD WYJSCIA: 0`**. To był pomiar
+**statusu `grep`** w potoku, nie strażnika — a drugi przebieg szedł już na bazie z kotwicą
+zapisaną przez przebieg pierwszy, więc naprawdę był zielony. Powtórzony pomiar bez potoku
+i na wyczyszczonej tabeli `stan_konta`: **`KOD PRZY MUTACJI: 2`**.
+
+### Znalezisko po drodze: strażnik oślepiony sekwencją `/*` w komentarzu liniowym
+
+Pierwsza wersja nagłówka `kotwica.tsx` cytowała komendę zawierającą `makiety/*.dc.html`.
+`pomocnicze.bez_komentarzy` zdejmuje komentarze blokowe wyrażeniem `/\*.*?\*/`, więc ciąg
+`/*` w środku komentarza `//` **otworzył komentarz blokowy** i zjadł 90% pliku. Skutek:
+pięć strażników W8 zaczerwieniło się na kodzie, który był poprawny. Zdanie przepisane bez
+tej sekwencji. Wada jest w treści komentarza, nie w strażniku — ale pokazuje, że narzędzie
+czyszczące kod potrafi oślepić pomiar, a wynik wygląda wtedy jak defekt kodu.
+
+### Znalezisko z OGLĄDANIA EKRANU, którego nie złapał żaden test
+
+Pole `<input type="date">` rysuje sobie przeglądarka według ustawień systemu. Na tym laptopie
+data **2 września 2026** wyświetliła się jako **`09/02/2026`** — zapis, który po polsku czyta
+się jako **9 lutego**. Pomyłka o siedem miesięcy przesuwa punkt startu całej prognozy i nie
+zostawia śladu. Pod polem dopisano tę samą datę słowami (`sformatujOdczyt`, ten sam nośnik,
+którego używa nagłówek ekranu). Wykryte zrzutem ekranu, nie testem — jak w W7.
+
+### Czego przebieg W8 NIE objął
+
+- **Nie mierzono na wdrożeniu w chmurze** — wszystkie liczby z lokalnej budowy produkcyjnej.
+  Wdrożenie prowadzi Eva.
+- **Nie zbudowano wezwania „Odśwież stan konta"** z `TrzyStany.dc.html` — kontrakt nie niesie
+  stanu świeżości odczytu. Dług ze strażnikiem i progiem:
+  `test_wezwanie_ODSWIEZ_Z_RAMKI_NIE_MA_dzis_na_ekranie`.
+- **Nie sprawdzono kontrolki czytnikiem ekranu ani przy wyłączonym JavaScript.**
+- **Nie ma ramki dla rozwiniętej kontrolki** — układ pól powstał bez makiety (odstępstwo od §3.6).

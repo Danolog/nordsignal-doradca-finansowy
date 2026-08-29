@@ -48,7 +48,13 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Powloka } from "../powloka";
 import { NAPISY, PROZA, type Czlon } from "@/lib/napisy";
-import { sformatujDate, sformatujKwote, sformatujOdczyt } from "@/lib/kwota";
+import {
+  dataJestCzytelna,
+  odczytajKwote,
+  sformatujDate,
+  sformatujKwote,
+  sformatujOdczyt,
+} from "@/lib/kwota";
 import {
   NAPIS_TYPU,
   TYPY,
@@ -63,44 +69,14 @@ import s from "./style.module.css";
 
 /* ---------- odczyt tego, co uzytkownik wpisal ---------- */
 
-type OdczytKwoty =
-  | { stan: "pusta" }
-  | { stan: "nieczytelna" }
-  | { stan: "ujemna"; kwota: Kwota }
-  | { stan: "ok"; kwota: Kwota };
-
-// Praca WYLACZNIE na napisie: zdejmujemy jednostke i separatory, zamieniamy
-// przecinek na kropke i sprawdzamy KSZTALT wyrazeniem regularnym. Nigdzie
-// nie powstaje liczba, wiec nie ma gdzie zgubic groszy.
-function odczytajKwote(tekst: string): OdczytKwoty {
-  const oczyszczony = tekst
-    .replace(/zł/gi, "")
-    .replace(/[\s ]/g, "")
-    .replace(",", ".")
-    .trim();
-  if (oczyszczony === "") return { stan: "pusta" };
-  if (!/^-?\d+(\.\d{1,2})?$/.test(oczyszczony)) return { stan: "nieczytelna" };
-  if (oczyszczony.startsWith("-")) return { stan: "ujemna", kwota: oczyszczony.slice(1) };
-  return { stan: "ok", kwota: oczyszczony };
-}
-
-// Data budowana i czytana W CZASIE POWSZECHNYM (UTC), nigdy lokalnym.
-// Zmierzone 2026-08-29: `new Date("2026-10-06T00:00:00")` to czas LOKALNY,
-// wiec w strefie letniej Warszawy `getUTCDate()` zwraca 5, nie 6 — i poprawna
-// data 6 X 2026 wypadala jako przypadek (a) z §41.5, blokujac KAZDY zapis.
-// Brzmienia bledu nie cytujemy nawet w komentarzu: ma JEDEN nosnik
-// (`lib/napisy.ts`) i pilnuje tego `test_siedem_brzmien_bledu_MA_JEDEN_nosnik`.
-function dataJestCzytelna(iso: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
-  const [rok, miesiac, dzien] = iso.split("-");
-  const d = new Date(Date.UTC(Number(rok), Number(miesiac) - 1, Number(dzien)));
-  return (
-    !Number.isNaN(d.getTime()) &&
-    d.getUTCFullYear() === Number(rok) &&
-    d.getUTCMonth() + 1 === Number(miesiac) &&
-    d.getUTCDate() === Number(dzien)
-  );
-}
+// OD W8 KSZTALT WPISANEJ KWOTY I DATY MA JEDEN NOSNIK — `lib/kwota.ts`.
+// Kopia stala tutaj do W8; kontrolka stanu konta na ekranie Plynnosci
+// potrzebuje tej samej reguly co do znaku, a dwie kopie rozjechalyby sie
+// przy pierwszej zmianie (CLAUDE.md §3.2). Co ZOSTALO tutaj: rozstrzygniecie,
+// CO ZROBIC z kwota ujemna. Tu jest ona pytaniem („minus jest w typie
+// wpisu"), na stanie konta jest zwyklym odczytem — i to jest roznica
+// dziedzinowa, nie roznica odczytu.
+// Straznik: `testy/test_ekran_ksiegowanie.py::test_ksztalt_kwoty_MA_JEDEN_nosnik`.
 
 /* ---------- znaki rysowane, przeniesione z ramki ---------- */
 

@@ -34,6 +34,18 @@
 // na mutacji M-Z7c-6 (stopka odpięta) — sama bramka pikselowa dała 0,29%
 // przy progu 2%, czyli PRZESZŁA. Wygląd nie jest nośnikiem tej reguły.
 //
+// CO DOSZŁO W W8: STRAŻNIK SAM STAWIA STAN, KTÓRY MIERZY.
+// Do W8 przebieg na czystej bazie kończył się kodem 2 („zapisz odczyt salda
+// PRZED przebiegiem") — bo bez kotwicy prognozy nie ma, księga jest pusta
+// i porównywać nie ma czego. Znaczyło to, że najczęstszy stan aplikacji —
+// świeża baza — był stanem, w którym strażnik NIE PATRZY. Wymóg ręcznego
+// kroku przed pomiarem jest tym samym co brak pomiaru: pierwszy przebieg,
+// przy którym ktoś tego kroku nie zrobi, zamelduje błąd, a nie wadę.
+// Od W8 ekran ma kontrolkę stanu konta, więc strażnik doprowadza się do
+// stanu mierzalnego SAM — tą samą drogą, którą przechodzi człowiek:
+// klika „Podaj stan konta", wpisuje odczyt, zapisuje. Ten krok jest
+// wypisywany w logu, bo zmienia dane w bazie.
+//
 // Uruchomienie:
 //   node narzedzia/straznik-ekran-wobec-silnika.mjs [dzis]
 //   node narzedzia/straznik-ekran-wobec-silnika.mjs 2026-09-02
@@ -50,6 +62,17 @@ const SILNIK = process.env.ADRES_SILNIKA ?? "http://127.0.0.1:8000";
 //: Księga w stanie z kotwicą ma co najmniej wiersz otwarcia z saldem
 //: i jedną pozycję z kwotą i saldem — czyli minimum trzy liczby.
 const PROG_LICZNOSCI = 3;
+
+//: Odczyt, którym strażnik doprowadza pustą bazę do stanu mierzalnego (W8).
+//: Wartość jest własnością POMIARU, nie aplikacji — dlatego stoi tutaj,
+//: a nie w `lib/dane/`, gdzie po Z7 nie ma ani jednej kwoty.
+const ODCZYT_STARTOWY = "9920,79";
+//: Brzmienie wezwania z `lib/napisy.ts` (`NAPISY_KOTWICY.podaj`) i z ramki
+//: `makiety/NieWiem.dc.html`. Powtórzone tutaj świadomie: strażnik ma trafiać
+//: w to, co WIDZI CZŁOWIEK, a import z modułu ekranu uczyniłby go ślepym na
+//: rozjazd między napisem a ramką. Rozjazdu pilnuje osobno
+//: `testy/test_ekran_plynnosc.py::test_wezwanie_MA_BRZMIENIE_Z_RAMKI`.
+const WEZWANIE_KOTWICY = "Podaj stan konta";
 
 function znak(kwota) {
   return sformatujKwote(kwota, znakKwoty(kwota));
@@ -133,7 +156,7 @@ async function glowna() {
   const dzis = process.argv[2] ?? null;
   const parametr = dzis ? `?dzis=${encodeURIComponent(dzis)}` : "";
 
-  let dane;
+  let dane;   // `let`, bo po postawieniu kotwicy odpytujemy silnik ponownie
   try {
     const odp = await fetch(`${SILNIK}/api/plynnosc${parametr}`, { cache: "no-store" });
     if (!odp.ok) throw new Error(`trasa odpowiedziała kodem ${odp.status}`);
@@ -151,6 +174,47 @@ async function glowna() {
     if (!odp || !odp.ok()) {
       console.error(`BŁĄD POMIARU: ekran odpowiedział kodem ${odp ? odp.status() : "—"}`);
       process.exit(2);
+    }
+
+    // STAN MIERZALNY STAWIAMY SAMI (W8). Bez kotwicy księga jest pusta,
+    // więc porównanie nie miałoby czego porównać. Wchodzimy tą samą drogą
+    // co człowiek — przez kontrolkę na ekranie, nie przez trasę: dzięki temu
+    // przebieg dowodzi przy okazji, że kontrolka DZIAŁA. Wpis do bazy jest
+    // wypisany, bo to zmiana danych, a nie odczyt.
+    if (dane.saldoMinimalne === null) {
+      const wezwanie = strona.locator(`button:has-text("${WEZWANIE_KOTWICY}")`);
+      if ((await wezwanie.count()) === 0) {
+        console.error(
+          `BŁĄD POMIARU: prognoza nie ma punktu startu, a na ekranie nie ma wezwania ` +
+            `„${WEZWANIE_KOTWICY}". Do W8 trzeba było zapisać odczyt ręcznie; ` +
+            "jeśli kontrolka zniknęła, to jest wada, nie brak danych.",
+        );
+        process.exit(2);
+      }
+      console.log(
+        `STAN POSTAWIONY PRZEZ STRAŻNIKA: brak kotwicy → wpisuję ${ODCZYT_STARTOWY} zł ` +
+          "przez kontrolkę na ekranie (to zmienia dane w bazie).",
+      );
+      await wezwanie.click();
+      await strona.locator('input[inputmode="decimal"]').fill(ODCZYT_STARTOWY);
+      await strona.keyboard.press("Enter");
+      await strona.waitForTimeout(1200);
+
+      // Silnik odpytujemy PONOWNIE, bo mierzymy ekran wobec liczby, którą
+      // silnik ma TERAZ — nie wobec tej sprzed zapisu.
+      const odpNowa = await fetch(`${SILNIK}/api/plynnosc${parametr}`, { cache: "no-store" });
+      if (!odpNowa.ok) {
+        console.error(`BŁĄD POMIARU: po zapisie kotwicy trasa odpowiedziała ${odpNowa.status}`);
+        process.exit(2);
+      }
+      dane = await odpNowa.json();
+      if (dane.saldoMinimalne === null) {
+        console.error(
+          "BŁĄD POMIARU: kontrolka stanu konta nie zapisała odczytu — " +
+            "prognoza nadal nie ma punktu startu. To jest wada kontrolki.",
+        );
+        process.exit(2);
+      }
     }
 
     const zek = await zEkranu(strona);
@@ -228,8 +292,10 @@ async function glowna() {
     if (porownanych < PROG_LICZNOSCI) {
       console.error(
         `BŁĄD POMIARU: porównano ${porownanych} liczb, próg to ${PROG_LICZNOSCI} — ` +
-          "to nie jest zgodność, to ślepy pomiar. Ekran bez kotwicy nie ma czego pokazać; " +
-          "zapisz odczyt salda (PUT /api/kotwica) przed przebiegiem.",
+          "to nie jest zgodność, to ślepy pomiar. Od W8 strażnik sam stawia kotwicę " +
+          "przez kontrolkę na ekranie, więc pusta księga PO tym kroku znaczy, że zapis " +
+          "nie zadziałał albo ekran nie dostał odświeżonych danych — to jest wada, " +
+          "nie brak danych.",
       );
       process.exit(2);
     }
