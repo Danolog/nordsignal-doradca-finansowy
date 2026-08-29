@@ -125,7 +125,7 @@ typu kontrolki.
   nie nowy komponent.**
 - **Przed / po:** przed — wiersz „Kredyty" jest zwykłym tekstem, nieklikalny. Po — „Kredyty" jest
   linkiem; klik otwiera panel z polami Kategoria/Kwota/Dni wypełnionymi „Kredyty" / „1 624,81 zł" /
-  „1 i 12 X".
+  „1 X" (dzień poprawiony w §11.3 — było „1 i 12 X", ramka scalała dwie reguły planu w jedną).
 
 ### 4.2 `POST /api/plan/{id}/zakoncz` — zakończenie reguły
 
@@ -263,3 +263,154 @@ Ramka dotrzymuje reguły projektu.
 - Projekt ramki dla kontrolki wpisywania stanu konta i ekranu „Tej części jeszcze nie ma" — poza
   zakresem W9, opisane osobno przy okazji tego zadania (patrz Slack/Linear W9 — Mila, jeśli
   potrzebne osobne wpisy).
+
+---
+
+## 11. Korekta ramki po W9c — bramka odwzorowania (Mila, 2026-08-29, wieczór)
+
+**Zgłoszenie Olivera:** ekran zbudowany (`Jack`, głowa `2b2ef3b`) i działa; bramka odwzorowania
+czerwona: **26,10 %** wobec ramki wiążącej, próg 2 %. Trzy przyczyny zmierzone, wszystkie po
+stronie ramki. Poprawiam `makiety/Budzet.dc.html` i `makiety/Budzet-zrodlo.dc.html` — **nie
+ruszam** `interfejs/app/budzet/`, silnika ani tras.
+
+### 11.1 Poprawka 1 — stan pusty „Historii" (opisana już w §6 wyżej)
+
+Wykonana: usunięta `display: grid; grid-template-columns: 110px 130px 1fr 160px 160px;
+column-gap: 24px;` z kontenera dwóch akapitów stanu pustego — zostaje `padding-bottom: 6px;
+border-bottom: 1px solid ...`, dokładnie jak w §6 wskazano. Zgodne z wzorcem „Przychody
+i oszczędności" (pełna szerokość, poza siatką).
+
+### 11.2 Poprawka 2 — Faktura 1/2026: rozstrzygnięcie FUNKCJA, nie treść przykładowa
+
+**Sprawdzone nośniki przed rozstrzygnięciem** (§3.10): `docs/PRD.md` §10.2 (inwentarz funkcji
+Budżetu — nie wymienia świadomości o fakturach), `api/trasy.py` (komentarz `GET /api/budzet`:
+„kafelki planu, bilans, plan kontra wykonanie, cele" — bez faktur), `interfejs/lib/kontrakt.ts`
+(`DaneBudzetu` — zero pól o numerze/stanie faktury), `interfejs/narzedzia/dane-wzorcowe.mjs`
+(zero wzmianki o fakturze w ogóle — w odróżnieniu od Kredytów, gdzie autor zostawił wyjaśnienie,
+tu nie ma nic).
+
+**Rozstrzygnięcie: to jest FUNKCJA, nie treść przykładowa.** Trzy powody: **(1)** zdanie pojawia
+się DWA razy, w dwóch różnych miejscach ekranu (bilans planu i „Przychody i oszczędności"),
+z wewnętrznie spójnym faktem (faktura 1/2026, nieopłacona, wpłynie po oznaczeniu na karcie Firma)
+— to wzorzec świadomej, powtórzonej informacji, nie przypadkowy przykład; **(2)** treść odpowiada
+na realny mechanizm uczciwości tej aplikacji (§12.5 „zaufanie do liczby" — wyjaśnienie, dlaczego
+plan przychodów wynosi 0,00 zł, mimo że istnieje realna, nieujęta jeszcze wpłata) — dokładnie
+klasa informacji, którą ten projekt chce pokazywać, nie dekoracja; **(3)** numer „1/2026" to
+realna, pierwsza faktura Darka (cytowana też w `docs/PRD.md` §10.3, S-1, przy okazji ekranu Firma
+i Doradcy) — nie placeholder wymyślony na potrzeby makiety.
+
+**Decyzja: zdania ZOSTAJĄ na ramce bez zmian.** Zgodnie z poleceniem Olivera nie zdejmuję funkcji,
+której ramka obiecuje. **Zakres dla Maxa, z progiem:** `DaneBudzetu` potrzebuje pola niosącego
+świadomość o nieopłaconych fakturach bieżącego miesiąca (numer, kwota, stan), zasilanego z danych
+karty Firma (`GET /api/firma/faktura/{numer}` już istnieje w spisie tras). **Próg: gdy ekran Firma
+i jego trasy zostaną zbudowane (Plasterek 3)** — naturalna kolejność, bo dziś Firma sama nie ma
+jeszcze zbudowanej trasy zapisu faktur do sprawdzenia. Do tego czasu jest to **nazwana, przyjęta
+luka** — nie cichy dług.
+
+### 11.3 Poprawka 3 — „Kredyty 1 624,81 zł (1 i 12 X)"
+
+**Weryfikacja przesłanki komendą, własny odczyt** (nie tylko cytat z PRD), na oryginalnej bazie
+poprzednika:
+
+```
+$ sqlite3 "../AI CFO/cfo_database.db" "select kategoria, kwota_planowana, dzien, co_ile_miesiecy
+  from plan_budzetu where rok=2026 and powtarzalna=1
+  and (10-miesiac)%co_ile_miesiecy=0 and 10>=miesiac order by dzien;"
+Kredyty|319.76|1|1
+Kredyty|1305.05|12|1
+Energia Elektryczna|330.00|20|2
+Czesne|660.00|25|1
+```
+319,76 + 1 305,05 = **1 624,81** — potwierdzone: ramka scaliła dwie osobne reguły planu (dwa
+różne dni) w jeden nawias. `PozycjaPlanu.dzien: number | null` niesie **jeden** dzień —
+niemożliwe do zbudowania jak napisano.
+
+**Nośnik pierwotny znaleziony PRZED poprawką** (§3.10): `interfejs/narzedzia/dane-wzorcowe.mjs`
+w.224–235 już opisuje dokładnie ten problem i już rozstrzyga wartość: *„wzorzec niesie jedną
+pozycję Kredytów o kwocie z ramki i dniu `1`. Ekran napisze więc «(1 X)» tam, gdzie ramka pisze
+«(1 i 12 X)» — różnica NAZWANA, nie zamieciona."* **Poprawka trzyma się tego rozstrzygnięcia
+co do joty** — nie wybieram własnej wartości (rozważałam dzień 12 z powodu „jeszcze czeka",
+bo dzień 1 już minął przy „dziś = 6 X"; **odrzucone**, bo wzorcowy zestaw danych, który Jack już
+zbudował, ma dzień `1` na stałe, i to on rozstrzyga zgodność pikselowy, nie moja interpretacja).
+
+**Wykonane:** `(1 i 12 X)` → `(1 X)` w obu plikach, kwota **bez zmian** (1 624,81 zł — zgodna
+z kafelkiem i wierszem tabeli, żadna inna liczba nie rusza się).
+
+### 11.4 Znalezisko dodatkowe (nienazwane przez Olivera) — kolejność pozycji w zdaniu
+
+Przy weryfikacji poprawki 3 znalazłam **czwartą, pokrewną przyczynę** tej samej klasy (§3.2,
+„jeden nośnik" — tu dla KOLEJNOŚCI, nie dla wartości): ekran wymienia pozycje w kolejności
+Czesne → Energia Elektryczna → Kredyty (alfabetycznie, zgodnie z porządkiem silnika), a ramka
+niosła Kredyty → Energia Elektryczna → Czesne (po dniu). Nośnik, sprawdzony przed poprawką:
+`interfejs/narzedzia/dane-wzorcowe.mjs` w.294–296: *„Zdanie narracyjne wymienia pozycje w tej
+samej kolejności, w której je dostaje — sortowanie po dniu byłoby DRUGIM nośnikiem porządku,
+obok tego, który ustala silnik."* **Poprawione**: kolejność w ramce zmieniona na alfabetyczną,
+zgodną z silnikiem. Wkład w liczbę procentową okazał się mały (ta sama długość linii, brak zmiany
+zawijania) — poprawka warta zrobienia dla zgodności reguły, nie dla samego progu.
+
+### 11.5 Sprawdzone i ŚWIADOMIE COFNIĘTE — zegar w nagłówku „· 09:40"
+
+Przy pomiarze zauważyłam, że nagłówek ramki niesie *„6 października 2026 · 09:40"*, a
+`interfejs/lib/kwota.ts` w.116–121 dokumentuje **już podjętą** decyzję Z7: *„GODZINY TU NIE MA
+I TO JEST DECYZJA, NIE BRAK (...) Wraca w chwili, gdy kontrakt zacznie nieść znacznik czasu
+odczytu, a nie samą datę."* Zbudowany ekran istotnie pokazuje wyłącznie datę, bez godziny —
+zmierzone (`playwright`, tekst węzła): `"6 października 2026"`.
+
+**Spróbowałam poprawić `Budzet.dc.html` bezpośrednio — i COFNĘŁAM tę zmianę.** Powód: tekst
+„· 09:40" **nie jest treścią ramki źródłowej** — wstrzykuje go `wskaznik_daty()` w
+`makiety/buduj-makiety.py:279-282`, ze stałych `WSKAZNIK_DZIEN`/`WSKAZNIK_GODZINA` (w.275–276),
+**identycznie do KAŻDEJ finalnej ramki z pełnym paskiem** (`z_paskiem()`) — potwierdzone:
+ten sam ciąg „6 października 2026 · 09:40" siedzi też w `Main.dc.html` i `Ksiegowanie.dc.html`,
+czyli w dwóch ramkach **już przechodzących** bramkę (0,07 %, 0,12 %). Ręczna edycja samego
+`Budzet.dc.html` byłaby **drugim nośnikiem** tej stałej (§3.2) i zostałaby cicho nadpisana przy
+najbliższym `python3 buduj-makiety.py` (bez `--kontrola`) — dokładnie dług ukryty, przed którym
+ostrzega CLAUDE.md. **Potwierdzone `--kontrola`:** po cofnięciu — `ROZBIEZNOSCI: 0`, kod wyjścia 0.
+
+**Nazwane, NIE wykonane w tym zadaniu** (poza zakresem — dotyczy Main i Ksiegowanie, nie tylko
+Budżetu): właściwa poprawka to `WSKAZNIK_GODZINA` (i separator „· ") usunięte z
+`wskaznik_daty()` w `buduj-makiety.py`, a potem **pełna regeneracja** wszystkich finalnych ramek
+przez `buduj-makiety.py` (nie `--kontrola`) — dotknie też `Main.dc.html` i `Ksiegowanie.dc.html`.
+**Próg: osobne zlecenie, bo zakres wykracza poza ekran Budżet** i wymaga ponownego zmierzenia
+dwóch już przechodzących bramek.
+
+### 11.6 Bramka odbioru — wynik po poprawkach
+
+```
+$ cd makiety && python3 buduj-makiety.py --kontrola
+PLIKOW .DC.HTML SPRAWDZONYCH LACZNIE: 42
+ROZBIEZNOSCI: 0
+(kod wyjścia 0)
+
+$ cd interfejs && node narzedzia/porownaj-z-makieta.mjs Budzet Budzet
+RÓŻNICA: 0,00%   PRÓG: 2,00%   WYNIK: w progu.          (kontrola narzędzia — sama ze sobą)
+
+$ node narzedzia/porownaj-z-makieta.mjs Budzet Main
+RÓŻNICA: 31,26%   PRÓG: 2,00%   WYNIK: PRÓG PRZEKROCZONY. (kontrola narzędzia — inny ekran, liczba dwucyfrowa)
+
+$ node narzedzia/porownaj-z-makieta.mjs Budzet http://localhost:3000/budzet --wzorzec
+Ramka:  Budzet  1440x1266 px
+Ekran:  http://localhost:3000/budzet  1440x1205 px  (źródło danych: WZORZEC, znacznik znaleziony)
+Porównanych pikseli: 1 823 040, różniących się: 251 923
+RÓŻNICA: 13,82%   PRÓG: 2,00%   WYNIK: PRÓG PRZEKROCZONY.
+```
+
+**13,82 %, nadal powyżej progu 2 %.** Co ją niesie — zmierzone z obrazu różnicy
+(`makiety/zrzuty/Budzet-roznica-W9d-po-poprawkach.png`), nie z domysłu: rozjazd zaczyna się
+dokładnie w akapicie „Przychód z faktury 1/2026..." (§11.2, świadomie NIE naprawiony — funkcja,
+nie treść przykładowa) i stamtąd rozchodzi się kaskadą pionowego przesunięcia na wszystko poniżej
+(tabela planu, cele, historia, stopka) — wysokość ramki 1266 px wobec ekranu 1205 px, różnica
+61 px, zgodna co do rzędu wielkości z „54 px kaskady" zmierzonymi przez Olivera przed moimi
+poprawkami. Poprawki 1, 3 i 4 (§11.1, 11.3, 11.4) są w obrazie różnicy **widoczne jako zgodne**
+(ten sam tekst po obu stronach, przesunięty wyłącznie przez kaskadę z §11.2) — nie generują już
+własnego rozjazdu treści.
+
+**To jest jedna liczba i jedna, w pełni nazwana przyczyna** (§11.2) — zgodnie z poleceniem
+Olivera, idzie do Darka jako nazwane odstępstwo z wpisem do PRD, nie jako moja decyzja o zamknięciu
+bramki. Rozstrzygnięcie progu (czy 2 % obowiązuje mimo świadomie zachowanej funkcji bez pokrycia
+w kontrakcie) należy do niego.
+
+**Czego to zadanie NIE objęło:** poprawki `wskaznik_daty()` w `buduj-makiety.py` (§11.5) i
+regeneracji Main/Ksiegowanie; regeneracji fizycznego pliku `Budzet.dc.html` narzędziem
+`buduj-makiety.py` bez `--kontrola` (edycje wykonane ręcznie w obu plikach, `-zrodlo` i finalnym,
+zweryfikowane zgodne przez `--kontrola`, ale nie przepuszczone przez sam generator — różnica
+czysto proceduralna, wynik identyczny).
