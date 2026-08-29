@@ -779,3 +779,74 @@ wobec 972 px ramki. Różnica jest **układowa, nie tekstowa**: dochodzi cały w
 Dług opisany przy `KSIEGOWANIE` w `interfejs/narzedzia/dane-wzorcowe.mjs`, z progiem:
 **przy pierwszym przerysowaniu `Ksiegowanie.dc.html` wzorzec dostaje piąty wiersz**, a strażnik
 M-Z7c-7 pilnuje, żeby ten moment nie przeszedł niezauważony.
+
+---
+
+## Przebieg 2026-08-29 — Z10, przegląd gałęzi (Leo)
+
+Przebieg recenzenta, nie wykonawcy: mutacje pisane **przeciwko strażnikom, które
+już stały**, żeby sprawdzić, czy strzegą tego, co deklarują. Wszystkie w kopii
+drzewa poza repozytorium (`scratchpad/leo-mut`), kontrola bazowa `892 passed`.
+
+| # | Co zmieniono | Który test padł | Wynik |
+|---|---|---|---|
+| M-L1 | `pieniadz.do_zlotych`: `ROUND_HALF_UP` → `ROUND_DOWN` | `test_stawki_jeden_nosnik.py::test_zaokraglenie_ma_JEDEN_nosnik_i_jest_nim_pieniadz` (+5) | **czerwony** |
+| M-L3 | `podatki.zaplaty_podatkowe`: zdjęty filtr kategorii | `test_rezerwa.py::test_zaplata_liczy_sie_TYLKO_z_kategorii_podatkowej` (+5) | **czerwony** |
+| M-L4 | `api/kwoty.kwota`: `str(x)` zamiast `str(pieniadz.do_groszy(x))` | `test_kontrakt_dwa_nosniki.py::test_kwota_wychodzi_NAPISEM_i_zaokragla_sie_RAZ` | **czerwony** |
+| M-L5 | `pieniadz.zabron_float`: zdjęta odmowa dla `float` | `test_kontrakt_dwa_nosniki.py::test_kwota_wychodzi_NAPISEM_i_zaokragla_sie_RAZ`, `test_stawki_jeden_nosnik.py::test_zaokraglenie_ma_JEDEN_nosnik_i_jest_nim_pieniadz` | **czerwony** |
+| M-L8 | `interfejs/lib/kontrakt.ts`: pole `saldoMinimalne` → `saldoMinimalneXX` | `test_kontrakt_dwa_nosniki.py::test_nazwy_pol_sie_ZGADZAJA[DanePlynnosci]` (+2) | **czerwony** |
+| **M-L7** | `prognoza_plynnosci.py:409`: `stawki.do_groszy(...)` → `Decimal(f'{...:.2f}')` — drugi nośnik zaokrąglenia, inna reguła | **żaden** | **PRZEŻYŁA — `892 passed`** |
+
+### M-L8 zamyka pozycję otwartą przez Z5
+
+Ślad Z5 („Czego ten przebieg NIE objął") notował: *strona TypeScriptu nie była
+mutowana, zgodność kontraktu wnioskowana z symetrii porównania*. **Zmierzone:**
+mutacja po stronie `.ts` czerwieni trzy testy `test_kontrakt_dwa_nosniki.py`.
+Pozycja schodzi z listy otwartych — porównanie działa w obie strony.
+
+### M-L7 — strażnik, który pilnował jednego kształtu zapisu, nie reguły
+
+`test_stawki_jeden_nosnik.py::test_kwota_nie_jest_liczona_wlasnym_quantize_poza_pieniadzem`
+deklaruje, że kwot nie wolno zaokrąglać poza `silnik/pieniadz.py`. Szuka wyłącznie
+`quantize(GROSZ | ZLOTY | Decimal("0.01") | Decimal("1"))`. Python zaokrągla też
+opisem formatu — `f"{x:,.2f}"` — i tego wzorzec nie widzi. Podstawiony drugi
+nośnik, działający **inną regułą** (`ROUND_HALF_EVEN` zamiast `ROUND_HALF_UP`),
+w ścieżce kwoty prognozy płynności, przeszedł całą suitę.
+
+To nie jest hipoteza. `silnik/rdzen/prezentacja.py:56` **już jest** takim drugim
+nośnikiem — jedynym miejscem formatowania kwot w projekcie (`CLAUDE.md` §5).
+Pomiar 2026-08-29:
+
+```
+ wartosc | silnik do_groszy | ekran prezentacja.zloty
+   0.145 |             0.15 | 0,14 zł
+   0.005 |             0.01 | 0,00 zł
+  12.345 |            12.35 | 12,34 zł
+   2.675 |             2.68 | 2,68 zł
+```
+
+Trzy z sześciu wartości dają **inny grosz**. Nagłówek `pieniadz.py` twierdzi
+*„każde zaokrąglenie w tej aplikacji przechodzi przez ten plik"* — pomiar tego
+nie potwierdza.
+
+### Domknięcie — `testy/test_zaokraglenie_ekranu.py`
+
+Dopisany strażnik zamyka klasę, nie jeden przypadek: skanuje `silnik/**` i `api/*`
+za opisem formatu z dwoma miejscami po przecinku, z **jednym nazwanym wyjątkiem**
+(`prezentacja.py`) i **jawnym progiem konsolidacji** — przy pierwszej zmianie
+`prezentacja.liczba` formatowanie woła `pieniadz.do_groszy`, a wyjątek znika.
+
+**Mutacja dowodząca (kontrola dwustronna):** ta sama M-L7, powtórzona po dopisaniu
+strażnika, daje `1 failed, 894 passed` i czerwieni **dokładnie**
+`test_zaokraglenie_ekranu.py::test_grosze_nie_sa_zaokraglane_OPISEM_FORMATU_poza_jednym_wyjatkiem`.
+Kontrola po cofnięciu mutacji: `895 passed, 3 deselected`. Data: 2026-08-29.
+
+### Czego ten przebieg NIE objął
+
+1. **Odwzorowania ramek** — bramka pikselowa nie była uruchamiana ani mutowana
+   w tym przeglądzie; stan przyjęty z raportów Z2b/Z7c.
+2. **Ekranów w przeglądarce** — przegląd czytał kod i mierzył silnik, nie oglądał
+   wyrenderowanych stron.
+3. **`silnik/rdzen/narzedzia.py:238`** (`f"{...:.0f}"`) — zaokrąglenie **procentu**,
+   nie kwoty; świadomie poza wzorcem nowego strażnika. Niepilnowane: że ten procent
+   zaokrągla się tą samą regułą co reszta aplikacji.
