@@ -399,3 +399,88 @@ z realnymi finansami. Komunikat: `Failed: DID NOT RAISE BladMagazynu`.
   `test_dwa_nosniki_formatowania_kwoty_sa_PRZYPIETE` nie sprawdza zgodności — pilnuje, żeby
   **znana** różnica (Python U+00A0, TypeScript U+0020) nie zmieniła się bez decyzji. Ramki niosą
   U+0020, więc odstaje strona Pythona.
+
+---
+
+## Przebieg 2026-08-29 — Z6, sześć tras pod dwa ekrany (`testy/test_trasy_dwa_ekrany.py`, `testy/test_trasy_bez_rachunku.py`)
+
+Kopia drzewa poza repozytorium (`scratchpad/mut-z6`), `__pycache__` czyszczony **przed każdym**
+przebiegiem, po jednej mutacji na przebieg. Kontrola bazowa kopii: **849 passed, 3 deselected** —
+identycznie jak w repozytorium (przed dołożeniem M-Z6-8: 849). Kontrola po cofnięciu wszystkich ośmiu: **850 passed,
+3 deselected**, a `diff -rq` katalogów `api/` i `silnik/` wobec repozytorium: bez różnic.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-Z6-1** | `api/kwoty.py`: `kwota()` zwraca `float(...)` zamiast `str(...)` | `test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` (+ 18 dalszych, w tym cały `test_trasy_dwa_ekrany.py` i dwa z `test_kontrakt_dwa_nosniki.py`) | **czerwony** |
+| **M-Z6-2** | `api/trasy_plynnosc.py`: `APIRouter(default_response_class=…)` → `APIRouter()` | `test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb` | **czerwony** |
+| **M-Z6-3** | `silnik/ekran_ksiegowanie.py`: `rozstrzygnij_kwote` przestaje zwracać stan pytania — minus schodzi po cichu | `test_kwota_UJEMNA_zwraca_PYTANIE_a_nie_blad_i_NIC_nie_zapisuje` | **czerwony** |
+| **M-Z6-4** | `silnik/ekran_plynnosc.py`: `ksiega=kontrakt.zbij_saldo_raz_na_dzien(ksiega)` → `tuple(ksiega)` | `test_ksiega_bije_saldo_RAZ_NA_DZIEN` | **czerwony** |
+| **M-Z6-5** | `silnik/ekran_ksiegowanie.py`: `KATEGORIE_POZA_EKRANEM = ()` — kategoria kosztu firmowego wraca na ekran | `test_kategoria_kosztu_firmowego_NIE_STOI_na_tym_ekranie` · `test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` | **czerwony** |
+| **M-Z6-6** | `silnik/ekran_ksiegowanie.py`: czwarty wiersz podglądu („Wolne środki") nie jest dokładany | `test_podglad_ma_CZTERY_wiersze_a_czwarty_mowi_co_sie_NIE_ruszylo` · `test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` | **czerwony** |
+| **M-Z6-8** | `silnik/rdzen/podatki.py`: `rezerwa_z_bazy` przestaje podawać formę z bazy i liczy zawsze ryczałtem 8,5% | `test_FORMA_OPODATKOWANIA_dojezdza_az_do_odpowiedzi_HTTP` · `test_zbieracz_PODAJE_silnikowi_takze_FORME_z_bazy` · `test_stan_roku_ZMIENIA_prognoze_a_nie_tylko_do_niej_wchodzi` (+ 3 dalsze z `test_trasy_dwa_ekrany.py`) | **czerwony** |
+| **M-Z6-7** | `api/trasy_plynnosc.py`: trasa mnoży `saldoMinimalne` przez 2 przed zwróceniem | `test_cialo_trasy_NIE_LICZY_niczego[trasy_plynnosc.py::plynnosc]` · `test_cialo_trasy_to_JEDNO_zdanie_return[trasy_plynnosc.py::plynnosc]` | **czerwony** |
+
+### M-Z6-1 i M-Z6-2 — dwie mutacje, bo jedna nie wystarczała
+
+To jest najważniejsza pozycja tego przebiegu i wyszła dopiero z pomiaru, nie z projektu.
+
+Mutacja M-Z6-1 zaczerwieniła 19 testów, ale **nie tak, jak zakładałem**. Odpowiedź z liczbą
+zmiennoprzecinkową nigdy nie dojechała do przeglądarki: `OdpowiedzJSON` odmówiła jej wypuszczenia
+i trasy zwróciły kod 500. Strażnik `test_ZADNA_z_szesciu_tras…` zaczerwienił się więc **na kodzie
+odpowiedzi, nie na liczbie w treści**. Sprawdzenie „w odpowiedzi nie ma liczby zmiennoprzecinkowej"
+nie ma jak paść inaczej, bo **mierzy to samo, co bramka, którą sprawdza** — a bramka stoi wcześniej.
+
+Wniosek: ten strażnik nie dowodzi, że liczby nie wychodzą. Dowodzi, że **sześć tras naprawdę
+zostało wywołanych i wszystkie odpowiedziały kodem 200**. Rzeczą, która faktycznie broni granicy,
+jest klasa odpowiedzi ustawiona **w konstruktorze `APIRouter`** — i to ona dostała własnego
+strażnika oraz własną mutację (M-Z6-2). Dopiero M-Z6-2 pada pojedynczo, na mechanizmie:
+
+```
+E  AssertionError: trasy_plynnosc: klasa odpowiedzi to
+   <fastapi.datastructures.DefaultPlaceholder object at 0x10d048e50>,
+   a nie OdpowiedzJSON — liczby zmiennoprzecinkowe wyjda z 200
+```
+
+To nie jest szczegół konfiguracji. U poprzednika zmierzono (FastAPI 0.141), że klasa odpowiedzi
+przekazana do `include_router` **nie dociera do trasy** — więc router bez niej wygląda dokładnie
+tak samo jak router z nią, aż do chwili, w której grosze zaczynają znikać przy kodzie 200.
+
+### M-Z6-5 i M-Z6-6 — przypięta liczba liści działa jako strażnik kształtu
+
+Obie mutacje zmieniły **kształt** odpowiedzi (o jedną kategorię więcej, o jeden wiersz mniej)
+i obie zaczerwieniły także `test_ZADNA_z_szesciu_tras…` — nie przez liczbę zmiennoprzecinkową,
+tylko przez przypiętą liczbę odwiedzonych liści:
+
+```
+E  AssertionError: liczba lisci odpowiedzi sie zmienila:
+   {'GET /api/ksiegowanie': 76, 'POST /api/wpisy': 86,
+    'DELETE /api/wpisy/{id}': 80, …} wobec
+   {'GET /api/ksiegowanie': 73, 'POST /api/wpisy': 83,
+    'DELETE /api/wpisy/{id}': 77, …}
+```
+
+Licznik liści powstał jako **kontrola liczności** obchodu („sprawdzenie, do którego nic nie
+dociera, melduje sukces") i przy okazji okazał się strażnikiem kształtu odpowiedzi. Zmiana
+którejkolwiek z sześciu liczb jest sygnałem do sprawdzenia, nie pozycją do podbicia.
+
+### M-Z6-8 — jedyna mutacja, która sięgnęła poza warstwę sieciową
+
+Ryczałt jest w tym projekcie **wadą, nie opcją domyślną**, i to jest zmierzony mechanizm awarii,
+nie hipoteza: rachunek liczył ryczałtem komuś, kto jest na skali, i robił to wiarygodnie.
+`testy/test_forma_bez_domyslnej.py` pilnuje, że **pominięcie** formy jest błędem wywołania —
+ale nie odpowiada na pytanie o poziom wyżej: czy forma zapisana w bazie zmienia **liczbę
+wychodzącą z trasy**. Ta mutacja odpowiada: zmienia. Skala i ryczałt na tych samych danych dają
+`2986.44` wobec innej wartości, a gdyby były równe, żaden inny test tego pliku by tego nie
+zauważył.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano `zdanie_werdyktu` ani `najnizszy_punkt`.** Oba mają testy
+  (`test_zdanie_werdyktu_nazywa_PRZYCZYNE_nie_tylko_fakt`), ale **żaden z nich nie został
+  potwierdzony mutacją** — etykieta jawna: ta część jest **niepotwierdzona**, dokładnie w rozumieniu
+  §3.8. Kandydat na kolejny przebieg: `_co_wychodzi_tego_dnia` zwracające pusty napis.
+- **Nie mutowano strony TypeScriptu** — `interfejs/` jest cudzą własnością (Z1/Z2); czytam go,
+  nie piszę do niego.
+- **Nie ma strażnika behawioralnego** — żaden z tych testów nie mówi, że liczba **na ekranie**
+  równa się liczbie z silnika. Ta luka zostaje otwarta do zadania Z7, którego bramka brzmi
+  „prognoza po wpisie jest inna niż przed".

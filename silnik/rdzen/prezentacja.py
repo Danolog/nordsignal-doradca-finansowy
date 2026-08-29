@@ -438,3 +438,70 @@ def opis_do_zaplacenia(stan) -> list[str]:
         wiersze.append("plan wydatków przekroczony o "
                        f"{zloty(stan.nadwyzka)}")
     return wiersze
+
+
+# --- ekran Ksiegowanie (Z6) ----------------------------------------------
+
+#: Nazwy miesiecy w MIEJSCOWNIKU — forma po slowie „w". TRZECI przypadek obok
+#: mianownika (`MIESIACE`) i dopelniacza (`MIESIACE_DOPELNIACZ`), a nie ich
+#: wariant: „0 w wrzesien" i „0 w wrzesnia" sa oba zle po polsku, a to zdanie
+#: idzie na ekran Ksiegowania dwa razy — jako licznik wpisow
+#: (`NAPISY.licznikWpisow` w `interfejs/lib/napisy.ts`) i jako etykieta
+#: pierwszego wiersza karty „Co ruszy ten wpis".
+#:
+#: Nosnik stoi tutaj, a nie w module ekranu, z tego samego powodu co dwie
+#: listy wyzej: nazwy miesiecy po polsku maja w tym projekcie JEDNO miejsce
+#: (CLAUDE.md §5, wiersz „Napisy i formatowanie kwot").
+MIESIACE_MIEJSCOWNIK = ["styczniu", "lutym", "marcu", "kwietniu", "maju",
+                        "czerwcu", "lipcu", "sierpniu", "wrześniu",
+                        "październiku", "listopadzie", "grudniu"]
+
+#: Tytul trzeciego wiersza karty „Co ruszy ten wpis", per typ wpisu. Napis
+#: skladany z typu („Plan " + typ + " wykonany") dawalby „Plan Wydatki
+#: wykonany" — dopelniacz nie wynika z mianownika przez doklejenie.
+TYTUL_PLANU_WYKONANEGO = {
+    "Przychody": "Plan przychodów wykonany",
+    "Wydatki": "Plan wydatków wykonany",
+    "Oszczędności": "Plan oszczędności wykonany",
+}
+
+
+def procent_wykonania(x: "Decimal | None") -> str:
+    """Procent wykonania planu z JEDNYM miejscem po przecinku: „10,5%".
+
+    OSOBNO OD `procent`, a nie zamiast niego — to sa dwie rozne rzeczy i
+    zwiniecie ich w jedna zepsuloby obie:
+
+    * `procent` bierze UŁAMEK (0,085) i obcina zera nieznaczace („8,5%",
+      ale tez „0%"). Sluzy stawkom podatkowym, gdzie „8,5%" i „8,50%" to ta
+      sama stawka, a zero nie wystepuje;
+    * ta funkcja bierze PUNKTY PROCENTOWE (`budzet.Wykonanie.procent`, czyli
+      wykonane/planowane*100) i zawsze pokazuje jedno miejsce po przecinku.
+      Ramka `Ksiegowanie.dc.html` niesie „0,0%" obok „10,5%" — kolumna liczb
+      o roznej liczbie miejsc po przecinku czyta sie jako blad, a nie jako
+      precyzja.
+
+    `None` znaczy „planu nie ma", nie „zero procent" (`budzet.Wykonanie`
+    §procent). Zero klamaloby, ze wydatek zmiescil sie w budzecie.
+    """
+    if x is None:
+        return BRAK_KWOTY
+    return f"{Decimal(str(x)).quantize(Decimal('0.1'))}".replace(".", ",") + "%"
+
+
+def odmien_kategorie(ile: int) -> str:
+    """Liczebnik z odmieniona fraza „kategoria" w MIANOWNIKU — jeden nosnik.
+
+    Cztery formy polskie, te same co w `odmien_pozycje`, ale w innym
+    przypadku gramatycznym: tam fraza stoi po „znalazl" (biernik), tutaj po
+    „stoja" (mianownik). Wspolna implementacja musialaby przyjac przypadek
+    jako argument i zwrocic napis skladany z kawalkow — a skladanie napisu
+    z kawalkow zabiera straznikowi zakresu mozliwosc znalezienia frazy.
+    """
+    ostatnia = ile % 10
+    dwie_ostatnie = ile % 100
+    if ile == 1:
+        return f"{ile} kategoria"
+    if 2 <= ostatnia <= 4 and not 12 <= dwie_ostatnie <= 14:
+        return f"{ile} kategorie"
+    return f"{ile} kategorii"

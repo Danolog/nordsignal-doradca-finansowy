@@ -603,6 +603,33 @@ def wykonanie_planu(wpisy: pd.DataFrame, plan: pd.DataFrame,
     return _pozycje_z_sum(planowane, wykonane)
 
 
+def wykonanie_typu(wpisy: pd.DataFrame, plan: pd.DataFrame,
+                   rok: int, miesiac: int, typ: str) -> Wykonanie:
+    """Plan kontra wykonanie dla CALEGO typu w miesiacu — jedna pozycja.
+
+    Powstalo w Z6 dla trzeciego wiersza karty „Co ruszy ten wpis"
+    („Plan wydatkow wykonany: 0,0% -> 10,5%"). Ten wiersz mowi o CALYM planie
+    wydatkow miesiaca, nie o planie jednej kategorii — a `wykonanie_planu`
+    rozbija zestawienie na pary (typ, kategoria) i sumy typu nie zwraca.
+
+    ANI JEDNEJ WLASNEJ LICZBY. Sumy zbieraja istniejace nosniki (`sumy_planu`,
+    `sumy_miesieczne`), a pola pochodne — procent, pozostalo, przekroczone —
+    liczy ten sam `_pozycje_z_sum` co obie wersje zestawienia. Wlasny rachunek
+    `wykonane / planowane * 100` bylby DRUGIM NOSNIKIEM reguly procentu
+    i rozjechalby sie przy pierwszej zmianie zaokraglenia.
+
+    `kategoria` w wyniku jest pusta: to jest pozycja o typie, nie o kategorii.
+    """
+    if typ not in TYPY:
+        raise ValueError(
+            f"Nieznany typ wpisu: {typ}. Dozwolone sa wylacznie: "
+            + ", ".join(TYPY) + ".")
+    planowane = {(typ, ""): sumy_planu(plan, rok, miesiac)[typ]}
+    wykonane = {(typ, ""): sumy_miesieczne(wpisy, [(rok, miesiac)])[
+        (rok, miesiac)][typ]}
+    return _pozycje_z_sum(planowane, wykonane)[0]
+
+
 def wykonanie_planu_okres(wpisy: pd.DataFrame, plan: pd.DataFrame,
                           miesiace: list[tuple[int, int]]) -> list[Wykonanie]:
     """Zestawienie plan kontra wykonanie dla CALEGO okresu.

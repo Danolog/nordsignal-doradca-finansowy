@@ -1,16 +1,29 @@
 # -*- coding: utf-8 -*-
-"""JEDEN NOSNIK SPISU TRAS — co warstwa sieciowa ma udostepniac.
+r"""JEDEN NOSNIK SPISU TRAS — co warstwa sieciowa ma udostepniac.
 
 DLACZEGO SPIS, A NIE SAME DEKORATORY. Ta sama lista jest potrzebna w trzech
 miejscach: buduje trasy (`index.py`), pilnuje kompletnosci (straznik w
 `testy/`) i odpowiada na pytanie "czy nowy interfejs moze juz wylaczyc stary"
 (PRD §9). Trzy kopie rozjechalyby sie przy pierwszym dopisaniu trasy — a
-wlasnie tego rodzaju rozjazd sprawil, ze poprzednia aplikacja miala dziesiec
-tras i przekonanie, ze brakuje "jednej".
+wlasnie tego rodzaju rozjazd sprawil, ze o warstwie sieciowej poprzednika
+krazyly dwie rozne liczby.
 
-STAN POPRZEDNIKA, ZMIERZONY: 10 tras — osiem odczytu, dwie zapisu. Funkcja
-zapisu wpisu istniala w silniku razem z transakcyjnoscia; BRAKOWALO WYLACZNIE
-DROGI HTTP. Dlatego nowy interfejs byl galeria, nie aplikacja.
+SPROSTOWANIE (Z6, 2026-08-29). Ten naglowek niosl do dzis zdanie „STAN
+POPRZEDNIKA, ZMIERZONY: 10 tras — osiem odczytu, dwie zapisu". Liczba byla
+NIEPRAWDZIWA i przezyla sprostowanie S1 w `docs/plan-nocy-2026-08-29.md`,
+czyli byla DRUGIM NOSNIKIEM przeslanki, ktora juz upadla.
+
+POMIAR, dwukrotny i zgodny (Ethan w Z5, powtorzony przeze mnie w Z6):
+
+    $ grep -c -E '@trasy\.(get|post|put|delete)\("' "../AI CFO/api/router.py"
+    24                       # Counter({'GET': 22, 'PUT': 2})
+    + 3 trasy plikow w `api/statyka.py`
+
+24 trasy danych, ani jednej metody POST. To zmienia nie liczbe, tylko WNIOSEK:
+poprzednik mial rozbudowany ODCZYT i prawie zaden ZAPIS. Funkcja zapisu wpisu
+istniala w silniku razem z transakcyjnoscia; BRAKOWALO WYLACZNIE DROGI HTTP.
+Dlatego nowy interfejs byl galeria, nie aplikacja — przyczyna jest wezsza, niz
+mowilo stare zdanie, i dokladnie dlatego warto ja bylo sprostowac.
 
 CZTERY OPERACJE, BEZ KTORYCH NIE DA SIE WYLACZYC STAREJ ZAKLADKI (P-1):
 dodac wpis · wycofac wpis · ustawic pozycje planu · ZAKONCZYC pozycje planu.
