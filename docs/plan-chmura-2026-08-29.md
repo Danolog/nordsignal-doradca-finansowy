@@ -42,7 +42,7 @@ i plan, a pasek prowadzi tam, gdzie obiecuje.
 |---|---|---|
 | **Pusty start** | Aplikacja startuje pusta od **1 IX 2026**. 204 wpisy i 46 pozycji planu **nie migrują**. Baza poprzednika zostaje **wyłącznie jako dane robocze do budowy** (`~/Dane-robocze-doradca-finansowy/`, prawa 600, poza repozytorium) | 08:44 i 09:19 |
 | **Dane w chmurze** | Prawdziwe finanse **trafiają do Neona** (Frankfurt, UE) | 10:15 |
-| **Dostęp** | **SSO Vercela wystarczy na teraz** — świadomy dług, nie przeoczenie | 10:3x |
+| **Dostęp** | ~~SSO Vercela wystarczy na teraz~~ — **przesłanka obalona pomiarem w W6.** Decyzja zastępcza Darka 2026-08-29, godz. 20:34: **aplikacja zostaje otwarta**; własne logowanie budujemy, gdy będzie w pełni gotowa | 10:3x, sprostowane 20:34 |
 | **Kolejność** | **Najpierw pomiar Vercela**, potem migracja, potem wdrożenie | 10:3x |
 | **Tryb pracy** | Jeden wyspecjalizowany agent na zadanie, własne okno kontekstowe | 10:38 |
 
@@ -283,7 +283,7 @@ nie zadziałał**. Każdy przebieg ma sekcję „Czego ten przebieg NIE objął"
 
 | Dług | Próg powrotu |
 |---|---|
-| **Brak uwierzytelniania w aplikacji** — chroni ją wyłącznie SSO Vercela, zabezpieczenie platformy, nie aplikacji. Wyłączenie ochrony wdrożenia „żeby było wygodniej" **upublicznia finanse bez żadnego sygnału** | pierwsze wejście z urządzenia bez konta Vercela, albo pierwsza prośba o pokazanie komuś aplikacji |
+| **Aplikacja jest OTWARTA dla każdego, kto zna adres** — nie „chroni ją SSO”. **Sprostowanie z pomiaru W6, 2026-08-29:** SSO Vercela chroni wyłącznie adresy pojedynczych wdrożeń (`...-949s2pc45-...` → 302); adres, pod który się wchodzi, nie jest chroniony przez nic. Zmierzone bez żadnych poświadczeń, dwukrotnie i niezależnie (wykonawca W6 i Oliver): `GET /` → 200, `GET /api/plynnosc` → 200 z pełną treścią bazy, **`PUT /api/kotwica` → 200**. Ostatnia pozycja jest najcięższa: **zapis** przechodzi bez uwierzytelnienia, więc każdy, kto zna adres, może kwoty nie tylko odczytać, ale i zmienić. Zamknięcie przez `deploymentType: "all"` zepsułoby aplikację — przepisanie z interfejsu do silnika jest żądaniem serwer-do-serwera i nie niesie sesji przeglądarki. **Decyzja Darka 2026-08-29, godz. 20:34: zostawiamy otwarte; własne logowanie budujemy, gdy aplikacja będzie w pełni gotowa.** Świadomy dług podjęty na zmierzonej przesłance — nie na tej z godz. 10:3x, która była nieprawdziwa. **Skutek do wiadomości: od tej chwili każda prawdziwa kwota wpisana do aplikacji leży w bazie dostępnej publicznie.** | **aplikacja w pełni gotowa** → własne logowanie (decyzja Darka). Progi wcześniejsze, gdyby zaszły przed tamtym: pierwsza prośba o pokazanie komuś aplikacji; pierwszy adres, który wyszedł poza Darka |
 | **Rejestr stawek ma 19 pozycji i zero konsumentów** — silnik liczy z 28 stałych w `stawki.py`. Zatwierdzenie stawki przez Darka **nie zmienia dziś żadnej liczby** | pierwsza zmiana wartości w `stawki.py` albo w `wiedza/stawki_poczatkowe.py` |
 | **`PUT /api/forma` i `PUT /api/dzialalnosc` nie istnieją nawet w spisie tras** — luka o poziom wyżej niż brak implementacji: brak decyzji, gdzie te dane wchodzą | przed pozycjami 4 i 7 pierwszego uruchomienia |
 | **Spacja przed „zł"**: `prezentacja.py` daje U+00A0, ramki i `kwota.ts` U+0020 | pierwszy napis składany w Pythonie, który trafia na ekran |
@@ -343,7 +343,7 @@ STAN, W KTÓRYM ZACZYNASZ — zbudowane w nocy 2026-08-29
   obniża saldo na dziś o 500,00 zł, wycofanie przywraca
 - repo prywatne: github.com/Danolog/nordsignal-doradca-finansowy (gałąź main)
 - Vercel: projekt nordsignal-doradca-finansowy w zespole dareks-projects-da398fc0,
-  build przechodzi, adres za ochroną SSO
+  build przechodzi, adres OTWARTY (SSO chroni tylko adresy pojedynczych wdrozen - pomiar W6)
 - Neon: projekt doradca-finansowy (purple-hat-65403365), aws-eu-central-1, Postgres 18,
   DATABASE_URL w zmiennych Vercela. BAZA JEST PUSTA — zero schematu, zero danych
 - baza robocza z prawdziwymi danymi Darka: ~/Dane-robocze-doradca-finansowy/ (prawa 600,
