@@ -26,6 +26,11 @@ interfejs/CLAUDE.md
 *.pem
 
 # dane
+# Baza produkcyjna wymieniona Z NAZWY, mimo ze `*.db` juz ja lapie.
+# Powod: straznik `testy/test_magazyn.py::test_baza_jest_w_gitignore`
+# pyta o nazwe, a nie o wzorzec — wzorzec latwo zawezic w przyszlosci
+# nie zauwazywszy, ze przestal obejmowac realne finanse Darka.
+cfo_database.db
 *.db
 *.db-*
 *.sqlite

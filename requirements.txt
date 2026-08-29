@@ -5,6 +5,10 @@ httpx==0.28.1
 pydantic==2.12.4
 python-dotenv==1.2.1
 openpyxl==3.1.5
+# Silnik przeniesiony w Z4: `magazyn.py` czyta i pisze przez ramki danych,
+# `import_arkusza.py` czyta arkusz. Wersje zgodne z poprzednikiem, zeby
+# przeniesione testy mierzyly ten sam kod, a nie inna implementacje.
+pandas==3.0.5
 
 # testy
 pytest==9.0.2

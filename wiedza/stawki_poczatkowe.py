@@ -111,6 +111,18 @@ POROWNANIE_FORM = [
        "PORÓWNANIE FORM — ryczalt dla PKWiU 74.90.19.0. "
        "NIE JEST forma Darka; obecnosc tej wartosci w rejestrze nie upowaznia "
        "zadnego modulu do liczenia ryczaltem."),
+    _p("ryczalt.stawka_15", D("0.15"), "ulamek", f"{_BIZNES}/00263",
+       "PORÓWNANIE FORM — druga stawka ryczaltu zestawiana w porownaniu. "
+       "Dopisana w Z4: `formy.porownaj_formy` uzywa DWOCH stawek ryczaltu, "
+       "a rejestr niosl jedna, wiec druga zyla wylacznie jako literal w kodzie "
+       "liczacym (`formy.py:162`) — wbrew regule 'zadnej stawki w kodzie'. "
+       "Kwalifikacja PKWiU jest sporna i to jest powod, dla ktorego porownanie "
+       "pokazuje obie, zamiast wybierac za czlowieka.",
+       niezweryfikowane="Ktora z dwoch stawek ryczaltu obowiazywalaby przy "
+                        "uslugach Darka, rozstrzyga kwalifikacja PKWiU — a ta "
+                        "jest sporna. Wartosc jest poprawna jako STAWKA; "
+                        "niezweryfikowane jest jej ZASTOSOWANIE do tej "
+                        "dzialalnosci."),
 ]
 
 WSZYSTKIE: list[Stawka] = SPOLECZNE + ZDROWOTNA + SKALA + VAT + POROWNANIE_FORM
