@@ -21,6 +21,9 @@
 //             wtedy oba wyprowadzamy z `silnik/prezentacja.py` (Z4/Z5).
 
 import { DOPELNIACZ_TYPU, type TypWpisu } from "./kontrakt";
+// `sformatujOdczyt` jest JEDYNYM nosnikiem zapisu daty slownie („6 pazdziernika
+// 2026"). Powtorzony tutaj bylby drugim nosnikiem odmiany miesiecy.
+import { sformatujOdczyt } from "./kwota";
 
 export const NAPISY = {
   // --- etykiety ekranu, w kolejnosci ramki ---
@@ -340,4 +343,299 @@ export const NAPISY_KOTWICY = {
   // i dopisek „z odczytu 9 920,79 zl z 2 wrzesnia" — czyli te sama informacje
   // przy samej liczbie. Osobne zdanie „Zapisane: …" byloby DRUGIM NOSNIKIEM
   // tego faktu i pierwszym kandydatem do rozjazdu przy nastepnej zmianie.
+} as const;
+
+/* ---------- EKRAN BUDZET (W9c) ---------- */
+
+// GRANICA WARSTW, POWTORZONA TU JAKO WOLANIE, NIE JAKO DRUGI NOSNIK:
+// silnik oddaje LICZBY i NAZWY MIESIECY, widok sklada z nich PROZE. Nosnik
+// tej reguly stoi w `lib/kontrakt.ts`, naglowek „EKRAN BUDZET". Zdania
+// niosace liczbe ALBO odmowe silnika (`KafelekBudzetu.wyjasnienie`,
+// `CelNaEkranie.tempoNapis`) przychodza gotowe i NIE MA ICH w tym pliku.
+//
+// CZEGO TU NIE MA I DLACZEGO — cztery odstepstwa od brzmien ramki
+// `makiety/Budzet.dc.html`, zgloszone jawnie, nie zdecydowane po cichu:
+//
+//  (1) NAZWY MIESIECY WPISANE NA STALE. Ramka mowi „ta sama liczba wraca
+//      w listopadzie i w grudniu" — zdanie prawdziwe wylacznie w pazdzierniku.
+//      Kontrakt niesie miesiac w mianowniku (`miesiacNapis`) i miejscowniku
+//      (`nazwaMiesiaca`); miejscownika MIESIECY NASTEPNYCH nie niesie, a
+//      tablica odmiany po stronie widoku bylaby drugim nosnikiem tej odmiany
+//      (pierwszy: `silnik/prezentacja.MIESIACE_MIEJSCOWNIK`). Zdanie mowi
+//      wiec „w kolejnych miesiacach" i jest prawdziwe w kazdym miesiacu.
+//      Straznik: `test_ekran_NIE_WPISUJE_nazw_miesiecy_na_sztywno`.
+//
+//  (2) FAKTURA 1/2026. Ramka wplata ja w dwa akapity („Przychod z faktury
+//      1/2026 nie jest planem…", „Faktura 1/2026 stoi na karcie Firma…").
+//      `DaneBudzetu` nie niesie ani numeru faktury, ani jej stanu — numer
+//      wpisany tutaj bylby liczba z nieznanego zrodla (§3.7) i klamalby
+//      w kazdym miesiacu bez tej faktury. Zdania nie ma; luka zgloszona.
+//
+//  (3) „Kredyty 1 624,81 zl (1 i 12 X)". Ramka SUMUJE dwie pozycje planu tej
+//      samej kategorii (1 305,05 + 319,76) i skleja ich dni. Sumowanie kwot
+//      w widoku jest zakazane wprost (§3.1 — liczba zmiennoprzecinkowa na
+//      sciezce kwoty), a `PozycjaPlanu.dzien` niesie JEDEN dzien, wiec „1 i
+//      12 X" nie ma jak powstac. Lista wymienia pozycje osobno.
+//
+//  (4) „w tym miesiacu nie ma ani jednego" — ogon zdania o kategorii Firmowe.
+//      Warunek („czy w tym miesiacu jest koszt firmowy") wymagalby rozstrzygania
+//      po NAZWIE kategorii w widoku. Zostaje czesc bezwarunkowo prawdziwa.
+
+/** Odmiana przez liczbe: 1 / 2–4 / 5+ (z wyjatkiem nastolatkow). */
+function odmien(ile: number, poj: string, kilka: string, wiele: string): string {
+  const setki = ile % 100;
+  const dziesiatki = ile % 10;
+  if (ile === 1) return poj;
+  if (dziesiatki >= 2 && dziesiatki <= 4 && !(setki >= 12 && setki <= 14)) return kilka;
+  return wiele;
+}
+
+// Liczebnik slowny do dziewieciu — dalej cyfra. Ramka pisze „Trzy pozycje
+// czekaja", nie „3 pozycje": zdanie narracyjne czyta sie slowami, a rubryka
+// pod nim cyframi. Powyzej dziewieciu slowo przestaje byc krotsze od cyfry.
+const LICZEBNIKI = ["", "Jedna", "Dwie", "Trzy", "Cztery", "Pięć",
+                    "Sześć", "Siedem", "Osiem", "Dziewięć"];
+
+// Dzien miesiaca w miejscowniku — „miesiac jest w szostym dniu". Ramka pisze
+// to slowem; liczba porzadkowa cyfra („w 6. dniu") jest innym rejestrem niz
+// reszta zdania. Tablica jest JEDYNYM nosnikiem tej odmiany w projekcie —
+// silnik nie odmienia dni porzadkowo.
+const DZIEN_PORZADKOWY = [
+  "", "pierwszym", "drugim", "trzecim", "czwartym", "piątym", "szóstym",
+  "siódmym", "ósmym", "dziewiątym", "dziesiątym", "jedenastym", "dwunastym",
+  "trzynastym", "czternastym", "piętnastym", "szesnastym", "siedemnastym",
+  "osiemnastym", "dziewiętnastym", "dwudziestym", "dwudziestym pierwszym",
+  "dwudziestym drugim", "dwudziestym trzecim", "dwudziestym czwartym",
+  "dwudziestym piątym", "dwudziestym szóstym", "dwudziestym siódmym",
+  "dwudziestym ósmym", "dwudziestym dziewiątym", "trzydziestym",
+  "trzydziestym pierwszym",
+];
+
+export const NAPISY_BUDZETU = {
+  tytul: "Budżet",
+
+  // „4 pozycje planu · 0 wpisów". LICZY TAKZE CELE — tak jak `liczbaPozycjiPlanu`
+  // w kontrakcie; sama dlugosc listy pozycji dalaby trzy, a etykieta opisywalaby
+  // wtedy inna liczbe niz ta, ktora widac pod spodem (§3.5).
+  licznikNaglowka: (pozycji: number, wpisow: number) =>
+    `${pozycji} ${odmien(pozycji, "pozycja", "pozycje", "pozycji")} planu · ` +
+    `${wpisow} ${odmien(wpisow, "wpis", "wpisy", "wpisów")}`,
+
+  // Zdanie pod kafelkami. Rezerwa jest SALDEM NARASTAJACYM, nie wydatkiem
+  // miesiaca — bez tego zdania kafelek „Plan miesiąca razem" czyta sie jako
+  // kwota do wydania w tym miesiacu.
+  rezerwaZdanie:
+    "Rezerwa nie jest wydatkiem tego miesiąca. To saldo tego, co jeszcze " +
+    "należysz urzędowi — ta sama liczba wraca w kolejnych miesiącach, " +
+    "dopóki jej nie zapłacisz.",
+
+  bilansEtykieta: "Bilans planu",
+  bilansPodpis: "tyle zostanie, gdy zrealizujesz plan co do złotówki",
+
+  // Proza bilansu. Kazda liczba przychodzi sformatowana z `lib/kwota.ts` —
+  // tutaj sklada sie wylacznie zdanie. Czlon o oszczednosciach ma dwa
+  // brzmienia, bo „i plan oszczędności 0,00 zł" mowi co innego niz
+  // „oszczędności na ten miesiąc nie zaplanowałeś".
+  bilansProza: (przychody: string, wydatki: string, oszczednosci: string | null) =>
+    `Plan przychodów ${przychody} minus plan wydatków ${wydatki}` +
+    (oszczednosci === null
+      ? "; oszczędności na ten miesiąc nie zaplanowałeś."
+      : ` i plan oszczędności ${oszczednosci}.`),
+  bilansUjemny:
+    " Ujemny bilans znaczy, że plan się nie spina — miesiąc bez ani jednej " +
+    "zaplanowanej pozycji przychodu wygląda tak samo.",
+  bilansRezerwa: " Rezerwa nie wchodzi w tę liczbę; stoi wyżej, osobno.",
+
+  // --- narracja nad tabela ---
+
+  // Stan „nic jeszcze nie wydane" ma WLASNE zdanie, bo „wydałeś 0,00 zł"
+  // i „nie wydałeś jeszcze nic" to dla czytajacego dwie rozne wiadomosci.
+  zPlanuNic: (plan: string, dzien: number) =>
+    `Z planu ${plan} nie wydałeś jeszcze nic — miesiąc jest w ${DZIEN_PORZADKOWY[dzien]} dniu.`,
+  zPlanuWydane: (plan: string, wydane: string, dzien: number) =>
+    `Z planu ${plan} wydałeś ${wydane} — miesiąc jest w ${DZIEN_PORZADKOWY[dzien]} dniu.`,
+
+  czekajaNaDni: (ile: number) =>
+    `${LICZEBNIKI[ile] ?? ile} ${odmien(ile, "pozycja czeka na swój dzień", "pozycje czekają na swoje dni", "pozycji czeka na swoje dni")}: `,
+
+  firmowe:
+    "Kategoria Firmowe nie wpisuje się ręcznie — powstaje z każdego kosztu " +
+    "na karcie Firma, na kwotę brutto.",
+
+  // --- plan kontra wykonanie ---
+
+  planKontraWykonanie: "Plan kontra wykonanie",
+  podpisOdchylenia: "największe odchylenie u góry",
+  dodajPozycje: "Dodaj pozycję planu",
+
+  kolumnaKategoria: "Kategoria",
+  kolumnaPlan: "Plan",
+  kolumnaPostep: "Postęp",
+  kolumnaWykonanie: "Wykonanie",
+  kolumnaOdchylenie: "Odchylenie",
+
+  grupaWydatki: "Wydatki",
+  grupaPrzychodyIOszczednosci: "Przychody i oszczędności",
+
+  // Stan pusty grupy przychodow — WZORZEC POPRAWNEGO STANU PUSTEGO na tej
+  // ramce: akapit pelnej szerokosci POZA siatka kolumn.
+  //
+  // OGON JEST WARUNKOWY I TO JEST POPRAWKA PO OBEJRZENIU EKRANU, nie po
+  // tescie. Ramka pisze to zdanie jednym ciagiem, razem z „dlatego bilans
+  // planu jest ujemny o cala kwote wydatkow" — bo na ramce bilans JEST ujemny.
+  // W miesiacu bez ani jednej pozycji planu bilans wynosi 0,00 zl, a zdanie
+  // twierdzilo, ze jest ujemny — cztery centymetry ponizej liczby, ktora mowi
+  // co innego (§3.5). Zmierzone na zywym silniku, sierpien 2026.
+  bezPrzychodow: (miesiac: string) =>
+    `Na ${miesiac} nie zaplanowałeś ani przychodu, ani oszczędności.`,
+  bezPrzychodowOgon:
+    " Dlatego bilans planu jest ujemny o całą kwotę wydatków.",
+
+  // Stan pusty grupy wydatkow. Etykieta grupy nad zerem wierszy opisuje
+  // rzecz, ktorej nie ma — a wejscie do dzialania („Dodaj pozycję planu")
+  // stoi w naglowku tuz nad nia (PRD §12.8).
+  bezWydatkow: (miesiac: string) =>
+    `Na ${miesiac} nie zaplanowałeś ani jednego wydatku.`,
+
+  // MIESIAC BEZ PLANU — po co ten ekran w ogole istnieje.
+  // „Z planu 0,00 zl nie wydales jeszcze nic" jest formalnie prawdziwe
+  // i mowi nieprawde o stanie rzeczy: podaje ZERO JAKO WYNIK tam, gdzie
+  // planu nie ma wcale (PRD §12.8 — „nigdy zero udajace wynik"). Zdanie
+  // nizej nazywa skutek, ktory z tego wynika dla PIERWSZEGO ekranu
+  // aplikacji, bo to jest jedyny powod, dla ktorego plan trzeba wpisac.
+  bezPlanu: (miesiac: string) =>
+    `Na ${miesiac} nie masz jeszcze ani jednej pozycji planu. Dopóki jej nie ` +
+    "ma, prognoza płynności nie ma czego odjąć i pokazuje przyszłość " +
+    "spokojniejszą, niż jest.",
+
+  // --- cele ---
+
+  cele: "Cele oszczędnościowe",
+  podpisCelow:
+    "postęp liczy się z wpisów w kategorii celu, nie z ręcznie wpisanej liczby",
+  dodajCel: "Dodaj cel",
+  bezCelow: "Nie masz jeszcze ani jednego celu oszczędnościowego.",
+
+  // --- historia ---
+
+  historia: "Historia",
+  podpisHistorii: "zaznacz wiersz, żeby poprawić pomyłkę",
+  usunZaznaczone: "Usuń zaznaczone",
+
+  kolumnaData: "Data",
+  kolumnaKwota: "Kwota",
+  kolumnaOpis: "Opis",
+  kolumnaTyp: "Typ",
+
+  // Stan pusty Historii. PIERWSZE zdanie jest wlasne, DRUGIE wola istniejacy
+  // nosnik `PROZA.pustaHistoriaHoryzont` — fakt o 204 wpisach sprzed wznowienia
+  // dzialalnosci ma w tym projekcie jeden nosnik i jest nim tamten czlon.
+  pustaHistoria: (nazwaMiesiaca: string) =>
+    `W ${nazwaMiesiaca} nie ma jeszcze czego poprawiać.`,
+} as const;
+
+/* ---------- PANEL POZYCJI PLANU (W9c, odstepstwo od §3.6) ---------- */
+
+// CZEGO RAMKA NIE RYSUJE — nazwane, bo §3.6 czyni makiete wiazaca.
+// `makiety/Budzet.dc.html` rysuje WEZWANIE „Dodaj pozycję planu" i nic poza
+// nim: ani pola wpisywania, ani kontrolki zmiany pozycji, ani kontrolki
+// konca reguly. Uklad panelu ponizej jest ODSTEPSTWEM rozstrzygnietym przez
+// Mile (`docs/2026-08-29-spis-ekran-budzet.md` §4) — jeden panel w dwoch
+// trybach, reuzywajacy istniejacy wzorzec wizualny ramki, zamiast nowego
+// typu wiersza z ikonami w siatce, ktora nie ma na nie miejsca.
+// PROG: ramka Budzetu przy najblizszej edycji dostaje te dwa elementy.
+// Straznik: `testy/test_ekran_budzet.py::
+// test_ramka_Budzetu_NIE_RYSUJE_kontrolki_zmiany_ani_konca_reguly`.
+//
+// KOSZ KONCZY REGULE, NIE KASUJE. Kontrolka NIE MOZE nazywac sie ani dzialac
+// jak „usuń": pazdziernik i listopad nadal maja pokazywac, ze pozycja byla
+// zaplanowana i ile z niej wykonano. Zmienia sie wylacznie przyszlosc —
+// i zdanie potwierdzenia mowi to wprost, razem z miesiacem, od ktorego
+// skutek obowiazuje (§3.5: stan wyjatkowy podaje WIELKOSC, nie samo slowo).
+export const NAPISY_PANELU = {
+  tytulDodania: "Dodaj pozycję planu",
+  tytulZmiany: "Zmień pozycję planu",
+
+  etykietaTypu: "Typ",
+  etykietaKategorii: "Kategoria",
+  etykietaKwoty: "Kwota",
+  etykietaOpisu: "Opis — nieobowiązkowy",
+  etykietaDnia: "Dzień miesiąca",
+  etykietaCyklu: "Co ile miesięcy",
+
+  bezZnaku: "Bez znaku — kierunek niesie typ pozycji.",
+  dzienPusty: "Puste = pozycja bez konkretnego dnia.",
+
+  zapiszNowa: "Zapisz pozycję",
+  zapiszZmiane: "Zapisz zmianę",
+  rezygnuje: "Rezygnuję",
+
+  // Tozsamosc pozycji NIE ZMIENIA SIE przez zmiane — mowi o tym pole, nie
+  // milczenie. Bez tego zdania czlowiek widzi kategorie jako tekst i nie wie,
+  // czy jej nie da sie zmienic, czy zapomniano zrobic z niej pole.
+  tozsamoscNieruchoma:
+    "Typu i kategorii tej pozycji nie zmieniam — zmiana kategorii to nowa " +
+    "pozycja, a wykonanie policzone w starej zostałoby przy niej. Zakończ tę " +
+    "i załóż nową.",
+
+  // KONIEC REGULY. Miesiac stoi W ZDANIU, nie domyslnie — etykieta niesie od
+  // razu zakres skutku.
+  zakonczOd: (miesiac: string) => `Zakończ tę pozycję od ${miesiac}`,
+  potwierdzenieZakonczenia: (kategoria: string, miesiac: string) =>
+    `Wcześniejsze miesiące zostają bez zmian — ${kategoria} przestanie się ` +
+    `pojawiać w planie od ${miesiac}.`,
+  zakoncz: "Zakończ",
+
+  // Stany bledu. Wspolny komunikat „błąd" dla trzech przyczyn jest tym samym,
+  // co brak komunikatu (§3.7).
+  kwotaPusta: "Podaj kwotę.",
+  kwotaNieczytelna: "Nieczytelna kwota.",
+  kwotaUjemna: "Kwota pozycji planu jest bez znaku — kierunek niesie typ pozycji.",
+  kategoriaPusta: "Wybierz kategorię.",
+  dzienPozaMiesiacem: "Dzień miesiąca to liczba od 1 do 31.",
+  cyklPozaZakresem: "Co ile miesięcy: liczba od 1 do 12.",
+
+  // Awaria o nieznanym rodzaju. Silnik ma dla swoich odmow wlasne zdania
+  // i te oddajemy w calosci; to brzmienie stoi WYLACZNIE dla wyjatku,
+  // ktorego nie umiemy nazwac — i mowi wprost, czyja to wada.
+  awariaNieznana:
+    "Coś padło po naszej stronie i nie umiem powiedzieć co. Plan NIE został " +
+    "zmieniony — zgłoś to, zanim spróbujesz ponownie.",
+} as const;
+
+/* ---------- PANEL CELU OSZCZEDNOSCIOWEGO (W9c) ---------- */
+
+export const NAPISY_CELU = {
+  tytul: "Dodaj cel",
+
+  etykietaNazwy: "Nazwa celu",
+  etykietaKategorii: "Kategoria",
+  etykietaKwoty: "Ile chcesz uzbierać",
+  etykietaTerminu: "Do kiedy",
+
+  // Regule „kategoria celu musi byc typu Oszczednosci" egzekwuje silnik
+  // (`magazyn.zapisz_cel`) — to zdanie ja ZAPOWIADA, zeby czlowiek nie
+  // dowiadywal sie o niej dopiero z odmowy. Nie jest jej drugim nosnikiem:
+  // niczego nie sprawdza i niczego nie przepuszcza.
+  kategoriaOszczednosci:
+    "Kategoria oszczędności — z wpisów w niej liczy się postęp celu.",
+
+  zapisz: "Zapisz cel",
+
+  nazwaPusta: "Cel bez nazwy nie da się odróżnić od innego celu.",
+  kwotaUjemna: "Kwota docelowa jest bez znaku — cel zbiera, nie wydaje.",
+  terminNieczytelny:
+    "Nie rozumiem tej daty. Podaj ją jako rok-miesiąc-dzień, np. 2027-12-31.",
+
+  terminSlownie: (iso: string) => sformatujOdczyt(iso),
+
+  // DLUG JAWNY (PRD §10.3, S-2): prog poduszki ma byc LICZONY — 6 x wydatki
+  // niezbedne — a wartosc nadpisana recznie widocznie oznaczona. Kontrakt nie
+  // niesie ani liczonego progu, ani znacznika nadpisania, wiec kazda kwota
+  // wpisana tutaj jest z natury reczna. Zdanie mowi to wprost, zamiast
+  // udawac, ze liczba pochodzi z rachunku.
+  progRecznie:
+    "Tę kwotę wpisujesz ręcznie. Wyliczonego progu poduszki (sześciokrotność " +
+    "wydatków niezbędnych) ta wersja jeszcze nie pokazuje — gdy się pojawi, " +
+    "wpisana ręcznie wartość zostanie oznaczona jako nadpisana.",
 } as const;

@@ -92,15 +92,62 @@ test("zdanie werdyktu stoi w ramce dosłownie", () => {
 // stać w KAŻDYM zestawie, bo bramka szuka go na ekranie niezależnie od tego,
 // który wzorzec jest podstawiony.
 test("znacznik wzorca stoi w ramkach i w każdym zestawie", () => {
-  for (const nazwa of ["Main", "Main-Dobrze", "Ksiegowanie"]) {
+  for (const nazwa of ["Main", "Main-Dobrze", "Ksiegowanie", "Budzet"]) {
     expect(readFileSync(join(RAMKI, `${nazwa}.dc.html`), "utf8")).toContain(ZNACZNIK_WZORCA);
   }
   const zestawy = Object.values(ZESTAWY);
-  expect(zestawy.length).toBe(5);
+  // SZEŚĆ od W9c — doszedł zestaw `budzet`. Ta liczba jest kontrolą liczności
+  // i zaczerwieniła się na dodaniu zestawu dokładnie tak, jak miała.
+  expect(zestawy.length).toBe(6);
   for (const z of zestawy) {
     expect(z.plynnosc.ostatnieSprawdzenie).toBe(ZNACZNIK_WZORCA);
     expect(z.ksiegowanie.ostatnieSprawdzenie).toBe(ZNACZNIK_WZORCA);
+    expect(z.budzet.ostatnieSprawdzenie).toBe(ZNACZNIK_WZORCA);
   }
+});
+
+// Wzorzec Budżetu jest WŁASNOŚCIĄ RAMKI: każda jego kwota ma stać w rubryce
+// `Budzet.dc.html` znak po znaku. Wzorzec rozjechany z ramką jest gorszy niż
+// brak wzorca — bramka meldowałaby wtedy zgodność z rysunkiem, którego nikt
+// już nie rysuje.
+test("wzorzec Budżetu niesie liczby z ramki", () => {
+  const html = readFileSync(join(RAMKI, "Budzet.dc.html"), "utf8");
+  const b = ZESTAWY.budzet.budzet;
+
+  // KWOTY IDĄ ZE WZORCA, NIE Z LISTY WPISANEJ TUTAJ — i to jest cała różnica
+  // między strażnikiem a atrapą. Pierwsza wersja tego testu sprawdzała, że
+  // ramka zawiera kwoty wypisane w teście: zdanie prawdziwe o ramce i milczące
+  // o wzorcu. Mutacja „2614.81 → 2614.82" w `dane-wzorcowe.mjs` PRZEŻYŁA ją
+  // (48 passed, zmierzone 2026-08-29). Teraz kwoty są składane ze wzorca tym
+  // samym nośnikiem formatowania, którego używa ekran (`lib/kwota.ts`).
+  const naEkranie = (kwota) => sformatujKwote(kwota, znakKwoty(kwota));
+  const zeWzorca = [
+    ...b.kafelki.map((k) => naEkranie(k.kwota)),
+    naEkranie(b.bilansPlanu),
+    ...b.pozycjeWykonania.map((w) => naEkranie(w.plan)),
+    naEkranie(b.cele[0].kwotaDocelowa),
+  ];
+  // Kontrola liczności: osiem kwot, nie „tyle, ile się znalazło".
+  expect(zeWzorca.length).toBe(8);
+  for (const kwota of zeWzorca) {
+    expect(html).toContain(kwota.replace(/ /g, "&nbsp;"));
+  }
+
+  // Kontrola liczności: wzorzec ma dokładnie tyle rzeczy, ile rysuje ramka.
+  expect(b.kafelki.length).toBe(3);
+  expect(b.pozycjeWykonania.length).toBe(3);
+  expect(b.cele.length).toBe(1);
+  expect(b.historia.length).toBe(0);
+  expect(b.liczbaPozycjiPlanu).toBe(4);   // trzy wydatki + jeden cel
+  expect(b.liczbaWpisow).toBe(0);
+  expect(html).toContain("4 pozycje planu · 0 wpisów");
+  expect(html).toContain(b.napisKopiujZ);
+  expect(html).toContain(b.miesiacNapis);
+
+  // Suma kafelków: 2 614,81 + 7 696,65 = 10 311,46. Porównanie NA NAPISACH,
+  // bo kwota jest napisem po obu stronach granicy (§3.1) — tutaj wystarczy
+  // sprawdzić, że trzecia liczba jest tą, którą ramka rysuje jako sumę.
+  expect(b.kafelki.map((k) => k.klucz)).toEqual(["wydatkiZPlanu", "rezerwa", "razem"]);
 });
 
 // Ramka Księgowania rysuje kartę „Co ruszy ten wpis" w stanie po wpisaniu

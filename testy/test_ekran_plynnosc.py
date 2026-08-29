@@ -117,10 +117,42 @@ def test_ekran_NIE_KLAMIE_o_ratach_spoza_planu():
     assert "NIE dolicza" not in _tekst_ekranu()
 
 
+#: Bloki brzmien, ktore NALEZA do ekranu Plynnosci. `lib/napisy.ts` jest
+#: nosnikiem brzmien CALEGO interfejsu — od W9c mieszkaja w nim takze brzmienia
+#: Budzetu, a ten ekran ma sekcje „Przychody i oszczednosci" wprost z ramki.
+BLOKI_PLYNNOSCI = ("NAPISY_PLYNNOSCI", "NAPISY_KARTY", "NAPISY_KOTWICY")
+
+
+def _napisy_tego_ekranu() -> str:
+    """Brzmienia NALEZACE do Plynnosci, nie caly wspolny nosnik.
+
+    SPROSTOWANIE PREMISY (W9c, 2026-08-29). Do W9c ten straznik czytal caly
+    `lib/napisy.ts` i mial racje, bo plik niosl wylacznie Ksiegowanie,
+    Plynnosc i powloke. Od W9c niesie takze Budzet, ktorego ramka ma sekcje
+    „PRZYCHODY I OSZCZEDNOSCI" — wiec straznik czerwienil sie na brzmieniu
+    CUDZEGO ekranu i mowil o Plynnosci cos, czego Plynnosc nie robi.
+
+    To ta sama poprawka, ktora wczesniej przeszly nazwy typow wpisu: stoja
+    w `lib/kontrakt.ts`, bo jest wspolny (patrz naglowek `DOPELNIACZ_TYPU`).
+    Tutaj zawezamy CZYTANIE, a nie regule — pliki samego ekranu Plynnosci
+    sa nadal czytane w calosci.
+    """
+    tekst = bez_komentarzy(NAPISY.read_text(encoding="utf-8"))
+    czesci = []
+    for nazwa in BLOKI_PLYNNOSCI:
+        blok = re.search(rf"export const {nazwa} = \{{(.*?)\n\}} as const;", tekst, re.S)
+        assert blok, f"nie znalazłem bloku brzmień {nazwa} w lib/napisy.ts"
+        czesci.append(blok.group(1))
+    # Kontrola liczności: obchód po pustym zbiorze meldowałby sukces.
+    assert len(czesci) == len(BLOKI_PLYNNOSCI)
+    assert sum(len(c) for c in czesci) > 500, "bloki brzmień Płynności są podejrzanie krótkie"
+    return "\n".join(czesci)
+
+
 def test_ekran_NIE_MA_kafelkow_z_innego_pytania():
     """Przychody / wydatki / oszczędności odpowiadają na inne pytanie i mają
     inny ekran. Jeden ekran na jedno pytanie."""
-    tekst = _tekst_ekranu()
+    tekst = _polacz([p for p in _zrodla() if p != NAPISY]) + "\n" + _napisy_tego_ekranu()
     for slowo in ("Przychody", "Oszczędności", "Poduszka", "Cele oszczędnościowe"):
         assert slowo not in tekst, f"kafelek z innego pytania: {slowo}"
 

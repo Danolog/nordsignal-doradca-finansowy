@@ -67,6 +67,50 @@ export function sformatujDzienSlownie(iso: string): string {
   return `${Number(dzien)} ${MIESIACE_DOPELNIACZ[Number(miesiac) - 1]}`;
 }
 
+// Dzien miesiaca zapisem rzymskim — „20 X". Jedyny nosnik tego zapisu dla
+// pozycji planu, ktora dostaje dzien POLEM (`PozycjaPlanu.dzien`), a nie data:
+// regula planu obowiazuje do odwolania, wiec nie ma jednej daty, ktora by ja
+// opisywala. Zaden napis z silnika tego zapisu nie zawiera — mowi o tym wprost
+// naglowek „EKRAN BUDZET" w `lib/kontrakt.ts`.
+//
+// TABLICA JEST TA SAMA, ktorej uzywa `sformatujDzien` — jeden nosnik zapisu
+// rzymskiego po stronie interfejsu, nie drugi.
+export function dzienWMiesiacu(dzien: number, miesiac: string): string {
+  const [, numer] = miesiac.split("-");
+  return `${dzien} ${RZYMSKIE[Number(numer) - 1]}`;
+}
+
+// „Czy ta kwota jest zerem" — PRACA WYLACZNIE NA NAPISIE, jak wszystko na
+// sciezce kwoty (§3.1). Odpowiedz jest potrzebna tam, gdzie zero i brak
+// znacza dla czytajacego co innego: „nie wydales jeszcze nic" brzmi inaczej
+// niz „wydales 0,00 zl", a „oszczednosci nie zaplanowales" inaczej niz
+// „plan oszczednosci 0,00 zl". Regula ma jeden nosnik, bo inaczej kazdy
+// ekran rozstrzygalby ja u siebie — i pierwszy, ktory zapomni o wiodacym
+// znaku, pokaze zdanie o niezaplanowanych oszczednosciach przy kwocie.
+export function kwotaJestZerem(kwota: string): boolean {
+  return /^[-+−]?0+([.,]0+)?$/.test(kwota.trim());
+}
+
+// Miesiac w dopelniaczu razem z rokiem — „października 2026". Stoi w zdaniu
+// „Zakoncz te pozycje OD …" i w potwierdzeniu konca reguly (Budzet, W9c).
+//
+// DLACZEGO SKLADA TO WIDOK, A NIE SILNIK. Kontrakt niesie miesiac w dwoch
+// przypadkach: mianowniku (`miesiacNapis` — „październik 2026", napis
+// selektora) i miejscowniku (`nazwaMiesiaca` — „październiku"). Dopelniacza
+// nie ma i dokladanie go do kontraktu byloby trzecia forma tej samej nazwy
+// przesylana przez granice po to, zeby zlozyc jedno zdanie — a granica
+// warstw mowi wprost: silnik oddaje NAZWY MIESIECY, proze sklada widok
+// (`lib/kontrakt.ts`, naglowek „EKRAN BUDZET").
+//
+// TABLICA JEST TA SAMA, ktora sluzy `sformatujDzienSlownie` — jeden nosnik
+// odmiany po stronie interfejsu, nie drugi. Odpowiednik po stronie silnika
+// (`silnik/prezentacja.MIESIACE_DOPELNIACZ`) istnial przed ta funkcja i nie
+// przybywa przez nia ani jeden nosnik.
+export function sformatujMiesiacDopelniacz(miesiac: string): string {
+  const [rok, numer] = miesiac.split("-");
+  return `${MIESIACE_DOPELNIACZ[Number(numer) - 1]} ${rok}`;
+}
+
 // Odczyt w naglowku — „6 października 2026". Odpowiada na pytanie „z ktorego
 // dnia jest to, co widze", i od Z7 bierze ten dzien Z DANYCH: `DanePlynnosci.
 // odczyt` albo `DaneKsiegowania.dzisiaj`, czyli dokladnie ten dzien, dla

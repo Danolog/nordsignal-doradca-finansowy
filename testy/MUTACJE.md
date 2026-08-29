@@ -1589,3 +1589,121 @@ Naprawione: źródło i cel czyta ten sam nośnik co ekran, tożsamość to peł
 - **Kontrolka „Wybrany miesiąc"** z ramki jest poza zakresem (rozstrzygnięcie Mili, §7 spisu
   `docs/2026-08-29-spis-ekran-budzet.md`) — trasa `GET /api/budzet` przyjmuje **jeden** parametr
   miesiąca.
+
+---
+
+## W9c — ekran Budżet (2026-08-29)
+
+Dwadzieścia siedem mutacji, wszystkie na **kopii drzewa poza repozytorium**
+(`scratchpad/drzewo-mutacji`), z `PYTHONDONTWRITEBYTECODE=1`. Harness sprawdza
+nie „ile testów padło", tylko **czy padł ten, który miał paść** — ostrzeżenie
+z tej sesji mówi wprost, że mutacja potrafi zaczerwienić inny test i wyglądać
+na dowód. Każda z 24 mutacji strażników Budżetu zaczerwieniła **dokładnie
+jeden** test i **dokładnie ten**.
+
+**Kontrola przed i po:** `22 passed in 0.61s` → 24 mutacje → `22 passed in 0.55s`.
+
+### Sam harness mutacyjny był atrapą na pierwszym uruchomieniu
+
+Wart zapisania, bo to trzeci raz w tej sesji, gdy pomiar melduje sukces, nie
+zmierzywszy niczego. Pierwszy przebieg dał **„24 mutacje, 0 trafień, 0 padłych
+testów"** — i wyglądało to jak dowód, że wszyscy strażnicy są atrapami.
+Faktycznie pytest **w ogóle nie zbierał testów**: `conftest.py` odmawia startu
+bez `DATABASE_URL_TESTY`, a harness tej zmiennej nie przekazywał. Zbiór padłych
+testów był pusty z tego samego powodu, z którego jest pusty przy przebiegu
+zielonym.
+
+Druga odsłona tej samej wady: po dodaniu zmiennej harness nadal widział
+`BRAK WYJŚCIA`, bo dokładał `-q` do `-q` z `pytest.ini` — **`-qq` połyka linię
+podsumowania**, więc ani „22 passed", ani „FAILED" nie docierało do pomiaru.
+
+Naprawione **kontrolą liczności w samym harnessie**: przebieg, w którego wyjściu
+nie ma ani „N passed", ani „N failed", kończy się błędem pomiaru, a nie zerem
+padłych. Plus asercja, że kontrola przed mutacjami zbiera **22 strażników**.
+
+### Mutacje treści (15)
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-1 | `zakonczOd` → „Usuń tę pozycję" | `test_kosz_planu_KONCZY_regule_i_MOWI_O_TYM_trzy_razy` |
+| M-W9c-2 | kasowanie wpisu przekierowane na `/api/plan/${id}` | `test_zadna_trasa_planu_NIE_JEST_kasujaca` |
+| M-W9c-3 | `parseFloat(kwotaTekst)` dołożony w panelu | `test_kwota_NIE_STAJE_SIE_liczba_nigdzie_na_ekranie` |
+| M-W9c-4 | kwota `"1 305,05 zł"` wpisana w komponent | `test_ekran_NIE_MA_wpisanej_recznie_kwoty` |
+| M-W9c-5 | gałąź `k.kwota === null` → `false` | `test_odmowa_silnika_NIE_STAJE_SIE_zerem` |
+| M-W9c-6 | tytuł kafelka brany jako `DANE.kafelki[0].tytul` | `test_kafelki_BIERZE_SIE_PO_KLUCZU_nie_po_indeksie` |
+| M-W9c-7 | warunek `idPozycjiPlanu === null` → `false` | `test_link_zmiany_STOI_TYLKO_przy_JEDNEJ_pozycji_planu` |
+| M-W9c-8 | stan pusty znów twierdzi ujemny bilans bezwarunkowo | `test_stan_pusty_NIE_TWIERDZI_ujemnego_bilansu_gdy_bilans_JEST_ZEREM` |
+| M-W9c-9 | gałąź miesiąca bez planu usunięta | `test_miesiac_bez_planu_NIE_PODAJE_zera_jako_wyniku` |
+| M-W9c-10 | „w kolejnych miesiącach" → „w listopadzie i w grudniu" | `test_ekran_NIE_WPISUJE_nazw_miesiecy_na_sztywno` |
+| M-W9c-11 | „Bilans planu (ryczałt)" | `test_ekran_NIE_MOWI_o_formie_opodatkowania` |
+| M-W9c-12 | `var(--atrament-cichy)` → `#4A5267` w arkuszu | `test_styl_NIE_MA_wpisanej_recznie_barwy` |
+| M-W9c-13 | zapis odpytuje `pobierzBudzet` zamiast oddać odpowiedź | `test_zapis_ODDAJE_odswiezony_ekran_zamiast_pytac_drugi_raz` |
+| M-W9c-14 | wycofanie wpisu zwraca `{}` zamiast odświeżyć Budżet | `test_wycofanie_wpisu_ODPYTUJE_BUDZET_bo_trasa_oddaje_inny_ekran` |
+| M-W9c-15 | „Cele oszczędnościowe" → „Cele" | `test_kazda_fraza_z_ramki_JEST_na_ekranie` |
+
+### Mutacje liczności (9)
+
+Pytają nie „czy ta rzecz jest dobra", tylko **„ile rzeczy pomiar zobaczył"**.
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-16 | adres `/api/plan/kopiuj` → `/api/plan/kopiowanie` (trasa bez wołającego) | `test_KAZDA_z_szesciu_tras_Budzetu_MA_WOLAJACEGO_na_ekranie` |
+| M-W9c-17 | wywołanie `kopiujPlan(` skasowane z ekranu (funkcja bez wołającego) | `test_KAZDA_funkcja_danych_Budzetu_MA_WOLAJACEGO_w_komponencie` |
+| M-W9c-18 | `DANE.liczbaWpisow` zastąpione stałą `0` (pole bez czytającego) | `test_KAZDE_pole_kontraktu_Budzetu_MA_CZYTAJACEGO` |
+| M-W9c-19 | trasa `/api/cele` przypisana do innego ekranu (spis oddaje 5, nie 6) | `test_KAZDA_z_szesciu_tras_Budzetu_MA_WOLAJACEGO_na_ekranie` |
+| M-W9c-20 | pole `liczbaWpisow` usunięte z kontraktu (19 → 18) | `test_KAZDE_pole_kontraktu_Budzetu_MA_CZYTAJACEGO` |
+| M-W9c-21 | ramka dostaje odsyłacz „Zmień pozycję planu" (próg odstępstwa) | `test_ramka_Budzetu_NIE_RYSUJE_kontrolki_zmiany_ani_konca_reguly` |
+| M-W9c-22 | do spisu dopisana `PUT /api/wpisy/{id}` (próg długu) | `test_popraw_zaznaczony_CZEKA_na_trase_zmiany_wpisu` |
+| M-W9c-23 | `CelNaEkranie` dostaje `nadpisanyRecznie` (próg długu S-2) | `test_prog_poduszki_CZEKA_na_pole_kontraktu` |
+| M-W9c-24 | „Wybrany miesiąc" dopisane do nośnika brzmień | `test_kontrolka_Wybrany_miesiac_ZOSTAJE_poza_zakresem` |
+
+### Sprostowanie premisy strażnika Płynności (M-W9c-25, M-W9c-26)
+
+`test_ekran_plynnosc.py::test_ekran_NIE_MA_kafelkow_z_innego_pytania` czytał
+**cały** `interfejs/lib/napisy.ts` i miał rację, dopóki plik niósł wyłącznie
+Księgowanie, Płynność i powłokę. Od W9c niesie także Budżet, którego ramka ma
+sekcję „PRZYCHODY I OSZCZĘDNOŚCI" — strażnik zaczerwienił się więc na brzmieniu
+**cudzego** ekranu i mówił o Płynności coś, czego Płynność nie robi.
+
+To ta sama poprawka, którą wcześniej przeszły nazwy typów wpisu (mieszkają
+w `lib/kontrakt.ts`, bo jest wspólny). Zawężone zostało **czytanie**, nie reguła:
+pliki samego ekranu Płynności są nadal czytane w całości, a z nośnika brzmień
+brane są trzy bloki należące do tego ekranu (`NAPISY_PLYNNOSCI`, `NAPISY_KARTY`,
+`NAPISY_KOTWICY`).
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-25 | „Księga płynności — Przychody" w `NAPISY_PLYNNOSCI` (TREŚĆ) | `test_ekran_NIE_MA_kafelkow_z_innego_pytania` |
+| M-W9c-26 | `NAPISY_KARTY` przemianowane — blok znika (LICZNOŚĆ) | `test_ekran_NIE_MA_kafelkow_z_innego_pytania` |
+
+Kontrola: `31 passed` → mutacja → `1 failed, 30 passed` → cofnięcie → `31 passed`.
+
+### Strażnik wzorca Budżetu przeżył własną mutację — i został przepisany (M-W9c-27)
+
+Czwarty w tej sesji przypadek strażnika-atrapy, tym razem świeżo napisanego.
+Pierwsza wersja `wzorzec.test.mjs::wzorzec Budżetu niesie liczby z ramki`
+sprawdzała, że **ramka zawiera kwoty wypisane w teście** — zdanie prawdziwe
+o ramce i **całkowicie milczące o wzorcu**. Mutacja `2614.81 → 2614.82`
+w `dane-wzorcowe.mjs` dała **48 passed** (zmierzone 2026-08-29).
+
+Przepisany tak, żeby kwoty **pochodziły ze wzorca** i były składane **tym samym
+nośnikiem formatowania, którego używa ekran** (`lib/kwota.ts::sformatujKwote`).
+Po przepisaniu ta sama mutacja daje `1 failed, 47 passed`; po cofnięciu
+`48 passed`.
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-27 | kafelek wzorca 2 614,81 → 2 614,82 (rozjazd z ramką o grosz) | `wzorzec Budżetu niesie liczby z ramki` |
+
+### Czego przebieg W9c NIE objął
+
+- **Bramka odwzorowania `Budzet` NIE PRZECHODZI: 26,10% przy progu 2%.** Przyczyna
+  jest nazwana i zmierzona — patrz raport odbiorczy i `docs/2026-08-29-spis-ekran-budzet.md` §6.
+- **Nie ma strażnika behawioralnego czytającego liczbę z wyrenderowanej strony.**
+  Cztery operacje P-1 zmierzono przejściem przez zbudowaną wersję produkcyjną
+  ręcznie prowadzonym Playwrightem; **przebieg nie jest zaniesiony do repozytorium**
+  i nie powtórzy się sam. Ta sama luka, co opisana w `conftest.py`.
+- **Nie mutowano strażników spoza W9c** — poza dwoma z `test_ekran_plynnosc.py`,
+  których premisę ta zmiana naruszyła.
+- **Nie ruszono silnika ani `api/`.** Znalezisko o kafelku rezerwy (niżej,
+  w raporcie) zgłoszone, nie naprawione.

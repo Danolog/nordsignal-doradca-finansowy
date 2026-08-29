@@ -212,13 +212,119 @@ const ZERO = {
   liczbaPozycjiCoMnieCzeka: 0,
 };
 
+/* ---------- Budzet.dc.html — pazdziernik 2026, plan bez ani jednego wpisu ---------- */
+//
+// ODCZYTANE Z RUBRYK RAMKI, ZNAK PO ZNAKU. Trzy kafelki (2 614,81 · 7 696,65 ·
+// 10 311,46), bilans (−2 614,81), trzy wiersze „Plan kontra wykonanie"
+// (1 624,81 · 660,00 · 330,00), jeden cel (30 000,00, tempo „2 000,00 zl / mc
+// przez 15 mc") i licznik naglowka („4 pozycje planu · 0 wpisow").
+// Kontrola: 2 614,81 + 7 696,65 = 10 311,46 ✓; 30 000 / 15 = 2 000 ✓.
+//
+// JEDNA LICZBA Z RAMKI JEST W TYM KSZTALCIE NIEWYRAZALNA i stoi to tutaj
+// napisane, zamiast udawac, ze sie zgadza. Ramka pisze „Kredyty 1 624,81 zl
+// (1 i 12 X)" — czyli SUMUJE dwie reguly planu tej samej kategorii
+// (1 305,05 + 319,76) i skleja ich dni. `PozycjaPlanu.dzien` niesie JEDEN
+// dzien, wiec „1 i 12 X" nie ma jak powstac; wzorzec niesie jedna pozycje
+// Kredytow o kwocie z ramki i dniu `1`. Ekran napisze wiec „(1 X)" tam,
+// gdzie ramka pisze „(1 i 12 X)" — roznica NAZWANA, nie zamieciona.
+// Zgodne z licznikiem naglowka: ramka liczy Kredyty jako JEDNA pozycje
+// (4 = trzy wydatki + jeden cel).
+//
+// `liczbaPozycjiPlanu` w wierszu „Kredyty" wynosi wiec 1, a nie 2 — bo tak
+// widzi to ramka. Gdyby wynosila 2, `idPozycjiPlanu` musialoby byc `null`
+// i nazwa kategorii przestalaby otwierac panel zmiany.
+
+const BUDZET = {
+  dzisiaj: "2026-10-06",
+  miesiac: "2026-10",
+  miesiacNapis: "październik 2026",
+  nazwaMiesiaca: "październiku",
+  liczbaPozycjiPlanu: 4,
+  liczbaWpisow: 0,
+  kafelki: [
+    {
+      klucz: "wydatkiZPlanu",
+      tytul: "Wydatki osobiste z planu",
+      kwota: "2614.81",
+      dopisek: "przepływ tego miesiąca",
+      wyjasnienie: null,
+    },
+    {
+      klucz: "rezerwa",
+      tytul: "Rezerwa na podatki",
+      kwota: "7696.65",
+      dopisek: "saldo narastające, nie wydatek miesiąca",
+      wyjasnienie: null,
+    },
+    {
+      klucz: "razem",
+      tytul: "Plan miesiąca razem",
+      kwota: "10311.46",
+      dopisek: "to jest kwota z ekranu Miesiąc",
+      wyjasnienie: null,
+    },
+  ],
+  planPrzychodow: "0.00",
+  planWydatkow: "2614.81",
+  planOszczednosci: "0.00",
+  bilansPlanu: "-2614.81",
+  wykonaneWydatki: "0.00",
+  // Kolejnosc z ramki i zarazem NAJWIEKSZE ODCHYLENIE U GORY:
+  // −1 624,81 · −660,00 · −330,00.
+  pozycjeWykonania: [
+    {
+      typ: "Wydatki", kategoria: "Kredyty",
+      plan: "1624.81", wykonane: "0.00", odchylenie: "-1624.81",
+      procent: "0,0%", procentPaska: 0, przekroczone: false,
+      idPozycjiPlanu: 1, liczbaPozycjiPlanu: 1,
+    },
+    {
+      typ: "Wydatki", kategoria: "Czesne",
+      plan: "660.00", wykonane: "0.00", odchylenie: "-660.00",
+      procent: "0,0%", procentPaska: 0, przekroczone: false,
+      idPozycjiPlanu: 2, liczbaPozycjiPlanu: 1,
+    },
+    {
+      typ: "Wydatki", kategoria: "Energia Elektryczna",
+      plan: "330.00", wykonane: "0.00", odchylenie: "-330.00",
+      procent: "0,0%", procentPaska: 0, przekroczone: false,
+      idPozycjiPlanu: 3, liczbaPozycjiPlanu: 1,
+    },
+  ],
+  // Kolejnosc z silnika: (typ, kategoria, opis). Zdanie narracyjne wymienia
+  // pozycje w tej samej kolejnosci, w ktorej je dostaje — sortowanie po dniu
+  // byloby DRUGIM nosnikiem porzadku, obok tego, ktory ustala silnik.
+  pozycjePlanu: [
+    { id: 2, typ: "Wydatki", kategoria: "Czesne", opis: "",
+      kwota: "660.00", dzien: 25, coIleMiesiecy: 1, czeka: true },
+    { id: 3, typ: "Wydatki", kategoria: "Energia Elektryczna", opis: "",
+      kwota: "330.00", dzien: 20, coIleMiesiecy: 1, czeka: true },
+    { id: 1, typ: "Wydatki", kategoria: "Kredyty", opis: "",
+      kwota: "1624.81", dzien: 1, coIleMiesiecy: 1, czeka: true },
+  ],
+  cele: [
+    {
+      id: 1, nazwa: "Poduszka finansowa", kategoria: "Poduszka finansowa",
+      kwotaDocelowa: "30000.00", uzbierane: "0.00", brakuje: "30000.00",
+      procent: "0,0%", procentPaska: 0, termin: "2028-01-31",
+      tempoNapis: `2${NB}000,00${NB}zł / mc przez 15 mc`,
+      osiagniety: false, poTerminie: false,
+    },
+  ],
+  historia: [],
+  miesiacKopiujZ: "2026-09",
+  napisKopiujZ: "Skopiuj z września",
+  ostatnieSprawdzenie: "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.",
+};
+
 /** Wszystkie zestawy — JEDEN nośnik odpowiedzi „jakie wzorce znamy". */
 export const ZESTAWY = {
-  main: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE },
-  "main-dobrze": { plynnosc: MAIN_DOBRZE, ksiegowanie: KSIEGOWANIE },
-  ksiegowanie: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE },
-  "nie-wiem": { plynnosc: NIE_WIEM, ksiegowanie: KSIEGOWANIE },
-  zero: { plynnosc: ZERO, ksiegowanie: KSIEGOWANIE },
+  main: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
+  "main-dobrze": { plynnosc: MAIN_DOBRZE, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
+  ksiegowanie: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
+  budzet: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
+  "nie-wiem": { plynnosc: NIE_WIEM, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
+  zero: { plynnosc: ZERO, ksiegowanie: KSIEGOWANIE, budzet: BUDZET },
 };
 
 // ZNACZNIK OBECNOŚCI WZORCA — zdanie, które stoi na ekranie WYŁĄCZNIE wtedy,
