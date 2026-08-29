@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "porownaj-z-makieta": "node narzedzia/porownaj-z-makieta.mjs"
+    "porownaj-z-makieta": "node narzedzia/porownaj-z-makieta.mjs",
+    "silnik-wzorcowy": "node narzedzia/silnik-wzorcowy.mjs",
+    "straznik-ekran-wobec-silnika": "node narzedzia/straznik-ekran-wobec-silnika.mjs",
+    "straznik-podwojne-klikniecie": "node narzedzia/straznik-podwojne-klikniecie.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",

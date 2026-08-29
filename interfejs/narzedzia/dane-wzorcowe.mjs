@@ -1,0 +1,212 @@
+// WZORCOWY ZESTAW DANYCH — WŁASNOŚĆ RAMKI, NIE APLIKACJI (D-63).
+//
+// PO CO ISTNIEJE. Bramka odwzorowania (`porownaj-z-makieta.mjs`) dowodzi
+// JEDNEJ rzeczy: że ekran wygląda jak rysunek. To jest twierdzenie o układzie
+// i typografii. Puszczona na żywych danych mierzy naraz układ I miesiąc —
+// i nie umie ich rozdzielić, więc przestaje być dowodem czegokolwiek.
+// Zmierzone 2026-08-29: `Main` na planie Darka daje 14,45% przy progu 2%,
+// bo ramka rysuje miesiąc Z DEFICYTEM (6 pozycji, −210,67 zł), a plan Darka
+// daje 7 pozycji i +7 485,98 zł. Układ był przez cały czas dobry.
+//
+// DLACZEGO NIE PRZERYSOWUJEMY RAMKI (rozstrzygnięcie Sophii, D-63).
+// Przerysowanie `Main.dc.html` pod plan Darka zniszczyłoby STAN DEFICYTOWY —
+// a to jest stan, dla którego zaprojektowano cały pierwszy ekran: wiersz
+// zamknięcia w czerwieni, zdanie werdyktu, karta „Co mam zrobić" w stanie 1.
+// Oddalibyśmy rysunek złego stanu za zgodność z danymi JEDNEGO miesiąca,
+// a dane zmieniają się co miesiąc. Stan nadwyżkowy ma własną ramkę:
+// `Main-Dobrze.dc.html`.
+//
+// DLACZEGO TE LICZBY MIESZKAJĄ TUTAJ, A NIE W `lib/dane/`.
+// Ten sam powód, dla którego mieszka tu stan `ksiegowanie-z-ramki`: wartości
+// są własnością RAMKI, nie aplikacji. Po Z7 w `lib/dane/` nie ma ani jednej
+// kwoty i pilnuje tego strażnik `testy/test_dane_bez_kwot.py`; wzorzec
+// wpuszczony tam znosiłby tamtą regułę tylnymi drzwiami.
+//
+// SKĄD SIĘ BIORĄ. Z rubryk ramek, znak po znaku — nie z pamięci. Pięć sald
+// `Main` jest odczytanych wprost i jest dokładne co do grosza:
+// 9 601,03 · 8 295,98 · 8 145,98 · 3 025,33 · −210,67. Trzy dalsze punkty
+// serii (30 IX, 1 X, 13 X) NIE STOJĄ w rubryce — ramka niesie je wyłącznie
+// jako współrzędne rysunku, z dokładnością 0,1 px. Odtworzone przez
+// odwrócenie skali wykresu; **błąd odczytu ±11 zł** (0,05 px na 44 px
+// wysokości przy rozpiętości 9 811,70 zł). To jest granica pomiaru, nie
+// zaokrąglenie — i dlatego stoi napisana, zamiast udawać, że te trzy liczby
+// są tej samej klasy co pozostałe pięć.
+//
+// STRAŻNIK PRZED DRYFEM: `testy/wzorzec.test.ts` wycina liczby z ramek przy
+// każdym przebiegu i porównuje je z tym plikiem. Wzorzec, który rozjedzie
+// się z ramką, jest gorszy niż brak wzorca — bramka meldowałaby wtedy
+// zgodność z rysunkiem, którego nikt już nie rysuje.
+
+/** Spacja nierozdzielająca — dokładnie ta, którą niosą ramki (`&nbsp;`). */
+const NB = " ";
+
+/** Seria dzienna o stałym saldzie — `ile` kolejnych dni od `od`. */
+function serie(od, ile, saldo) {
+  const [rok, miesiac, dzien] = od.split("-").map(Number);
+  return Array.from({ length: ile }, (_, i) => {
+    const d = new Date(Date.UTC(rok, miesiac - 1, dzien + i));
+    return { dzien: d.toISOString().slice(0, 10), saldo };
+  });
+}
+
+/* ---------- Main.dc.html — miesiąc z deficytem ---------- */
+
+const MAIN = {
+  odczyt: "2026-10-06",
+  okresNapis: "wrzesień 2026 · 45 dni naprzód",
+  ksiega: [
+    {
+      dzien: "2026-09-02",
+      pozycja: "Stan na dziś",
+      dopisek: `— z odczytu 9${NB}920,79${NB}zł z 1 września`,
+      kwota: null,
+      saldoPoDniu: "9601.03",
+    },
+    { dzien: "2026-09-12", pozycja: "Kredyt Revolut",    dopisek: null, kwota: "-1305.05", saldoPoDniu: "8295.98" },
+    { dzien: "2026-09-15", pozycja: "PGNiG",             dopisek: null, kwota: "-150.00",  saldoPoDniu: "8145.98" },
+    { dzien: "2026-09-21", pozycja: "ZUS",               dopisek: null, kwota: "-5120.65", saldoPoDniu: "3025.33" },
+    // Oba wiersze 25 IX mają `saldoPoDniu: null`. Saldo tego dnia jest
+    // najniższym punktem prognozy i stoi niżej jako wiersz zamknięcia;
+    // powtórzone w rubryce byłoby tą samą liczbą dwa razy, a druga
+    // wyglądałaby na błąd rachunku.
+    { dzien: "2026-09-25", pozycja: "Czesne WSB Merito", dopisek: null, kwota: "-660.00",  saldoPoDniu: null },
+    { dzien: "2026-09-25", pozycja: "VAT",               dopisek: null, kwota: "-2576.00", saldoPoDniu: null },
+  ],
+  wykres: [
+    ...serie("2026-09-02", 10, "9601.03"),   // 2–11 IX
+    ...serie("2026-09-12", 3, "8295.98"),    // 12–14 IX
+    ...serie("2026-09-15", 6, "8145.98"),    // 15–20 IX
+    ...serie("2026-09-21", 4, "3025.33"),    // 21–24 IX
+    ...serie("2026-09-25", 5, "-210.67"),    // 25–29 IX — pod kreską
+    ...serie("2026-09-30", 1, "8196.26"),    // 30 IX  — odczyt z rysunku, ±11 zł
+    ...serie("2026-10-01", 11, "7861.84"),   // 1–11 X — odczyt z rysunku, ±11 zł
+    ...serie("2026-10-12", 6, "6568.68"),    // 12–17 X — odczyt z rysunku, ±11 zł
+  ],
+  dzienPodKreska: "2026-09-25",
+  saldoMinimalne: "-210.67",
+  dataSaldaMinimalnego: "2026-09-25",
+  zdanieWerdyktu:
+    `25${NB}września schodzisz poniżej zera — tego dnia wychodzi VAT i czesne.`,
+  horyzontDni: 23,
+  liczbaPozycjiCoMnieCzeka: 7,
+  koniecOknaCoMnieCzeka: "2026-10-17",
+  ostatnieSprawdzenie: "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.",
+};
+
+/* ---------- Main-Dobrze.dc.html — miesiąc z nadwyżką ---------- */
+//
+// TA RAMKA NIE RYSUJE WYKRESU — i to nie jest przeoczenie rysownika.
+// `wykres: []` znaczy dla ekranu „prognozy nie ma czym narysować" i kafel
+// wykresu w ogóle nie wchodzi do drzewa. Pusta seria jest tu więc DANĄ,
+// nie brakiem danych.
+//
+// `saldoMinimalne` niesie WIODĄCY PLUS. Ramka rysuje „+2 468,39 zł", a znak
+// czyta `znakKwoty()` z zapisu kwoty — bez plusa ekran narysowałby
+// „2 468,39 zł" i wyróżnienie dodatniej wartości zniknęłoby. To jest
+// jednocześnie ZGŁOSZENIE: żywy silnik oddaje dodatnie `saldoMinimalne`
+// bez znaku (zmierzone: „11090.44"), więc na miesiącu z nadwyżką wiersz
+// „Najniżej" nie dostaje plusa, którego żąda ramka.
+const MAIN_DOBRZE = {
+  odczyt: "2026-10-06",
+  okresNapis: "sierpień 2026 · 45 dni naprzód",
+  ksiega: [
+    {
+      dzien: "2026-08-28",
+      pozycja: "Stan na dziś",
+      dopisek: `— z odczytu 1${NB}840,55${NB}zł z 27 sierpnia`,
+      kwota: null,
+      saldoPoDniu: "1840.55",
+    },
+    { dzien: "2026-08-31", pozycja: "Przychód JDG",      dopisek: null, kwota: "8400.00",  saldoPoDniu: "10240.55" },
+    { dzien: "2026-09-01", pozycja: "Kredyt Alior",      dopisek: null, kwota: "-319.76",  saldoPoDniu: "9920.79" },
+    { dzien: "2026-09-12", pozycja: "Kredyt Revolut",    dopisek: null, kwota: "-1305.05", saldoPoDniu: "8615.74" },
+    { dzien: "2026-09-15", pozycja: "PGNiG",             dopisek: null, kwota: "-150.00",  saldoPoDniu: "8465.74" },
+    { dzien: "2026-09-21", pozycja: "ZUS",               dopisek: null, kwota: "-2761.35", saldoPoDniu: "5704.39" },
+    { dzien: "2026-09-25", pozycja: "Czesne WSB Merito", dopisek: null, kwota: "-660.00",  saldoPoDniu: null },
+    { dzien: "2026-09-25", pozycja: "VAT",               dopisek: null, kwota: "-2576.00", saldoPoDniu: null },
+  ],
+  wykres: [],
+  dzienPodKreska: null,
+  saldoMinimalne: "+2468.39",
+  dataSaldaMinimalnego: "2026-09-25",
+  zdanieWerdyktu: "Przez 6 miesięcy nie schodzisz poniżej zera.",
+  horyzontDni: 23,
+  liczbaPozycjiCoMnieCzeka: 8,
+  koniecOknaCoMnieCzeka: "2026-10-12",
+  ostatnieSprawdzenie: "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.",
+};
+
+/* ---------- Ksiegowanie.dc.html ---------- */
+
+const kategoria = (nazwa) => ({ nazwa, aktywna: true, systemowa: false });
+
+const KSIEGOWANIE = {
+  dzisiaj: "2026-10-06",
+  typDomyslny: "Wydatki",
+  // Trzy pierwsze to pozycje planu na październik; dalej alfabetycznie.
+  kategorie: [
+    "Czesne", "Energia Elektryczna", "Kredyty", "Gaz", "Inne",
+    "Jedzenie poza domem", "Monika i Ada", "PUWIS", "Podatki i ZUS",
+    "Praca", "Subskrypcje", "Telefon i Internet", "Transport", "Zakupy",
+    "Zdrowie",
+  ].map(kategoria),
+  uzasadnienieKolejnosci:
+    "Kolejność ma się liczyć z częstości wpisów, a tych po 1 IX 2026 jeszcze nie ma — " +
+    "więc na początku stoją trzy kategorie z planu na październik, dalej alfabetycznie. " +
+    "Przeliczy się sama, gdy wpisy będą.",
+  ostatnieWpisy: [],
+  liczbaWpisowWMiesiacu: 0,
+  nazwaMiesiaca: "październiku",
+  podglad: {
+    kwota: "274.06",
+    wiersze: [
+      { etykieta: "Wydatki w październiku", przed: "0,00", po: `274,06${NB}zł`, wyjasnienie: null },
+      { etykieta: "Energia Elektryczna",    przed: "0,00", po: `274,06${NB}zł`, wyjasnienie: null },
+      { etykieta: "Plan wydatków wykonany", przed: "0,0%", po: "10,5%",         wyjasnienie: null },
+      {
+        etykieta: "Wolne środki",
+        przed: "",
+        po: null,
+        wyjasnienie: "bez zmian — liczą się z planu, nie z wpisów",
+      },
+    ],
+  },
+  ostatnieSprawdzenie: "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.",
+};
+
+/* ---------- dwa stany rozróżnienia „nie wiem" / „zero" (D-64) ---------- */
+//
+// NIE POCHODZĄ Z ŻADNEJ RAMKI i dlatego nie wolno ich mierzyć bramką
+// odwzorowania. Istnieją po to, żeby dało się ZOBACZYĆ oba renderowania
+// przycisku „Co mnie czeka" na prawdziwym ekranie — `null` znaczy
+// „nie policzyłem", `0` znaczy „policzyłem i nie ma". Zero renderowane jako
+// „nie wiem" albo `null` renderowane jako zero to ta sama klasa wady co
+// forma opodatkowania zgadnięta wartością domyślną.
+const NIE_WIEM = {
+  ...MAIN,
+  liczbaPozycjiCoMnieCzeka: null,
+  zdanieWerdyktu:
+    "Nie policzę prognozy — brakuje stanu konta, od którego miałaby ruszyć.",
+};
+
+const ZERO = {
+  ...MAIN,
+  liczbaPozycjiCoMnieCzeka: 0,
+};
+
+/** Wszystkie zestawy — JEDEN nośnik odpowiedzi „jakie wzorce znamy". */
+export const ZESTAWY = {
+  main: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE },
+  "main-dobrze": { plynnosc: MAIN_DOBRZE, ksiegowanie: KSIEGOWANIE },
+  ksiegowanie: { plynnosc: MAIN, ksiegowanie: KSIEGOWANIE },
+  "nie-wiem": { plynnosc: NIE_WIEM, ksiegowanie: KSIEGOWANIE },
+  zero: { plynnosc: ZERO, ksiegowanie: KSIEGOWANIE },
+};
+
+// ZNACZNIK OBECNOŚCI WZORCA — zdanie, które stoi na ekranie WYŁĄCZNIE wtedy,
+// gdy ekran dostał dane stąd, a nie z żywego silnika. Bramka odwzorowania
+// sprawdza je przed pomiarem: bez tego przebieg wobec przypadkiem
+// uruchomionego prawdziwego silnika zmierzyłby pogodę i zameldował wynik.
+// Żywy silnik oddaje tu `null` (nie ma jeszcze przebiegów strażnika),
+// więc powłoka rysuje wtedy zdanie o niepodpiętym strażniku.
+export const ZNACZNIK_WZORCA = "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.";

@@ -597,3 +597,84 @@ i zobacz skutek" została zbudowana.
 - **Nie mutowano strony TypeScriptu** (`kontrakt.ts`, `napisy.ts`). Zmiany tam są sprawdzane przez
   `tsc --noEmit` i przez `test_kontrakt_dwa_nosniki`, ale **nie przez mutację** — etykieta jawna.
 - **Nie mutowano `zbij_saldo_raz_na_dzien`** — ma własne mutacje z przebiegu Z5.
+
+---
+
+## Przebieg 2026-08-29 — Z7c: wzorcowy zestaw danych, zamek zapisu, stopka obu ekranów
+
+**Gdzie wykonano.** Kopia drzewa poza repozytorium:
+`scratchpad/mut-z7c/{interfejs,makiety}`, z własnym `node_modules` (sklonowanym, nie
+dowiązanym — Turbopack odmawia startu na dowiązaniu wychodzącym poza korzeń projektu)
+i własnym serwerem `next dev` na porcie **3001**. Baza odbiorcza: kopia
+`scratchpad/z7c.db` (204 wpisy, 46 pozycji planu, jeden wiersz `przebiegi_straznika`).
+
+**Kontrola przed mutacjami:** `vitest run` → **37 passed**;
+`straznik-ekran-wobec-silnika` → kod 0; `straznik-podwojne-klikniecie` → kod 0.
+
+| # | Mutacja | Który test / strażnik padł | Wynik |
+|---|---|---|---|
+| **M-Z7c-1** | `NAPISY_PLYNNOSCI.coMnieCzeka` traktuje `null` jak zero (`${pozycji ?? 0} pozycji`) | `null czyta się jako NIE POLICZYŁEM, nigdy jako zero` · `oba stany dają DWA RÓŻNE zdania — bez tego rozróżnienie jest na papierze` | **czerwony** (2 failed / 37) |
+| **M-Z7c-2** | jedno saldo wzorca rozjeżdża się z ramką (`9601.03` → `9601.30`) | `wzorzec Main niesie DOKŁADNIE kwoty ramki, w kolejności rysowania` | **czerwony** (1 failed / 37) |
+| **M-Z7c-3** | `ZNACZNIK_WZORCA` przestaje stać w ramkach (skrócone brzmienie) | `znacznik wzorca stoi w ramkach i w każdym zestawie` | **czerwony** (1 failed / 37) |
+| **M-Z7c-4** | `sformatujKwote` znowu zdejmuje tylko minus (`kwota.replace("-", "")`) | `wiodący plus jest ZDEJMOWANY, nie doklejany drugi raz` · `minus typograficzny wraca z tej funkcji taki sam, jak z niej wyszedł` · `para znakKwoty + sformatujKwote czyta ten sam zbiór zapisów` · `wzorzec Main-Dobrze niesie DOKŁADNIE kwoty ramki, w kolejności rysowania` | **czerwony** (4 failed / 37) |
+| **M-Z7c-5** | zamek zapisu wraca na stan Reacta (`if (wLocie)` zamiast `if (zamek.current)`) | `narzedzia/straznik-podwojne-klikniecie.mjs` → **kod 1**: `3 kliknięcia dały 3 wpisy`, `Żądań POST /api/wpisy: 3`, licznik `0 → 3` | **czerwony** |
+| **M-Z7c-6** | stopka Księgowania wraca na `straznik={null}` | `narzedzia/straznik-ekran-wobec-silnika.mjs` → **kod 1**: `STOPKA[KSIEGOWANIE]` i `STOPKA[DWA EKRANY]` | **czerwony** |
+
+Kontrola po cofnięciu wszystkich sześciu: `vitest run` → **37 passed**;
+`straznik-ekran-wobec-silnika` → **kod 0**; `straznik-podwojne-klikniecie` → **kod 0**
+(`przyrost 1`).
+
+### M-Z7c-5 — mutacja, która pokazała wadę ISTNIEJĄCĄ, nie wprowadzoną
+
+Ta mutacja nie jest wymysłem na potrzeby dowodu: **jest dokładnym stanem gałęzi sprzed
+tego zadania**. Pierwszy pomiar tej nocy poszedł na kod z `HEAD` (`3ee8bd0`) i dał
+`3 kliknięcia → 3 żądania → 3 wpisy`, przy przycisku, który po tych kliknięciach nadal
+miał `disabled === false`. Blokada opisana w nagłówku pliku jako „jedyna dzisiaj obrona
+przed podwójnym wydatkiem" **nie broniła nic**: stan Reacta dociera do funkcji obsługi
+dopiero przy następnym rysowaniu, a trzy `.click()` w jednym zadaniu przeglądarki biegną
+przed nim. D-64 był spełniony na papierze i niespełniony w przeglądarce.
+
+**Dlaczego zwykłe dwa kliknięcia myszą tego nie łapią:** Playwright oddaje między nimi
+sterowanie pętli zdarzeń, React zdąży przerysować przycisk i pomiar mierzy wtedy atrybut
+`disabled`, a nie zamek. Strażnik, który klika „po ludzku", byłby zielony na obu wersjach.
+
+### M-Z7c-6 — i dowód, że bramka pikselowa NIE jest tu strażnikiem
+
+Tę samą mutację (`straznik={null}`) puszczono także przez bramkę odwzorowania na
+wzorcowym zestawie danych. Wynik: **0,29% przy progu 2,00% — bramka PRZESZŁA.**
+Zdanie stopki zajmuje kilka tysięcy pikseli na półtora miliona, więc pomiar wyglądu nie
+odróżnia ekranu, który wie, od ekranu, który zmyśla „nie wiem". Regułę D-64 pilnuje
+`straznik-ekran-wobec-silnika`, nie `porownaj-z-makieta`.
+
+Osobno: przy włączonym `--wzorzec` ta sama mutacja kończy się **kodem 2** zamiast 1 —
+bo znacznikiem obecności wzorca jest właśnie zdanie stopki. Sygnał jest prawdziwy
+(coś jest nie tak), ale **nazywa złą przyczynę**: mówi „ekran nie stoi na wzorcu",
+gdy naprawdę stoi, tylko go nie pokazuje. Nazwane wprost, żeby następny wykonawca nie
+gonił nieistniejącego problemu z konfiguracją.
+
+### Kontrola dwustronna narzędzi pomiarowych
+
+Obie wykonane przed użyciem narzędzi jako dowodu:
+
+| Kontrola | Oczekiwane | Zmierzone |
+|---|---|---|
+| `porownaj-z-makieta.mjs Main Main` (ramka wobec siebie) | 0,00% | **0,00%** |
+| `porownaj-z-makieta.mjs Ksiegowanie Main` (dwie różne ramki) | ≫ 2% | **24,91%** |
+| `--wzorzec` przy działającym **prawdziwym** silniku | błąd pomiaru | **kod 2**, „ekran NIE stoi na wzorcowym zestawie danych" |
+| `silnik-wzorcowy.mjs` po `SIGTERM` | liczba obsłużonych żądań | **3×** przy przebiegu bramki; **0× + UWAGA** przy przebiegu, w którym bramka nie wystartowała |
+
+Ostatni wiersz zdarzył się naprawdę, nie w symulacji: jeden przebieg nocy wystartował
+wzorzec i nie zdążył puścić bramki. Bez licznika po stronie wzorca ten przebieg byłby
+nieodróżnialny od udanego.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano `--wzorzec` przez usunięcie sprawdzenia** — kierunek odwrotny (bramka bez
+  sprawdzenia przechodzi) jest trywialny. Dowodem, że sprawdzenie działa, jest kontrola
+  dwustronna wyżej: przy prawdziwym silniku bramka kończy kodem 2.
+- **Nie mutowano `silnik/` ani `api/`** — poza zakresem tego zadania (zgłoszenia w opisie
+  zgłoszenia zmiany, nie w kodzie).
+- **Nie ma strażnika dla wiersza `Płynność` w karcie „Co ruszy ten wpis" (D-62)** — bo nie
+  ma czego strzec: wiersz nie powstał. Powód w zgłoszeniu do Ethana/Maxa: podgląd nie
+  niesie pozycji planu kategorii ani jej dnia, a bez nich trzy brzmienia D-62 nie mają
+  skąd wziąć wielkości, której §3.5 żąda.

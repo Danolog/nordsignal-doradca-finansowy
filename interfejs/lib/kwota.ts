@@ -15,8 +15,18 @@ export type ZnakKwoty = "dodatnia" | "ujemna" | "neutralna";
 
 const RZYMSKIE = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 
+// ZNAK WIODĄCY ZDEJMUJEMY W KOMPLECIE, nie samym minusem — poprawka Z7c.
+// `znakKwoty()` niżej ROZPOZNAJE trzy zapisy: „-…", „+…" i goły. Tutaj
+// zdejmowany był wyłącznie minus, więc kwota z wiodącym plusem wracała jako
+// „++2 468,39 zł": prefiks doklejał się do plusa, który już w niej stał.
+// Zmierzone na wzorcu ramki `Main-Dobrze.dc.html`, gdzie wiersz „Najniżej"
+// niesie „+2 468,39 zł". Żywy silnik dodatniego salda minimalnego dziś nie
+// podpisuje, więc ta wada nie miała jak paść — a to jest dokładnie ten
+// rodzaj wady, który czeka do pierwszego dobrego miesiąca.
+// Minus typograficzny (U+2212) też, bo tym znakiem pisze ta funkcja: kwota
+// raz sformatowana i wpuszczona z powrotem nie ma się rozsypać.
 export function sformatujKwote(kwota: string, znak: ZnakKwoty): string {
-  const [calosc, grosze = "00"] = kwota.replace("-", "").split(".");
+  const [calosc, grosze = "00"] = kwota.replace(/^[-+\u2212]/, "").split(".");
   const zSpacjami = calosc.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const prefiks = znak === "dodatnia" ? "+" : znak === "ujemna" ? "−" : "";
   return `${prefiks}${zSpacjami},${grosze.padEnd(2, "0")} zł`;

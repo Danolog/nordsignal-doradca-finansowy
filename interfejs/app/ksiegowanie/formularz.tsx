@@ -32,7 +32,18 @@
 // ZAPIS NIE JEST IDEMPOTENTNY PO STRONIE SILNIKA — dwa zadania daja dwa wpisy
 // (zgloszenie Maxa z Z6). Skutek widzi uzytkownik, wiec bramka nalezy do tego
 // ekranu: przycisk jest WYLACZONY na czas lotu zadania. To nie jest ozdoba
-// interfejsu, tylko jedyna dzisiaj obrona przed podwojnym wydatkiem.
+// interfejsu, tylko jedyna dzisiaj obrona przed podwojnym wydatkiem
+// (D-64: klucz idempotentnosci po stronie silnika jest poza v1).
+//
+// BLOKADA STOI NA `useRef`, NIE NA STANIE — i to jest naprawa Z7c, nie styl.
+// Do Z7c zamek czytal `wLocie` ze stanu, a stan dociera do funkcji obslugi
+// dopiero przy NASTEPNYM rysowaniu; atrybut `disabled` tez wchodzi dopiero
+// wtedy. Trzy klikniecia w JEDNYM zadaniu przegladarki czytaly wiec trzy razy
+// `false` i przechodzily wszystkie. ZMIERZONE 2026-08-29 na `HEAD` sprzed tej
+// zmiany: trzy klikniecia -> `3 zadania POST /api/wpisy` -> `licznik wpisow
+// 1 -> 4`, przycisk po nich nadal `disabled === false`. `useRef` jest czytany
+// i zapisywany SYNCHRONICZNIE, w tym samym zadaniu, wiec drugie klikniecie
+// widzi juz zamkniety zamek. Straznik: `narzedzia/straznik-podwojne-klikniecie.mjs`.
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Powloka } from "../powloka";
@@ -181,6 +192,14 @@ export function Formularz({
   const [bladKategorii, setBladKategorii] = useState<string | null>(null);
   const [bladTypu, setBladTypu] = useState<string | null>(null);
   const [bladWarstwy, setBladWarstwy] = useState<string | null>(null);
+  // DWA NOSNIKI JEDNEGO FAKTU „zadanie leci" — swiadomie i z podzialem ról:
+  //   `zamek`  rozstrzyga, czy WOLNO wyslac (czytany synchronicznie),
+  //   `wLocie` rozstrzyga, jak ekran WYGLADA (przycisk wylaczony, `aria-busy`).
+  // Sam stan nie wystarcza do pierwszej roli, bo dociera dopiero przy
+  // nastepnym rysowaniu; sam `ref` nie wystarcza do drugiej, bo jego zmiana
+  // nie przerysowuje ekranu. Obie wartosci ustawia i zdejmuje TA SAMA para
+  // linii w `przekaz` i `wycofaj` — rozjazd wymagalby pominiecia jednej z nich.
+  const zamek = useRef(false);
   const [wLocie, setWLocie] = useState(false);
 
   const odczyt = odczytajKwote(kwotaTekst);
@@ -249,7 +268,7 @@ export function Formularz({
   // Zapis: siedem stanow z §41.5, kazdy z osobnym brzmieniem. Wspolny
   // komunikat „blad" dla siedmiu przyczyn jest tym samym, co brak komunikatu.
   function zapisz() {
-    if (wLocie) return;   // pierwsza obrona przed dubletem — patrz naglowek
+    if (zamek.current) return;   // pierwsza obrona przed dubletem — patrz naglowek
     wyczyscBledy();
     let wolno = true;
 
@@ -294,7 +313,8 @@ export function Formularz({
   // ma jeden nosnik i jest nim `ekran_ksiegowanie.rozstrzygnij_kwote` —
   // ekran przekazuje odpowiedz uzytkownika, nie podejmuje jej za niego.
   async function przekaz(kwota: Kwota, potwierdzone: boolean) {
-    if (wLocie) return;                       // druga obrona przed dubletem
+    if (zamek.current) return;                // druga obrona przed dubletem
+    zamek.current = true;
     setWLocie(true);
     try {
       const odp = await zapiszWpis(
@@ -312,6 +332,7 @@ export function Formularz({
     } catch (blad: unknown) {
       setBladWarstwy(opisBledu(blad));
     } finally {
+      zamek.current = false;
       setWLocie(false);
     }
   }
@@ -320,7 +341,8 @@ export function Formularz({
   // nie cicha zgoda — i to zdanie dociera tu w calosci, zamiast zamienic sie
   // w znikniecie wiersza bez sladu.
   async function wycofaj(id: number) {
-    if (wLocie) return;
+    if (zamek.current) return;
+    zamek.current = true;
     setWLocie(true);
     wyczyscBledy();
     try {
@@ -330,22 +352,25 @@ export function Formularz({
     } catch (blad: unknown) {
       setBladWarstwy(opisBledu(blad));
     } finally {
+      zamek.current = false;
       setWLocie(false);
     }
   }
 
   return (
-    // `straznik={null}` NIE JEST ZANIEDBANIEM. Stopka odpowiada na pytanie
-    // „czy to, co widze, jest aktualne", a odpowiedz na nie niesie WYLACZNIE
-    // `DanePlynnosci.ostatnieSprawdzenie`. `DaneKsiegowania` tego pola nie ma,
-    // wiec ten ekran go NIE WIE — i mowi „nie wiem" zdaniem z `lib/napisy.ts`,
-    // zamiast powtarzac zdanie sprzed podpiecia. Luka kontraktu zgloszona
-    // Ethanowi; drugie zapytanie o prognoze tylko dla stopki byloby drugim
-    // przebiegiem rachunku dla wyniku, ktorego ten ekran nie pokazuje.
+    // STOPKA MOWI TO SAMO, CO PLYNNOSC — od Z7c, bo dopiero teraz ma czym.
+    // Do Z7b `DaneKsiegowania` nie nioslo `ostatnieSprawdzenie`, wiec ten ekran
+    // podawal na sztywno `null` i mowil „nie wiem" o czyms, co aplikacja
+    // WIEDZIALA: dwa ekrany, dwie odpowiedzi na jedno pytanie „czy to, co widze,
+    // jest aktualne". Kontrakt dostal to pole w Z7b (straznik
+    // `test_OBA_ekrany_mowia_o_strazniku_DOKLADNIE_to_samo`), a podpiecie po
+    // stronie ekranu jest tutaj. `null` nadal znaczy „straznik nigdy nie
+    // dzialal" i tylko to — powloka mowi wtedy zdaniem z `lib/napisy.ts`,
+    // zamiast wymyslac date sprawdzenia, ktorego nie bylo.
     <Powloka
       aktywny="ksiegowanie"
       odczyt={sformatujOdczyt(DANE.dzisiaj)}
-      straznik={null}
+      straznik={DANE.ostatnieSprawdzenie}
     >
       <section className={s.ekran}>
 

@@ -25,6 +25,15 @@
 // reguły formatowania byłaby DRUGIM nośnikiem i przepuściłaby dokładnie te
 // wady, których ma pilnować (na przykład zgubiony grosz).
 //
+// CO DOSZŁO W Z7c: STOPKA OBU EKRANÓW. „Ostatnie sprawdzenie" nie jest kwotą,
+// ale jest odpowiedzią na to samo pytanie co liczby wyżej — „czy to, co widzę,
+// jest aktualne" — i do Z7c dwa ekrany dawały na nie dwie różne odpowiedzi:
+// Płynność czytała pole z silnika, a Księgowanie podawało na sztywno `null`
+// i mówiło „nie wiem" o czymś, co aplikacja wiedziała. Sprawdzenie stoi TUTAJ,
+// a nie w bramce odwzorowania, bo bramka mierzy piksele: ZMIERZONE 2026-08-29
+// na mutacji M-Z7c-6 (stopka odpięta) — sama bramka pikselowa dała 0,29%
+// przy progu 2%, czyli PRZESZŁA. Wygląd nie jest nośnikiem tej reguły.
+//
 // Uruchomienie:
 //   node narzedzia/straznik-ekran-wobec-silnika.mjs [dzis]
 //   node narzedzia/straznik-ekran-wobec-silnika.mjs 2026-09-02
@@ -55,6 +64,14 @@ function oczekiwane(dane) {
   const zamkniecie =
     dane.saldoMinimalne === null ? null : znak(dane.saldoMinimalne);
   return { wiersze, zamkniecie };
+}
+
+/** Zdanie stopki wyrenderowane na ekranie — albo `null`, gdy stopki nie ma. */
+async function stopkaZEkranu(strona) {
+  return strona.evaluate(() => {
+    const e = document.querySelector(".straznik");
+    return e ? e.textContent.replace(/\u00a0/g, " ").trim() : null;
+  });
 }
 
 /** Liczby, które NAPRAWDĘ stoją na wyrenderowanym ekranie. */
@@ -145,11 +162,68 @@ async function glowna() {
     const oczek = oczekiwane(dane);
     const { rozjazdy, porownanych } = porownaj(oczek, zek);
 
+    // --- stopka na OBU ekranach ---
+    const stopkaPlynnosci = await stopkaZEkranu(strona);
+    let daneKsiegowania;
+    try {
+      const o = await fetch(`${SILNIK}/api/ksiegowanie${parametr}`, { cache: "no-store" });
+      if (!o.ok) throw new Error(`trasa odpowiedziała kodem ${o.status}`);
+      daneKsiegowania = await o.json();
+    } catch (blad) {
+      console.error(`BŁĄD POMIARU: nie mam odpowiedzi /api/ksiegowanie — ${blad.message}`);
+      process.exit(2);
+    }
+    const odp2 = await strona.goto(`${EKRAN}/ksiegowanie${parametr}`, { waitUntil: "networkidle" });
+    if (!odp2 || !odp2.ok()) {
+      console.error(`BŁĄD POMIARU: ekran Księgowania odpowiedział kodem ${odp2 ? odp2.status() : "—"}`);
+      process.exit(2);
+    }
+    const stopkaKsiegowania = await stopkaZEkranu(strona);
+    if (stopkaPlynnosci === null || stopkaKsiegowania === null) {
+      console.error("BŁĄD POMIARU: nie widzę stopki na jednym z ekranów — pomiar nic nie porównał.");
+      process.exit(2);
+    }
+    // ILE STOPEK POMIAR NAPRAWDĘ POROWNAŁ. Gdy silnik nie ma ani jednego
+    // przebiegu strażnika, oba ekrany pokazują ten sam stały napis „nie wiem" —
+    // i porównanie ich ze sobą przechodzi także wtedy, gdy jeden z nich ma
+    // to zdanie WPISANE NA SZTYWNO. Taki przebieg NIE JEST dowodem i mówi
+    // o tym wprost, zamiast doliczać się do sukcesu.
+    let stopekPorownanych = 0;
+    for (const [nazwa, naEkranie, zSilnika] of [
+      ["PLYNNOSC", stopkaPlynnosci, dane.ostatnieSprawdzenie],
+      ["KSIEGOWANIE", stopkaKsiegowania, daneKsiegowania.ostatnieSprawdzenie],
+    ]) {
+      if (zSilnika === null) continue;      // patrz wyżej — ślepy przypadek
+      stopekPorownanych += 1;
+      if (naEkranie !== zSilnika) {
+        rozjazdy.push(`STOPKA[${nazwa}]: silnik „${zSilnika}", ekran „${naEkranie}"`);
+      }
+    }
+    // Pytanie osobne, bo oba ekrany mogą zgadzać się ze swoim silnikiem
+    // i mimo to mówić co innego — dokładnie tak było do Z7b, gdy kontrakt
+    // Księgowania nie miał tego pola w ogóle.
+    if (stopkaPlynnosci !== stopkaKsiegowania) {
+      rozjazdy.push(
+        `STOPKA[DWA EKRANY]: Płynność „${stopkaPlynnosci}", Księgowanie „${stopkaKsiegowania}" — ` +
+          "dwie odpowiedzi na jedno pytanie o aktualność tego, co widać",
+      );
+    }
+
     console.log(`Dzień odniesienia: ${dzis ?? "dzisiejszy (bez parametru)"}`);
     console.log(`Pozycji księgi z silnika: ${oczek.wiersze.length}`);
     console.log(`Pozycji księgi na ekranie: ${zek.wiersze.length}`);
     console.log(`Porównanych liczb: ${porownanych}`);
     console.log(`Wiersz zamknięcia: silnik „${oczek.zamkniecie}" · ekran „${zek.zamkniecie}"`);
+    console.log(
+      `Porównanych stopek: ${stopekPorownanych}` +
+        (stopekPorownanych === 2
+          ? ""
+          : "  — ŚLEPY PRZYPADEK: silnik nie ma przebiegu strażnika, więc oba ekrany " +
+            "pokazują ten sam stały napis o niewiedzy. Zgodność stopek NIE jest tu dowodem; " +
+            "żeby nim była, w bazie musi stać wiersz w `przebiegi_straznika`."),
+    );
+    console.log(`  Płynność:    „${stopkaPlynnosci}"`);
+    console.log(`  Księgowanie: „${stopkaKsiegowania}"`);
 
     if (porownanych < PROG_LICZNOSCI) {
       console.error(

@@ -34,3 +34,27 @@ test("kierunek odczytany z zapisu kwoty ma jeden nośnik", () => {
 test("znak nadal jest osobnym parametrem — zapis ujemny da się pokazać bez znaku", () => {
   expect(sformatujKwote("-210.67", "neutralna")).toBe("210,67 zł");
 });
+
+// ZNAK WIODĄCY W ZAPISIE KWOTY (Z7c). `znakKwoty` rozpoznaje trzy zapisy —
+// „-…", „+…" i goły — więc `sformatujKwote` musi umieć zdjąć każdy z nich.
+// Do Z7c zdejmowany był wyłącznie minus i kwota z plusem wracała jako
+// „++2 468,39 zł". Wada nie miała jak paść, bo żywy silnik dodatniego salda
+// minimalnego nie podpisuje; czekała na pierwszy dobry miesiąc.
+test("wiodący plus jest ZDEJMOWANY, nie doklejany drugi raz", () => {
+  expect(sformatujKwote("+2468.39", "dodatnia")).toBe("+2 468,39 zł");
+  expect(sformatujKwote("+2468.39", "neutralna")).toBe("2 468,39 zł");
+});
+test("minus typograficzny wraca z tej funkcji taki sam, jak z niej wyszedł", () => {
+  const raz = sformatujKwote("210.67", "ujemna");
+  expect(raz).toBe("−210,67 zł");
+  expect(sformatujKwote("−210.67", "ujemna")).toBe(raz);
+});
+test("para znakKwoty + sformatujKwote czyta ten sam zbiór zapisów", () => {
+  for (const [zapis, oczekiwany] of [
+    ["-210.67", "−210,67 zł"],
+    ["+2468.39", "+2 468,39 zł"],
+    ["9601.03", "9 601,03 zł"],
+  ] as const) {
+    expect(sformatujKwote(zapis, znakKwoty(zapis))).toBe(oczekiwany);
+  }
+});
