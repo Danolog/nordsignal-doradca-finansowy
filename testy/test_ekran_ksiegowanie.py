@@ -9,6 +9,8 @@ i czy z ekranu nie da się zapisać kosztu firmowego.
 import pathlib
 import re
 
+from pomocnicze import bez_komentarzy as _bez_komentarzy
+
 KATALOG = pathlib.Path(__file__).resolve().parent.parent
 
 FRAZY_Z_RAMKI = (
@@ -32,14 +34,6 @@ SIEDEM_BRZMIEN = (
 EKRAN = KATALOG / "interfejs" / "app" / "ksiegowanie" / "page.tsx"
 NAPISY = KATALOG / "interfejs" / "lib" / "napisy.ts"
 DANE = KATALOG / "interfejs" / "lib" / "dane" / "ksiegowanie.ts"
-
-
-def _bez_komentarzy(kod: str) -> str:
-    """Zdejmuje komentarze. Bez tego strażnik jest atrapą: mutacja kasująca
-    `autoFocus` z pola kwoty PRZESZŁA (36 passed, 2026-08-29), bo słowo stało
-    jeszcze w komentarzu nad komponentem. Wykryła to mutacja, nie czytanie kodu."""
-    kod = re.sub(r"/\*.*?\*/", " ", kod, flags=re.S)
-    return re.sub(r"//[^\n]*", " ", kod)
 
 
 def _tekst_ekranu() -> str:

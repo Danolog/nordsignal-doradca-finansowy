@@ -53,11 +53,13 @@ const css = `/* WYGENEROWANE z makiety/paleta.json (wersja ${paleta.wersja}, ${p
 
 :root {
 ${blok(paleta.jasny)}
+  --kafel-wykresu: ${paleta.kafel_wykresu};
   --faktura-arkusza: ${faktura};
 }
 
 [data-motyw="ciemny"] {
 ${blok(paleta.ciemny)}
+  --kafel-wykresu: ${paleta.kafel_wykresu_ciemny};
 }
 `;
 

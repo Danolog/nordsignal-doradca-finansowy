@@ -88,9 +88,3 @@ export const STAN_POKAZOWY = {
   szczegoly: "prąd, rozliczenie za wrzesień",
   kategoria: "Energia Elektryczna",
 };
-
-// Odczyt naglowka — na ramce stala data i godzina. Zegar systemowy tu nie
-// wchodzi, bo bramka odwzorowania porownuje zrzuty, a ruchoma godzina
-// dawalaby rozny wynik przy kazdym przebiegu.
-export const ODCZYT_NAGLOWKA = "6 października 2026 · 09:40";
-export const STRAZNIK_STOPKI = "Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.";

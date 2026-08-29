@@ -27,13 +27,8 @@ import { Powloka } from "../powloka";
 import { NAPISY, PROZA, type Czlon } from "@/lib/napisy";
 import { sformatujDate, sformatujKwote } from "@/lib/kwota";
 import { NAPIS_TYPU, TYPY, type Kwota, type TypWpisu } from "@/lib/kontrakt";
-import {
-  DANE,
-  ODCZYT_NAGLOWKA,
-  PODPIS_PASMA,
-  STAN_POKAZOWY,
-  STRAZNIK_STOPKI,
-} from "@/lib/dane/ksiegowanie";
+import { DANE, PODPIS_PASMA, STAN_POKAZOWY } from "@/lib/dane/ksiegowanie";
+import { ODCZYT_NAGLOWKA, OSTATNIE_SPRAWDZENIE } from "@/lib/dane/powloka";
 import s from "./style.module.css";
 
 /* ---------- odczyt tego, co uzytkownik wpisal ---------- */
@@ -219,7 +214,7 @@ export default function Ksiegowanie() {
   }
 
   return (
-    <Powloka aktywny="ksiegowanie" odczyt={ODCZYT_NAGLOWKA} straznik={STRAZNIK_STOPKI}>
+    <Powloka aktywny="ksiegowanie" odczyt={ODCZYT_NAGLOWKA} straznik={OSTATNIE_SPRAWDZENIE}>
       <section className={s.ekran}>
 
         {/* 1-2. przelacznik typu + data wpisu */}

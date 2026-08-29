@@ -70,3 +70,36 @@ export const NAPIS_TYPU: Readonly<Record<TypWpisu, string>> = {
   Wydatki: "Wydatek",
   Oszczędności: "Oszczędność",
 } as const;
+
+/* ---------- EKRAN PLYNNOSCI (Z2) ---------- */
+
+// Wiersz ksiegi. `kwota` moze niesc wiodacy minus — to jest kierunek pozycji,
+// nie ozdoba; `znakKwoty()` w `lib/kwota.ts` jest jedynym miejscem, ktore go
+// odczytuje, a `sformatujKwote` nadal DOSTAJE znak jako osobny parametr.
+export interface PozycjaKsiegi {
+  dzien: Data;
+  pozycja: string;
+  dopisek?: string;          // "z odczytu 9 920,79 zl z 1 wrzesnia"
+  kwota: Kwota | null;       // null = wiersz otwarcia, na ekranie „—"
+  saldoPoDniu: Kwota | null; // bite RAZ NA DZIEN; null dla kolejnej pozycji tego dnia
+}
+
+export interface PunktWykresu {
+  dzien: Data;
+  saldo: Kwota;
+}
+
+export interface DanePlynnosci {
+  odczyt: Data;                       // "2026-10-06"
+  okresNapis: string;                 // "wrzesien 2026 · 45 dni naprzod"
+  ksiega: readonly PozycjaKsiegi[];
+  wykres: readonly PunktWykresu[];
+  dzienPodKreska: Data | null;        // null = zaden dzien nie schodzi pod zero
+  saldoMinimalne: Kwota;
+  dataSaldaMinimalnego: Data;
+  zdanieWerdyktu: string;             // nazywa PRZYCZYNE, nie tylko fakt
+  horyzontDni: number;                // „Masz 23 dni."
+  liczbaPozycjiCoMnieCzeka: number;
+  koniecOknaCoMnieCzeka: Data;
+  ostatnieSprawdzenie: string | null; // null = straznik nigdy nie dzialal
+}

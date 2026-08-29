@@ -1,4 +1,7 @@
-// JEDEN NOSNIK BRZMIEN EKRANU KSIEGOWANIE.
+// JEDEN NOSNIK BRZMIEN INTERFEJSU.
+//
+// `NAPISY` — ekran Ksiegowanie. `NAPISY_PLYNNOSCI` — ekran Plynnosc.
+// `NAPISY_POWLOKI` — naglowek i stopka wspolne wszystkim ekranom.
 // Komponent WOLA te napisy, nigdy ich nie wpisuje. Powod nie jest porzadkowy:
 // komunikat wpisany w widok rozjezdza sie z komunikatem silnika po cichu,
 // a uzytkownik dostaje wtedy dwa rozne zdania o jednej regule.
@@ -104,4 +107,47 @@ export const PROZA: Readonly<Record<string, readonly Czlon[]>> = {
     { tekst: "Raportach", akcent: true },
     { tekst: "." },
   ],
+} as const;
+
+/* ---------- POWLOKA ---------- */
+
+export const NAPISY_POWLOKI = {
+  // Strażnik, który nigdy nie działał, MÓWI o tym wprost. Zero nigdy nie
+  // zastępuje „nie wiem" — zdanie o sprawdzeniu, którego nie było, jest
+  // gorsze niż brak zdania (CLAUDE.md §3.7).
+  straznikNieDzialal:
+    "Ostatnie sprawdzenie: brak danych — strażnik nie jest jeszcze podpięty.",
+} as const;
+
+/* ---------- EKRAN PLYNNOSCI ---------- */
+
+export const NAPISY_PLYNNOSCI = {
+  tytul: "Księga płynności",
+
+  // Nagłówki kolumn rubryki, w kolejności ramki.
+  kolumnaDzien: "Dzień",
+  kolumnaPozycja: "Pozycja",
+  kolumnaKwota: "Kwota",
+  kolumnaSaldo: "Saldo po tym dniu",
+
+  // Wiersz otwarcia: kwoty nie ma, więc kolumna mówi „—", a nie „0,00 zł".
+  brakKwoty: "—",
+
+  // Podpisy osi wykresu. Skrajne dwa niosą datę, środkowy — dzień zejścia.
+  osDzis: (dzien: string) => `${dzien} — dziś`,
+  osPodKreska: (dzien: string) => `${dzien} — pod kreską`,
+
+  // ETYKIETA WIELKIEJ LICZBY. Bez niej liczba stoi w wierszu VAT-u i czyta
+  // się jako kwota VAT-u — wykryte przy oglądaniu zrzutu, nie przy pisaniu
+  // kodu. Skasowanie tej etykiety zmienia znaczenie ekranu, nie jego wygląd.
+  najnizej: (dzienSlownie: string) => `Najniżej — ${dzienSlownie}`,
+
+  // Etykieta jest ta sama, gdy prognoza NIE schodzi pod zero: opisuje
+  // najnizszy punkt, a nie „problem". Osobne brzmienie na ten przypadek
+  // byloby drugim nosnikiem tego samego zdania.
+
+  horyzont: (dni: number) => `Masz ${dni} dni.`,
+
+  coMnieCzeka: (pozycji: number, doDnia: string) =>
+    `Co mnie czeka — ${pozycji} pozycji do ${doDnia}`,
 } as const;

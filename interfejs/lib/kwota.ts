@@ -23,6 +23,36 @@ export function sformatujKwote(kwota: string, znak: ZnakKwoty): string {
 }
 
 export function sformatujDate(iso: string): string {
-  const [rok, miesiac, dzien] = iso.split("-");
-  return `${Number(dzien)} ${RZYMSKIE[Number(miesiac) - 1]} ${rok}`;
+  const [rok] = iso.split("-");
+  return `${sformatujDzien(iso)} ${rok}`;
+}
+
+// Jedyne miejsce, ktore ODCZYTUJE kierunek z zapisu kwoty. `sformatujKwote`
+// nadal dostaje znak jako OSOBNY parametr — ta funkcja go nie omija, tylko
+// nazywa krok, w ktorym ksiega mowi, w ktora strone plyna pieniadze.
+// Bez niej kazdy widok robilby `kwota.startsWith("-")` u siebie, czyli
+// reguly kierunku bylaby tyle, ile ekranow.
+export function znakKwoty(kwota: string): ZnakKwoty {
+  if (kwota.startsWith("-")) return "ujemna";
+  if (kwota.startsWith("+")) return "dodatnia";
+  return "neutralna";
+}
+
+// Dzien bez roku — „2 IX". Kolumna „Dzien" w ksiedze i podpisy osi wykresu
+// nie powtarzaja roku przy kazdym wierszu.
+export function sformatujDzien(iso: string): string {
+  const [, miesiac, dzien] = iso.split("-");
+  return `${Number(dzien)} ${RZYMSKIE[Number(miesiac) - 1]}`;
+}
+
+// Dzien z nazwa miesiaca — „25 wrzesnia". Uzywany tam, gdzie data stoi
+// w zdaniu, a nie w kolumnie liczb.
+const MIESIACE_DOPELNIACZ = [
+  "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+  "lipca", "sierpnia", "września", "października", "listopada", "grudnia",
+];
+
+export function sformatujDzienSlownie(iso: string): string {
+  const [, miesiac, dzien] = iso.split("-");
+  return `${Number(dzien)} ${MIESIACE_DOPELNIACZ[Number(miesiac) - 1]}`;
 }

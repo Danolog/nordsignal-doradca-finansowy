@@ -10,6 +10,7 @@
 // aktualne" i jest jedynym miejscem, w ktorym cichy straznik mowi, ze istnieje.
 
 import { AKCJA, PASEK, ZNAK_SLOWNY } from "@/lib/ekrany";
+import { NAPISY_POWLOKI } from "@/lib/napisy";
 
 function IkonaPlus({ rozmiar = 16 }: { rozmiar?: number }) {
   return (
@@ -24,15 +25,31 @@ export function Powloka({
   odczyt,
   straznik,
   children,
+  pion = "gora",
+  odstepStopki = 24,
 }: {
   aktywny: string;
   odczyt: string;
-  straznik: string;
+  straznik: string | null;
   children: React.ReactNode;
+  // Ramki roznia sie w dwoch miarach powloki i te roznice sa prawdziwe:
+  // Ksiegowanie stawia tresc pod naglowkiem (`gora`), Plynnosc srodkuje ja
+  // w pionie (`srodek`), a odstep stopki wynosi 24 px na jednym ekranie
+  // i 28 px na drugim. Wartosci podaje EKRAN, bo to on ma swoja ramke.
+  pion?: "gora" | "srodek";
+  odstepStopki?: number;
 }) {
   const wKsiegowaniu = aktywny === AKCJA.klucz;
   return (
-    <div className="arkusz">
+    <div
+      className="arkusz"
+      style={
+        {
+          "--pion-tresci": pion === "srodek" ? "center" : "flex-start",
+          "--odstep-stopki": `${odstepStopki}px`,
+        } as React.CSSProperties
+      }
+    >
       <div className="naglowek">
         <div className="naglowek-wiersz">
           <span className="znak-slowny">{ZNAK_SLOWNY}</span>
@@ -72,7 +89,7 @@ export function Powloka({
 
       <div className="stopka">
         <div className="stopka-tresc">
-          <span className="straznik">{straznik}</span>
+          <span className="straznik">{straznik ?? NAPISY_POWLOKI.straznikNieDzialal}</span>
           <span className="rozpychacz" />
         </div>
       </div>

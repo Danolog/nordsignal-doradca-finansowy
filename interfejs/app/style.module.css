@@ -1,0 +1,197 @@
+/* EKRAN PLYNNOSC — uklad przeniesiony wezel po wezle z ramki
+   `makiety/Main.dc.html`. Ramka nie ma klas: caly uklad siedzi w atrybutach
+   `style="..."`. Wartosci pikselowe doslownie z ramki; barwy podmienione
+   na zmienne z `paleta.css`.
+
+   MODEL PUDELKA dla kontrolek wraca na `content-box` — przegladarka daje
+   `button`/`a` wlasny `border-box`, a ramka rysuje te ksztalty `span`-ami.
+   Zmierzone w Z1: bez tego kazda kontrolka z obrysem jest o 2 px nizsza. */
+
+.przycisk { box-sizing: content-box; }
+
+.ekran {
+  width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  margin: 32px 0 24px;
+}
+
+/* ---- blok ksiegi: tytul, wykres, rubryka, wiersz zamkniecia ---- */
+
+.ksiega { display: flex; flex-direction: column; }
+
+.tytulBloku {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 10px;
+}
+
+.etykietaSekcji {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.podpis { font-size: 13px; color: var(--atrament-cichy); }
+
+/* Kafel pod wykresem jest warstwa POLPRZEZROCZYSTA — przygasza arkusz
+   zamiast go rozjasniac. Ujemne marginesy boczne wypuszczaja go poza
+   kolumne 1040 px o tyle, ile wynosi wysciolka, wiec sam rysunek ma
+   dokladnie te sama miare co rubryka pod nim. */
+.kafelWykresu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--kafel-wykresu);
+  padding: 12px 20px 10px;
+  margin: 0 -20px 8px;
+}
+
+.osDat { display: flex; align-items: baseline; }
+
+.podpisOsi {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+/* Dzien zejscia niesie TE SAMA czerwien co kwota zamkniecia — to jedyna
+   robota tej barwy: zwiazac dolek na rysunku z liczba pod rubryka. */
+.podpisOsiPodKreska {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--saldo-ujemne);
+}
+
+.rozpychacz { flex: 1; }
+
+/* ---- rubryka ---- */
+
+.wierszKolumn,
+.wiersz,
+.wierszZamkniecia {
+  display: grid;
+  grid-template-columns: 96px 1fr 200px 260px;
+  column-gap: 24px;
+  align-items: baseline;
+}
+
+.wierszKolumn {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+
+.naglowekKolumny {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+.doPrawej { text-align: right; }
+
+.wiersz {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--liniatura-wierszy);
+}
+
+/* Dwie pozycje tego samego dnia stoja w jednej grupie: kreska rozdziela DNI,
+   nie wiersze. Wysciolka miedzy nimi schodzi z 11 px na 4 px, zeby bliskosc
+   powiedziala to samo, co powiedzialaby powtorzona data. */
+.wierszPrzedDalszym { padding-bottom: 4px; border-bottom: 0; }
+.wierszDalszyZDnia { padding-top: 4px; }
+
+.komorkaDnia { font-size: 15px; color: var(--atrament-cichy); }
+.komorkaPozycji { font-size: 15px; }
+.dopisek { font-size: 13px; color: var(--atrament-cichy); }
+.komorkaBezKwoty { font-size: 15px; color: var(--atrament-cichy); text-align: right; }
+
+/* Kwota nigdy nie lamie sie miedzy liczba a jednostka ani w separatorze
+   tysiecy. Zmierzone: bez tego „−210,67 zł" przy 56 px zawijalo sie na dwa
+   wiersze i wiersz zamkniecia urosl z 85 px na 144 px. Ramka rozwiazuje to
+   spacja nierozdzielajaca; my robimy to stylem, zeby `sformatujKwote`
+   zostala jednym nosnikiem BRZMIENIA, a nie takze lamania. */
+.komorkaKwoty,
+.komorkaSalda,
+.liczbaZamkniecia { white-space: nowrap; }
+
+.komorkaKwoty {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  text-align: right;
+}
+
+.komorkaSalda {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  text-align: right;
+}
+
+/* ---- wiersz zamkniecia: etykieta + jedyna wielka liczba ---- */
+
+.wierszZamkniecia { padding: 16px 0 10px; }
+
+/* Etykieta kapitalikami stoi w kolumnie POZYCJI, nie przy liczbie. Bez niej
+   wielka liczba laduje w wierszu VAT-u i czyta sie jako kwota VAT-u. */
+.etykietaZamkniecia {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.liczbaZamkniecia {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 56px;
+  line-height: 1.05;
+  text-align: right;
+}
+
+/* Barwa TYLKO dla liczby ocenianej: czerwien ponizej zera, zielen powyzej.
+   Gdyby szla na kazda kwote, ksiega zamienilaby sie w choinke. Barwa nie
+   jest jedynym nosnikiem — niesie tez znak minus i pozycja w kolumnie. */
+.zamknieciePonizejZera { color: var(--saldo-ujemne); }
+.zamknieciePowyzejZera { color: var(--saldo-dodatnie); }
+
+/* Podwojna linia zamkniecia rachunku. Atrament CICHY, nie liniatura —
+   niesie znaczenie, a liniatura jest dowiedziona jako dekoracja (1,29:1). */
+.kreska { height: 1px; background: var(--atrament-cichy); }
+.przerwa { height: 3px; }
+
+/* ---- werdykt ---- */
+
+.werdykt { display: flex; flex-direction: column; gap: 8px; }
+
+/* Wzorzec zlej wiadomosci: liczba, zdanie, dzialanie. Zdanie nazywa
+   PRZYCZYNE — bez przyczyny liczba zostawia lek bez wyjscia.
+   Ikony tu nie ma i nie wolno jej dolozyc: werdykt niosa juz slowo,
+   barwa i pozycja, wiec ikona bylaby trzecim nosnikiem tej samej rzeczy. */
+.zdanieWerdyktu { margin: 0; font-size: 20px; line-height: 1.45; }
+.horyzont { margin: 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* ---- jedyne wezwanie na ekranie ---- */
+
+.wierszWezwania { display: flex; align-items: center; gap: 32px; }
+
+.wezwanie {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  text-decoration: none;
+}
+.wezwanie svg { color: var(--atrament-cichy); }
