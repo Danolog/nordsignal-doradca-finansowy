@@ -13,11 +13,14 @@ from pomocnicze import bez_komentarzy
 
 KATALOG = pathlib.Path(__file__).resolve().parent.parent
 
-EKRAN = KATALOG / "interfejs" / "app" / "page.tsx"
+# W7: ekran przeniesiony z `app/page.tsx` pod swoj wlasny klucz, zeby
+# odsylacz paska `/plynnosc` prowadzil do niego, a nie do strony 404.
+# Straznik idzie za ekranem do jego nowego nosnika.
+EKRAN = KATALOG / "interfejs" / "app" / "plynnosc" / "page.tsx"
 NAPISY = KATALOG / "interfejs" / "lib" / "napisy.ts"
 DANE = KATALOG / "interfejs" / "lib" / "dane" / "plynnosc.ts"
 WYKRES = KATALOG / "interfejs" / "lib" / "wykres.ts"
-STYL = KATALOG / "interfejs" / "app" / "style.module.css"
+STYL = KATALOG / "interfejs" / "app" / "plynnosc" / "style.module.css"
 EKRANY = KATALOG / "interfejs" / "lib" / "ekrany.ts"
 POWLOKA_CSS = KATALOG / "interfejs" / "app" / "powloka.css"
 KARTA = KATALOG / "interfejs" / "lib" / "karta-dzialania.ts"

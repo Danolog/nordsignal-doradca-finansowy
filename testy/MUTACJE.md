@@ -1369,3 +1369,69 @@ bo żaden z jego trzech przykładów nie ma **końcowego zera** — a to właśn
   migracyjnej.
 - **Nie sprawdzono treści więzów `CHECK` innych niż `IN (...)`** — ta luka była nazwana już
   w nagłówku `test_schemat_wobec_bazy.py` i W5 jej nie ruszało.
+
+---
+
+## W7 — pasek prowadzi tam, gdzie obiecuje (2026-08-29)
+
+**Stan przed zmianą, zmierzony `curl` na zbudowanej aplikacji (nie odczytany z kodu):**
+dziewięć z dziewięciu odsyłaczy paska = **HTTP 404**, w tym odsyłacz do ekranu Płynności, który
+stał wtedy pod `/`. Cały widoczny tekst strony `/miesiac` brzmiał
+`Doradca Finansowy 404: This page could not be found. 404 This page could not be found.` —
+po angielsku, bez zdania o tym, co się stało i co z tym zrobić (łamie CLAUDE.md §3.7 i §4).
+
+Nowi strażnicy: `testy/test_odsylacze_paska.py` (pięć testów, statyczne) oraz
+`interfejs/narzedzia/straznik-odsylacze-paska.mjs` (przejście przeglądarką po całym nagłówku).
+
+**Wszystkie mutacje wykonane na kopii drzewa poza repozytorium**
+(`scratchpad/kopia-w7`, `PYTHONDONTWRITEBYTECODE=1`, `-p no:cacheprovider`), z kontrolą
+przed i po. Kontrola startowa kopii: `5 passed in 0.20s`.
+
+| # | Co zmieniono | Który strażnik padł (po nazwie) | Wynik |
+|---|---|---|---|
+| **M-W7-1** | skasowana trasa zastępcza `interfejs/app/[ekran]/page.tsx` | `test_kazdy_klucz_paska_MA_GDZIE_prowadzic` **oraz** `test_trasa_bez_ekranu_NIE_MA_wpisanej_listy_ekranow` (`2 failed, 3 passed`) | **czerwony** |
+| **M-W7-2** | skasowany `interfejs/app/plynnosc/page.tsx` — ekran wraca pod `/` | `test_ekran_plynnosci_STOI_POD_swoim_kluczem` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-3** | do trasy zastępczej dopisana gałąź `ekran === "budzet" ? ZNANE[2] : undefined` — klucz ekranu wpisany w kodzie | `test_trasa_bez_ekranu_NIE_MA_wpisanej_listy_ekranow` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-4** | skasowany `interfejs/app/not-found.tsx` | `test_nieznany_adres_MOWI_PO_POLSKU_co_sie_stalo` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-5** | `powloka.tsx`: `href={\`/${e.klucz}\`}` → `href="/plynnosc"` | `test_zaden_odsylacz_naglowka_NIE_JEST_wpisany_recznie` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-6** | skasowana trasa zastępcza + przebudowa i przebieg po adresach | `straznik-odsylacze-paska.mjs`, **kod wyjścia 1**, osiem wierszy `NIE PROWADZI — kod 404` | **czerwony** |
+| **M-W7-7** | `powloka.tsx`: `PASEK.map` → `PASEK.slice(0, 3).map` | `straznik-odsylacze-paska.mjs`, **kod wyjścia 2**: „pasek oddał 3 odsyłaczy, mapa ekranów ma 9" | **czerwony (błąd pomiaru)** |
+
+**Kontrola po cofnięciu każdej mutacji:** `5 passed` (testy statyczne) i `kod wyjścia 0`,
+`Sprawdzonych adresów: 11`, `WYNIK: każdy odsyłacz prowadzi` (przejście przeglądarką).
+Pliki kopii porównane `diff` z repozytorium po cofnięciu — identyczne.
+
+### Dlaczego M-W7-7 jest osobną mutacją, a nie odmianą M-W7-6
+
+M-W7-6 sprawdza, że strażnik **znajduje zepsuty odsyłacz**. M-W7-7 sprawdza coś innego: że
+strażnik **wie, ile rzeczy zobaczył**. Bez kontroli liczności pasek okrojony do trzech pozycji
+przeszedłby jako „zero błędnych odsyłaczy" — sprawdzenie, do którego nic nie dociera, melduje
+sukces. Dlatego niekompletny pasek kończy **kodem 2 (błąd pomiaru)**, nie kodem 0 i nie kodem 1.
+
+### Znalezisko po drodze: pierwsze brzmienie mówiło nieprawdę na jednym z jedenastu adresów
+
+Ekran zastępczy mówił początkowo `»X« stoi w pasku, bo ma odpowiadać na pytanie …`. Na
+`/co-mnie-czeka` było to **fałszem**: „Co mnie czeka" jest rozwinięciem otwieranym przyciskiem
+z ekranu Płynności, nie pozycją paska (`makiety/ekrany.py`, `ROZWINIECIA`). Wykryte **odczytem
+wyrenderowanego ekranu**, nie czytaniem kodu i nie przez żaden test — zdanie było poprawne
+składniowo i przechodziło wszystko. Brzmienie skrócone do `»X« ma odpowiadać na pytanie …`,
+prawdziwego dla obu rodzajów pozycji.
+
+### Sprostowanie nośnika przy okazji
+
+`interfejs/lib/ekrany.ts` wskazywał strażnika mapy ekranów pod adresem `testy/test_mapa_ekranow.py`.
+**Pomiar: `ls testy/test_mapa_ekranow.py` → `No such file or directory`.** Strażnik istnieje, ale
+w `testy/test_nosniki.py` (linia 41). Poprawka jest w komentarzu, nie w kodzie — kodu nie trzeba
+było dotykać.
+
+### Czego przebieg W7 NIE objął
+
+- **Nie mierzono na wdrożeniu w chmurze** — wszystkie liczby pochodzą z lokalnej budowy
+  produkcyjnej (`npm run build` + `next start`). Wdrożenie prowadzi Eva.
+- **Nie zbudowano żadnego z siedmiu brakujących ekranów** — to był jawny zakres zadania.
+- **Nie sprawdzono zachowania odsyłaczy przy wyłączonym JavaScript** ani czytnikiem ekranu.
+- **Zaobserwowana, niewyjaśniona chwiejność `not-found.tsx` w trybie deweloperskim
+  (Turbopack, Next 16.3.3):** przy jednym zimnym starcie strona nieznanego adresu oddała pustą
+  powłokę błędu zamiast ekranu, przy kolejnych — poprawny ekran. **Na budowie produkcyjnej
+  nie powtórzyło się ani razu** (trzy niezależne przebiegi strażnika, `kod wyjścia 0`).
+  Przyczyny nie ustalono; zapisane, bo dotyczy tylko trybu deweloperskiego.

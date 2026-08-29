@@ -153,6 +153,58 @@ export const NAPISY_AWARII = {
   odczytNieznany: "odczyt nieznany",
 } as const;
 
+/* ---------- ADRES BEZ EKRANU (W7, §3.7) ---------- */
+
+// DWA STANY, DWA ZDANIA — i to sa ROZNE stany, nie jeden z dwoma brzmieniami.
+//
+//   (1) ADRES ZNANY, EKRAN NIEZBUDOWANY — pozycja stoi w mapie ekranow
+//       (`lib/ekrany.ts`), ma swoje pytanie i swoja ramke, tylko nie ma
+//       jeszcze kodu. Uzytkownik trafil tu z paska i pasek NIE SKLAMAL.
+//   (2) ADRES NIEZNANY — w mapie nie ma nic o tej nazwie. Uzytkownik trafil
+//       tu z zakladki, z literowki albo z odsylacza, ktorego nie piszemy.
+//
+// Zlanie ich w jedno zdanie kosztowaloby dokladnie to, po co ten ekran
+// istnieje: „nie ma tego" i „jeszcze tego nie zrobilem" prowadza do dwoch
+// roznych ruchow uzytkownika.
+//
+// ZERO LICZB NA OBU EKRANACH. Kwota, licznik albo „0 pozycji" byly by
+// liczba z nieznanego zrodla — czyli tym, przed czym broni §3.7.
+
+export const NAPISY_NIEZBUDOWANEGO = {
+  tytul: "Tej części jeszcze nie ma",
+
+  // Pytanie ekranu przychodzi z mapy ekranow i jest oddane w calosci —
+  // to JEGO zdanie, nie nasze. Skrocone do samej nazwy przestaje mowic,
+  // czego uzytkownik sie tu nie dowie.
+  //
+  // ZDANIE NIE MOWI „stoi w pasku" — i to jest poprawka po pomiarze, nie
+  // ostroznosc. Pierwsze brzmienie tak mowilo i na `/co-mnie-czeka` bylo
+  // NIEPRAWDA: „Co mnie czeka" jest rozwinieciem otwieranym przyciskiem
+  // z ekranu Plynnosci, nie pozycja paska (`makiety/ekrany.py`, ROZWINIECIA).
+  // Wykryte odczytem wyrenderowanego ekranu, nie czytaniem kodu.
+  zdanie: (napis: string, pytanie: string) =>
+    `»${napis}« ma odpowiadać na pytanie: „${pytanie}”. ` +
+    "Ekranu jeszcze nie zbudowałem — nic tu nie policzyłem i żadnej liczby nie zmyślam.",
+
+  instrukcja: (start: string) =>
+    `Nie ma tu nic do zrobienia. Wróć paskiem u góry — odsyłacz »${start}« ` +
+    "prowadzi na ekran startowy.",
+} as const;
+
+export const NAPISY_NIEZNANEGO_ADRESU = {
+  tytul: "Nie znam tego adresu",
+
+  // „Nie zgaduje" jest tu tym samym zdaniem, co przy adresie silnika
+  // w `next.config.mjs`: ekran zgadniety wyglada tak samo jak wlasciwy,
+  // wiec zgadywanie zamienia pomylke w cicha nieprawde.
+  zdanie:
+    "Pod tym adresem nic w tej aplikacji nie stoi. Nie zgaduję, o który ekran chodziło — " +
+    "zgadnięty wyglądałby tak samo jak właściwy.",
+
+  instrukcja: (start: string) =>
+    `Wybierz obszar z paska u góry; odsyłacz »${start}« prowadzi na ekran startowy.`,
+} as const;
+
 /* ---------- EKRAN PLYNNOSCI ---------- */
 
 export const NAPISY_PLYNNOSCI = {

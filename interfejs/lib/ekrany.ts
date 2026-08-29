@@ -2,8 +2,13 @@
 //
 // Odpowiednik `makiety/ekrany.py`. Dwa nosniki tej samej listy to swiadomy
 // dlug, dopuszczony pod warunkiem straznika i jawnego progu (CLAUDE.md §3.2):
-//   STRAZNIK: `testy/test_mapa_ekranow.py` porownuje oba pliki i czerwieni sie,
-//             gdy sie rozjada.
+//   STRAZNIK: `testy/test_nosniki.py::test_mapa_ekranow_NIE_ROZJECHALA_sie_
+//             miedzy_jezykami` porownuje oba pliki i czerwieni sie, gdy sie
+//             rozjada. SPROSTOWANIE (W7, 2026-08-29): do dzis stalo tu
+//             `testy/test_mapa_ekranow.py` — takiego pliku NIE MA (pomiar:
+//             `ls testy/test_mapa_ekranow.py` → No such file or directory).
+//             Straznik istnieje, tylko pod innym adresem; blad byl w tym
+//             komentarzu, nie w kodzie.
 //   PROG:     przy pierwszym dopisaniu albo przemianowaniu pozycji paska —
 //             wtedy generujemy ten plik z `ekrany.py` zamiast utrzymywac recznie.
 //
