@@ -1,0 +1,386 @@
+/* MODEL PUDELKA DLA KONTROLEK. Przegladarka daje `button` i `input` wlasny
+   `border-box` z arkusza wbudowanego, a ramka rysuje te same ksztalty
+   `span`-ami, czyli w `content-box`. Roznica to 2 px na kazdej kontrolce
+   z obrysem — zmierzone: kafelek kategorii 44 px zamiast 46 px, przycisk
+   zapisu 52 px zamiast 54 px, a pasmo dwoch wierszy krocilo caly ekran
+   o 4 px. Dlatego przestawiamy je z powrotem na model ramki. */
+.pozycja,
+.kontrolkaDaty,
+.kafelek,
+.przyciskZapisz,
+.potwierdzenie,
+.wycofaj { box-sizing: content-box; }
+
+/* EKRAN KSIEGOWANIE — uklad przeniesiony wezel po wezle z ramki
+   `makiety/Ksiegowanie.dc.html`. Ramka nie ma klas: caly uklad siedzi
+   w atrybutach `style="..."`, wiec przepisuje sie DRZEWO, nie selektory.
+   Wartosci pikselowe przeniesione doslownie; wartosci szesnastkowe barw
+   podmienione na zmienne z `paleta.css` (jeden nosnik palety). */
+
+.ekran {
+  width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 28px 0 20px;
+}
+
+/* ---- 1-2. wiersz naglowka ekranu: przelacznik typu + data wpisu ---- */
+
+.sekcjaNaglowka { display: flex; flex-direction: column; }
+
+.wierszNaglowka {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 10px;
+}
+
+.tytulEkranu {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.etykieta {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.przelacznik {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pozycja {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Stan czynny: odwrocone wypelnienie + waga 600 + znacznik. Trzy nosniki
+   naraz, zeby barwa nie byla jedynym. */
+.pozycjaCzynna {
+  gap: 8px;
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+}
+
+.rozdzielacz { width: 1px; background: var(--obrys-kontrolki); }
+
+.rozpychacz { flex: 1; }
+
+.kontrolkaDaty {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Znaki rysowane biegna atramentem CICHYM, nie pelnym — tak jak na ramce.
+   Gdyby dziedziczyly barwe tekstu, daszek i strzalki bylyby o klase
+   mocniejsze niz liczby, ktore opisuja. */
+.kontrolkaDaty svg,
+.wierszSkutku svg { color: var(--atrament-cichy); }
+
+.dataSzeryfowa {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+}
+
+.kreska { height: 1px; background: var(--atrament-cichy); }
+.przerwa { height: 3px; }
+
+/* ---- 3-5. kwota, podpis o znaku, szczegoly ---- */
+
+.wierszPol { display: flex; align-items: flex-start; gap: 16px; }
+
+.kolumnaKwoty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+}
+
+.kolumnaSzczegolow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Pole kwoty: 26 px, cyfry tabelaryczne, kroj szeryfowy — jak na ramce.
+   Tekst konczy sie 18 px od prawej krawedzi (14 px odstepu ramki + 3 px
+   marginesu kursora + 1 px kursora), zeby liczba stanela tam, gdzie stoi
+   na ramce. */
+.ramkaKwoty {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px 0 14px;
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.wpisKwoty {
+  flex: 1;
+  min-width: 0;
+  /* Pole wypelnia ramke na cala jej wysokosc. Zmierzone: bez tego sam wpis
+     mial 18 px wysokosci wewnatrz 54-pikselowej ramki, czyli cel klikalny
+     byl mniejszy niz to, co uzytkownik widzi jako pole. */
+  align-self: stretch;
+  text-align: right;
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  color: var(--atrament);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.wpisKwoty:focus { outline: none; }
+
+.ramkaSzczegolow {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.wpisSzczegolow {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.wpisSzczegolow:focus { outline: none; }
+
+.podpis { font-size: 13px; color: var(--atrament-cichy); }
+
+/* Obszary mowiace: skladaja podpis stojacy zawsze razem z komunikatem,
+   ktory dopiero moze sie pojawic. Odstep 8 px dziala WEWNATRZ obszaru,
+   wiec pusty komunikat nie zmienia wysokosci ekranu. */
+.podKwota,
+.podPasmem { display: flex; flex-direction: column; gap: 8px; }
+
+/* Obrys uwagi na polu, ktore czeka na poprawke. Barwa nie jest jedynym
+   nosnikiem — obok stoi zdanie mowiace, co poprawic. */
+.uwaga { border-color: var(--saldo-ujemne); }
+.podpisUwagi { font-size: 13px; color: var(--saldo-ujemne); }
+
+.potwierdzenie {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+  border: 1px solid var(--atrament);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* ---- 6-7. pasmo kategorii ---- */
+
+.sekcjaKategorii { display: flex; flex-direction: column; gap: 8px; }
+
+.wierszEtykietyKategorii {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+/* Zawijanie NATURALNA SZEROKOSCIA, nie siatka: rowna siatka szesciu kolumn
+   dalaby 166,7 px, a najszerszy kafelek „Jedzenie poza domem" ma 182,2 px
+   i zostalby zawiniety. */
+.pasmo { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.kafelek {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.kafelekCzynny {
+  gap: 8px;
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+  border-color: var(--atrament);
+}
+
+.kafelekNieaktywny { color: var(--atrament-cichy); }
+
+/* ---- 8-9. zapis ---- */
+
+.wierszZapisu { display: flex; align-items: center; gap: 20px; }
+
+.przyciskZapisz {
+  flex: none;
+  white-space: nowrap;
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+  border: 1px solid var(--atrament);
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.podpisZapisu { font-size: 15px; color: var(--atrament-cichy); }
+.akcent { color: var(--atrament); }
+
+/* ---- 10-12. dwie kolumny: podglad skutku + ostatnie wpisy ---- */
+
+.dwieKolumny {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 40px;
+  align-items: start;
+}
+
+.kolumna { display: flex; flex-direction: column; }
+
+.naglowekBloku {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+
+.naglowekBlokuDalszego {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 24px 0 6px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+
+.wierszSkutku {
+  display: grid;
+  grid-template-columns: 1fr auto 14px auto;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--liniatura-wierszy);
+}
+
+/* Czwarty wiersz mowi, co sie NIE ruszylo — ma wiec inny uklad kolumn
+   i zadnej strzalki, bo strzalka obiecywalaby zmiane. */
+.wierszBezZmian {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+}
+
+.etykietaWiersza { font-size: 15px; }
+.etykietaWierszaCicha { font-size: 15px; color: var(--atrament-cichy); }
+
+.liczbaPrzed {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+}
+
+.liczbaPo {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--atrament);
+}
+
+.proza { margin: 10px 0 0; font-size: 15px; color: var(--atrament-cichy); }
+.prozaBlisko { margin: 8px 0 0; font-size: 15px; color: var(--atrament-cichy); }
+.pustaHistoria { margin: 14px 0 0; font-size: 20px; line-height: 1.45; }
+
+.listaWpisow { display: flex; flex-direction: column; }
+
+.wierszWpisu {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--liniatura-wierszy);
+}
+
+.wycofaj {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}

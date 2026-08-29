@@ -1,78 +1,166 @@
-/* Powloka wspolna. Barwy WYLACZNIE ze zmiennych z paleta.css — zadnej
-   wartosci szesnastkowej w tym pliku, bo to byłby drugi nosnik palety.
+/* POWLOKA WSPOLNA. Barwy WYLACZNIE ze zmiennych z `paleta.css` — zadnej
+   wartosci szesnastkowej w tym pliku, bo to bylby drugi nosnik palety.
+   Wartosci pikselowe przeniesione DOSLOWNIE z ramek `makiety/*.dc.html`.
 
-   TYPOGRAFIA: minimalny rozmiar tekstu to 11 pt (bramka PRD §12.2, prog ze
-   standardu). Poprzedni projekt mial caly tekst na 13 px = 9,75 pt, czyli
-   PONIZEJ progu — znalezisko Z-4, odlozone z jawnym progiem "przy pierwszej
-   zmianie skali typograficznej". Ta zmiana wlasnie nastapila, wiec podstawa
-   idzie na 15 px = 11,25 pt.
+   TYPOGRAFIA (D-53, PRD v1.3): kroj bezszeryfowy dokladnie jak w ramkach;
+   podstawa 15 px zamiast 13 px z ramki — to JEDYNE swiadome odstepstwo.
+   Bramka „>= 11 pt" (PRD §12.2) zostaje w mocy: 15 px = 11,25 pt.
+   Wysokosci wiersza NIE ustawiamy — ramka jej nie ustawia, a kazda wartosc
+   inna niz domyslna przesuwa bloki tekstu w pionie i lamie bramke odwzorowania.
 
-   KRÓJ WRACA DO RAMKI (D-53, decyzja Darka 2026-08-29 g. 00:55: „sama
-   wielkość tekstu może być 15 px, reszta zostaje bez zmian"). Szeryfowy
-   `ui-serif Georgia` był dodatkiem wykonawcy, nie decyzją, i schodzi.
-   Krój jest ten sam, co w `makiety/*.dc.html`, bo ramka jest wiążącą
-   specyfikacją wyglądu (CLAUDE.md §3.6), a bramka odwzorowania mierzy
-   zgodność z nią maszynowo. ROZMIAR 15 px ZOSTAJE — bramka „≥ 11 pt"
-   z PRD §12.2 jest nim spełniona i pozostaje w mocy. */
+   KROJ KWOT JEST SZERYFOWY. 37 z 41 ramek niesie `Iowan Old Style` na
+   kwotach; to nie jest dodatek, tylko odwzorowanie. Deklaracja przeniesiona
+   z ramki co do znaku i ma tu JEDEN nosnik — `--kroj-kwot`. */
 
-:root { color-scheme: light dark; }
+:root {
+  color-scheme: light;
+  --kroj-kwot: "Iowan Old Style", "Palatino Linotype", Palatino,
+               "Times New Roman", Times, serif;
+}
 
-* { box-sizing: border-box; }
+/* MODEL PUDELKA ZOSTAJE DOMYSLNY (`content-box`). Ramka go nie przestawia,
+   a `border-box` odejmuje obrys od wysokosci: kafelek 46 px z ramki zrobil by
+   sie 44-pikselowy, i to na KAZDEJ kontrolce naraz. Zmierzone: przy
+   `border-box` dziewiec pozycji paska bylo o 2 px nizsze, pole kwoty o 2 px,
+   a cala tresc plynela w gore o rosnaca roznice. */
 
 body {
   margin: 0;
-  background: var(--papier);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+}
+
+/* Arkusz papieru: barwa + faktura wlokna. Oba z jednego nosnika —
+   `paleta.css` generowana z `makiety/paleta.json` i z ramki. */
+.arkusz {
+  background-color: var(--papier);
+  background-image: var(--faktura-arkusza);
+  background-repeat: repeat;
   color: var(--atrament);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Helvetica Neue", Arial, sans-serif;
-  font-variant-numeric: tabular-nums;  /* kwoty maja stac w kolumnie */
+  min-height: 900px;
+  display: flex;
+  flex-direction: column;
 }
 
-.naglowek {
-  border-bottom: 1px solid var(--liniatura-wierszy);
-  padding: 16px 32px 0;
+.naglowek { display: flex; flex-direction: column; }
+
+.naglowek-wiersz {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 40px;
 }
 
-.znak { display: flex; align-items: baseline; gap: 20px; }
-.znak-slowny { font-size: 24px; letter-spacing: 0.02em; }
+.znak-slowny {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 
-/* Cel klikalny >= 44x44 px — prog podwyzszony z bramki PRD §12.2. */
-.akcja,
-.pasek a {
+/* Cel klikalny >= 44 x 44 px — prog z bramki PRD §12.2, w ramce spelniony
+   przez `min-height: 44px` na kazdej kontrolce naglowka. */
+.akcja {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.akcja svg { color: var(--atrament-cichy); }
+
+/* Stan czynny niosa trzy rzeczy naraz: odwrocenie wypelnienia, waga pisma 600
+   i obrys atramentowy. Po odbarwieniu zostaja odwrocenie jasnosci i waga —
+   barwa NIE jest jedynym nosnikiem znaczenia (fundament §6A). */
+.akcja-czynna {
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+  border-color: var(--atrament);
+}
+.akcja-czynna svg { color: var(--papier); }
+
+.pasek {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+.pasek a {
   min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   padding: 0 12px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--atrament-cichy);
   text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
-
-.akcja {
-  color: var(--atrament);
-  border: 1px solid var(--obrys-kontrolki);
-  background: var(--pole-kontrolki);
-}
-
-.pasek { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .pasek a[aria-current="page"] {
+  font-weight: 600;
   color: var(--atrament);
-  box-shadow: inset 0 -2px 0 var(--atrament);
+  border-bottom-color: var(--atrament);
 }
 
-main { padding: 24px 32px 48px; }
+.rozpychacz { flex: 1; }
 
-.straznik {
-  border-top: 1px solid var(--liniatura-wierszy);
-  padding: 12px 32px;
-  color: var(--atrament-cichy);
+.odczyt {
   font-size: 13px;
+  color: var(--atrament-cichy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* Barwa NIGDY nie jest jedynym nosnikiem znaczenia (bramka PRD §12.2).
-   Zielen dobrana pod rowna wage z czerwienia ma po odbarwieniu roznice 0,00 —
-   ratuje to WYLACZNIE znak "+"/"-" przy kwocie. Znak jest wiec WYMOGIEM,
-   nie ozdoba; usuniecie go lamie te bramke. */
-.kwota-ujemna { color: var(--saldo-ujemne); }
-.kwota-dodatnia { color: var(--saldo-dodatnie); }
-.kwota-ujemna::before { content: "−"; }
-.kwota-dodatnia::before { content: "+"; }
+/* Liniatura podwojna zamykajaca naglowek: 1 px + 3 px przerwy + 1 px. */
+.kreska { height: 1px; background: var(--atrament-cichy); }
+.przerwa { height: 3px; }
+
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.stopka {
+  display: flex;
+  justify-content: center;
+  padding: 0 40px 24px;
+}
+.stopka-tresc {
+  width: 1040px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.straznik {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--atrament-cichy);
+  border: 1px solid var(--atrament-cichy);
+  border-radius: 2px;
+  box-shadow: 0 0 0 3px var(--papier), 0 0 0 4px var(--atrament-cichy);
+}
+
+/* Widoczne ognisko klawiatury — bez niego ekran przestaje byc obslugiwalny
+   z klawiatury, a to jest bramka dostepnosci, nie ozdoba. */
+:focus-visible {
+  outline: 2px solid var(--atrament);
+  outline-offset: 2px;
+}

@@ -11,9 +11,13 @@
 // danych przykladowych; na ekranie, gdzie kolejnosc jest trescia, przykladowy
 // ranking to przykladowa odpowiedz, a etykieta go nie ratuje.
 
+import { Powloka } from "./powloka";
+import { ODCZYT_NAGLOWKA, STRAZNIK_STOPKI } from "@/lib/dane/ksiegowanie";
+
 export default function Plynnosc() {
   return (
-    <section>
+    <Powloka aktywny="plynnosc" odczyt={ODCZYT_NAGLOWKA} straznik={STRAZNIK_STOPKI}>
+    <section style={{ width: 1040, margin: "28px 0 20px" }}>
       <h1>Płynność</h1>
       <p>
         Szkielet. Silnik nie jest jeszcze podpięty, więc ten ekran nie pokazuje
@@ -26,5 +30,6 @@ export default function Plynnosc() {
         szerokości (PRD §12.7).
       </p>
     </section>
+    </Powloka>
   );
 }

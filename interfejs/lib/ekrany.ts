@@ -12,6 +12,19 @@
 // pieniadze w czasie — przyszlosc, biezacy miesiac, postanowienia; czwarta
 // domyka te rodzine czasem, ktory juz byl.
 
+// ZNAK SLOWNY — jeden nosnik napisu w naglowku.
+//
+// ODSTEPSTWO OD RAMKI, NAZWANE I ZMIERZONE. Ramki niosą znak „AI CFO"
+// (64,5 px przy 15 px / waga 700 / odstep liter 0,16em). Aplikacja nazywa sie
+// „Doradca Finansowy" (D-47), a AI CFO jest wygaszane (D-37) — wiec napisu
+// z ramki przepisac nie mozna. Pelna nazwa w tej samej typografii ma jednak
+// 213,2 px, czyli o 148,7 px wiecej, a caly wiersz naglowka ma zapasu
+// 26,2 px (pomiar rendera ramki, 2026-08-29): naglowek by sie rozjechal
+// i wiersz przestalby miescic sie w 1440 px.
+// Stoi tu wiec forma krotka — 92,6 px, +28,1 px wobec ramki. To jedyne
+// miejsce, w ktorym trzeba to zmienic, gdy zapadnie decyzja projektowa.
+export const ZNAK_SLOWNY = "Doradca";
+
 export type Ekran = {
   klucz: string;
   napis: string;
