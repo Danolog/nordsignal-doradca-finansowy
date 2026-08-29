@@ -194,7 +194,7 @@ def test_rezerwa_Z_data_nie_niesie_zastrzezenia_o_ZUS():
 def test_zbieracz_PODAJE_silnikowi_date_z_bazy(tmp_path):
     from silnik.rdzen import magazyn
 
-    p = magazyn.polacz(tmp_path / "zbieracz.db")
+    p = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_dzialalnosc_od(p, date(2026, 9, 1))
     magazyn.zapisz_fakture(
         p, data=date(2026, 9, 10), numer_faktury="FV/1/2026",
@@ -223,7 +223,7 @@ def test_zbieracz_BEZ_daty_w_bazie_melduje_nie_wiem(tmp_path):
     takze wtedy, gdy nie ma tam nic."""
     from silnik.rdzen import magazyn
 
-    p = magazyn.polacz(tmp_path / "zbieracz-pusty.db")
+    p = magazyn.zmigruj_i_polacz()
     r = podatki.rezerwa_z_bazy(p, dzis=date(2026, 11, 30))
     assert r.miesiace_zus is None
     assert r.zastrzezenia
@@ -236,7 +236,7 @@ def test_zbieracz_PODAJE_silnikowi_takze_FORME_z_bazy(tmp_path):
     liczylby ryczaltem takze osobie na skali, przy zielonej suicie."""
     from silnik.rdzen import magazyn
 
-    p = magazyn.polacz(tmp_path / "forma-zbieracz.db")
+    p = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_dzialalnosc_od(p, date(2026, 9, 1))
     r = podatki.rezerwa_z_bazy(p, dzis=date(2026, 11, 30))
     assert r.forma == magazyn.FORMA_SKALA, \

@@ -83,3 +83,37 @@ def kod_pythona_bez_prozy(zrodlo: str) -> str:
             zamaz(token.start[0], token.start[1],
                   token.end[0], token.end[1])
     return "".join(wiersze)
+
+
+# --- dostep do bazy testowej z pominieciem `polacz()` ----------------------
+
+def polaczenie_surowe():
+    """Gole polaczenie do przestrzeni testowej tego testu.
+
+    NASTEPCA `sqlite3.connect(sciezka)` w testach (W4, 2026-08-29). Tamte
+    testy budowaly stan SPRZED migracji — czyli stan, ktorego `polacz()`
+    z zalozenia nie otworzy. Potrzebna jest wiec droga obok `polacz()`, ale
+    NIE obok izolacji: to polaczenie idzie do tej samej przestrzeni nazw co
+    reszta testu i jest zamykane przy sprzataniu (`conftest.przestrzen_testowa`
+    sledzi `magazyn._otworz_surowo`). Gole `psycopg.connect` ominoloby
+    sledzenie i zawiesiloby sprzatanie na blokadzie.
+    """
+    from silnik.rdzen import magazyn
+
+    return magazyn._otworz_surowo(magazyn.adres_bazy())
+
+
+def tabele_w_bazie(polaczenie) -> set:
+    """Nazwy tabel w przestrzeni testowej — nastepca zapytania do `sqlite_master`."""
+    return {w[0] for w in polaczenie.execute(
+        "SELECT table_name FROM information_schema.tables"
+        " WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'"
+    ).fetchall()}
+
+
+def kolumny_tabeli(polaczenie, tabela: str) -> set:
+    """Nazwy kolumn tabeli — nastepca `PRAGMA table_info(...)`."""
+    return {w[0] for w in polaczenie.execute(
+        "SELECT column_name FROM information_schema.columns"
+        " WHERE table_schema = current_schema() AND table_name = %s",
+        (tabela,)).fetchall()}

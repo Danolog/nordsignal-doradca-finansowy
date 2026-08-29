@@ -30,10 +30,14 @@ to najczestszy ksztalt wlasnej wady i ma zostac gloshy jako 500.
 
 from __future__ import annotations
 
+import os
+import time
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api import trasy_ksiegowanie, trasy_plynnosc
+from api import trasy_budzet, trasy_ksiegowanie, trasy_plynnosc
 from api.kwoty import OdpowiedzJSON
 from silnik.rdzen import magazyn
 
@@ -49,8 +53,53 @@ from silnik.rdzen import magazyn
 # Obie roznice byly ciche. Straznik: `testy/test_kontrakt_dwa_nosniki.py`,
 # sekcja „serializacja".
 
+#: LICZNIKI ZYCIA PROCESU — jedyny sposob, zeby odpowiedziec na pytanie,
+#: ktore W6 zastalo NIEROZSTRZYGNIETE: czy na platformie uchwyt cyklu zycia
+#: biegnie RAZ NA ZIMNY START, czy RAZ NA WYWOLANIE. Roznica nie jest
+#: akademicka — migracja schematu siedzi w tym uchwycie (W2), wiec „raz na
+#: wywolanie" znaczyloby pelny DDL na sciezce zadania, czyli dokladnie to,
+#: co W2 usuwalo (pomiar sprzed W2: 98 polecen SQL, 59 piszacych, na kazde
+#: zadanie HTTP).
+#:
+#: Odczytuje je `/api/zdrowie`. Trzy liczby razem daja odpowiedz, ktorej
+#: zadna z nich nie daje osobno: ten sam `pid` przy `zadan > 1` znaczy ten
+#: sam proces, a `uruchomien_cyklu_zycia` mowi, ile razy migracja w tym
+#: procesie ruszyla. `uruchomien == zadan` to sygnal alarmowy.
+_CHWILA_IMPORTU = time.time()
+_URUCHOMIEN_CYKLU_ZYCIA = 0
+_ZADAN_ZDROWIA = 0
+
+
+@asynccontextmanager
+async def cykl_zycia(_aplikacja: FastAPI):
+    """MIGRACJA RAZ, PRZY STARCIE PROCESU — nie raz na zadanie (W2).
+
+    Do 2026-08-29 `magazyn.polacz()` stawialo schemat samo, przy kazdym
+    otwarciu bazy. Poniewaz polaczenie jest zaleznoscia NA ZADANIE
+    (`api/wspolne.polaczenie`), znaczylo to pelny DDL przy kazdym zadaniu HTTP:
+    zmierzone sonda `set_trace_callback` — **98 polecen SQL, 59 piszacych**.
+    U poprzednika (plik na dysku) niewidoczne; przy PostgreSQL nie do
+    utrzymania — od W4 baza jest serwerem, a nie plikiem obok kodu.
+
+    Po rozdzieleniu migracja jest tutaj i tylko tutaj. `polacz()` bazy
+    niezmigrowanej NIE naprawia po cichu — odmawia otwarcia i mowi, co
+    uruchomic. Gdyby ten uchwyt zniknal, aplikacja nie „dzialalaby na pustej
+    bazie": kazde zadanie konczylo by sie kodem 400 z instrukcja.
+
+    CO PRZEZ TO PRZESTAJE DZIALAC: proces, ktory otwiera baze z pominieciem
+    tego uchwytu (wlasny skrypt, wiersz polecen), musi zawolac migracje sam —
+    `./.venv/bin/python -m silnik.rdzen.magazyn`.
+    """
+    global _URUCHOMIEN_CYKLU_ZYCIA
+    _URUCHOMIEN_CYKLU_ZYCIA += 1
+    magazyn.zmigruj()
+    yield
+
+
 trasy = APIRouter(default_response_class=OdpowiedzJSON)
-aplikacja = FastAPI(title="Doradca Finansowy", default_response_class=OdpowiedzJSON)
+aplikacja = FastAPI(title="Doradca Finansowy",
+                    default_response_class=OdpowiedzJSON,
+                    lifespan=cykl_zycia)
 
 #: Trasy ZBUDOWANE, nie zapisane w spisie. Liczba wyprowadzona z routerow,
 #: a nie wpisana recznie — recznie wpisana rozjechalaby sie przy pierwszej
@@ -58,7 +107,8 @@ aplikacja = FastAPI(title="Doradca Finansowy", default_response_class=OdpowiedzJ
 #: do Z6 („10 tras" wobec 24 zmierzonych u poprzednika).
 ZBUDOWANE = tuple(
     trasa.path
-    for router in (trasy_ksiegowanie.trasy, trasy_plynnosc.trasy)
+    for router in (trasy_ksiegowanie.trasy, trasy_plynnosc.trasy,
+                   trasy_budzet.trasy)
     for trasa in router.routes) + ("/api/zdrowie",)
 
 
@@ -67,10 +117,27 @@ def zdrowie() -> dict:
     """Ile tras jest w spisie i ile z nich naprawde stoi."""
     from api import trasy as spis
 
+    global _ZADAN_ZDROWIA
+    _ZADAN_ZDROWIA += 1
     return {
-        "stan": "dwa ekrany",
+        "stan": "trzy ekrany",
         "tras_w_spisie": len(spis.WSZYSTKIE),
         "zbudowanych": len(ZBUDOWANE),
+        # Pomiar zycia procesu — patrz komentarz przy licznikach wyzej.
+        "pid": os.getpid(),
+        "uruchomien_cyklu_zycia": _URUCHOMIEN_CYKLU_ZYCIA,
+        "zadan_zdrowia_w_tym_procesie": _ZADAN_ZDROWIA,
+        # MILISEKUNDY JAKO LICZBA CALKOWITA, NIE SEKUNDY JAKO UŁAMEK.
+        # Pierwsze podejscie oddawalo `round(..., 3)` i wdrozenie odpowiedzialo
+        # kodem 500: `api/kwoty.py` ODMAWIA wypuszczenia liczby
+        # zmiennoprzecinkowej z odpowiedzi HTTP — takze takiej, ktora nie jest
+        # kwota. To zachowanie jest poprawne i zostaje; to pole sie do niego
+        # dostosowuje. Zmierzone na wdrozeniu 2026-08-29.
+        "milisekund_od_importu_modulu": int((time.time() - _CHWILA_IMPORTU) * 1000),
+        # Region podaje PLATFORMA, my go nie zgadujemy. Pusty napis znaczy
+        # „nie na platformie" (praca lokalna), nie „nieznany region".
+        "region": os.environ.get("VERCEL_REGION", ""),
+        "srodowisko_platformy": os.environ.get("VERCEL_ENV", ""),
     }
 
 
@@ -90,3 +157,15 @@ for _typ_bledu in (magazyn.BladMagazynu, ValueError, ArithmeticError):
 aplikacja.include_router(trasy)
 aplikacja.include_router(trasy_ksiegowanie.trasy)
 aplikacja.include_router(trasy_plynnosc.trasy)
+aplikacja.include_router(trasy_budzet.trasy)
+
+#: NAZWA WYMAGANA PRZEZ PLATFORME, NIE WYBOR STYLU (W6, 2026-08-29).
+#: Budowniczy Pythona Vercela szuka w `api/index.py` obiektu ASGI o nazwie
+#: `app` i bez niego ODMAWIA BUDOWY — zmierzone na probniku:
+#:   `Error: Found api/index.py but it does not define a top-level "app"
+#:    FastAPI instance.`
+#: Regula §4 konstytucji projektu („nazwy po polsku") ustepuje tu wymaganiu
+#: platformy. To jest DRUGA NAZWA TEGO SAMEGO OBIEKTU, nie drugi obiekt —
+#: przypisanie, nie `FastAPI()` drugi raz. Straznik:
+#: `testy/test_wejscie_platformy.py::test_app_JEST_TYM_SAMYM_obiektem_co_aplikacja`.
+app = aplikacja

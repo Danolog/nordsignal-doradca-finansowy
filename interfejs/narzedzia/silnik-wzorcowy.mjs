@@ -11,10 +11,13 @@
 // zestawu oraz `POST /api/wpisy/podglad` — kartą „Co ruszy ten wpis"
 // z ramki Księgowania.
 //
-// CZEGO NIE ROBI I DLACZEGO GŁOŚNO: `POST /api/wpisy`, `DELETE /api/wpisy/{id}`
-// i `PUT /api/kotwica` ODMAWIA zdaniem, zamiast udawać zapis. Wzorzec, który
+// CZEGO NIE ROBI I DLACZEGO GŁOŚNO: `POST /api/wpisy`, `DELETE /api/wpisy/{id}`,
+// `PUT /api/kotwica` oraz WSZYSTKIE PIĘĆ ZAPISÓW BUDŻETU (`POST /api/plan`,
+// `PUT /api/plan/{id}`, `POST /api/plan/{id}/zakoncz`, `POST /api/plan/kopiuj`,
+// `POST /api/cele`) ODMAWIAJĄ zdaniem, zamiast udawać zapis. Wzorzec, który
 // pozwala „zapisać", uczyłby, że przebieg odbiorczy przeszedł także po
-// stronie danych — a on nie dotknął żadnej bazy.
+// stronie danych — a on nie dotknął żadnej bazy. Cztery operacje P-1 dowodzi
+// się WYŁĄCZNIE na żywym silniku i żywej bazie, nigdy tutaj.
 //
 // ILE RZECZY TEN PROCES OBSŁUŻYŁ. Każde żądanie jest liczone, a `SIGTERM`
 // i `SIGINT` wypisują licznik na wyjście. Wzorzec, do którego nikt nie
@@ -77,6 +80,9 @@ const serwer = http.createServer((zadanie, odpowiedz) => {
   }
   if (zadanie.method === "GET" && sciezka === "/api/ksiegowanie") {
     return oddaj(odpowiedz, 200, zestaw.ksiegowanie);
+  }
+  if (zadanie.method === "GET" && sciezka === "/api/budzet") {
+    return oddaj(odpowiedz, 200, zestaw.budzet);
   }
   if (zadanie.method === "POST" && sciezka === "/api/wpisy/podglad") {
     // Karta z ramki, niezależnie od tego, co przyszło w treści żądania:

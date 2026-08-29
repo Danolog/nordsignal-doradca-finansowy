@@ -479,24 +479,34 @@ def zbierz(polaczenie, *, dzis: date, napis_kwoty: NapisKwoty,
 
 
 def _wpisy_miesiaca(wpisy: pd.DataFrame, rok: int, miesiac: int) -> pd.DataFrame:
-    if wpisy.empty:
-        return wpisy
-    return wpisy[wpisy["data"].astype(str)
-                 .str.startswith(f"{rok:04d}-{miesiac:02d}")]
+    """WOLA jedyny nosnik reguly, nie powtarza go (W9b).
+
+    Do W9b stal tu wlasny filtr po prefiksie daty — druga kopia
+    `budzet.wpisy_miesiaca`. Ekran Budzetu potrzebowal tej samej reguly po raz
+    trzeci, wiec kopia zostala zwinieta do wywolania.
+    """
+    return budzet.wpisy_miesiaca(wpisy, rok, miesiac)
 
 
-def ostatnie_wpisy(wpisy: pd.DataFrame, *,
-                   napis_kwoty: NapisKwoty) -> tuple[kontrakt.OstatniWpis, ...]:
+def ostatnie_wpisy(wpisy: pd.DataFrame, *, napis_kwoty: NapisKwoty,
+                   ile: int = ILE_OSTATNICH_WPISOW,
+                   ) -> tuple[kontrakt.OstatniWpis, ...]:
     """Sześć ostatnich wpisow, od najnowszego.
 
     `magazyn.wczytaj_wpisy` oddaje je rosnaco po dacie i numerze, wiec
     „ostatnie" to ogon listy odwrocony. Kolejnosc jest tu OBIETNICA wobec
     ekranu („Ostatnie wpisy"), a nie wlasnoscia cudzej listy — dlatego
     odwracamy jawnie, zamiast ufac, ze ktos posortowal malejaco.
+
+    `ile` DOLOZONE W W9b, z wartoscia domyslna niezmieniajaca zachowania
+    tego ekranu. Tabela „Historia" na Budzecie pokazuje WSZYSTKIE wpisy
+    miesiaca, nie szesc — a zamiana wiersza bazy na `OstatniWpis` jest regula
+    (ktore pola, w jakim ksztalcie, z jakim `napis_kwoty`) i ma miec jeden
+    nosnik. Wlasna petla po stronie Budzetu bylaby drugim.
     """
     if wpisy.empty:
         return ()
-    ogon = wpisy.tail(ILE_OSTATNICH_WPISOW)
+    ogon = wpisy.tail(ile)
     return tuple(
         kontrakt.OstatniWpis(
             id=int(w["id"]), data=str(w["data"]), typ=str(w["typ"]),

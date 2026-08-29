@@ -28,7 +28,12 @@ node narzedzia/buduj-palete.mjs    # paleta.css powstaje z makiety/paleta.json
 npm run dev
 ```
 
-Backend osobno: `./.venv/bin/uvicorn api.index:aplikacja --reload`
+Backend osobno: `./.venv/bin/uvicorn api.index:aplikacja --reload` — migrację bazy robi
+uchwyt startowy aplikacji. Ręcznie, bez stawiania serwera:
+`./.venv/bin/python -m silnik.rdzen.magazyn`.
+
+`magazyn.polacz()` **tylko otwiera** bazę i odmawia otwarcia bazy niezmigrowanej — schemat
+stawia wyłącznie `magazyn.zmigruj()` (W2, 2026-08-29).
 
 ## Układ
 

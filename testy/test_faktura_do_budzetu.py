@@ -22,7 +22,7 @@ from silnik.rdzen import budzet, magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "most.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_fakture(
         polaczenie, data=date(2026, 8, 25), numer_faktury="FV/1/2026",
         kwota_netto=Decimal("11200.00"), stawka_vat=Decimal("0.23"),
@@ -55,7 +55,7 @@ def test_wpis_ma_date_WPLYWU_nie_wystawienia(p):
     ktorych w sierpniu na koncie nie bylo."""
     magazyn.oznacz_fakture_zaplacona(p, faktura_id=int(_faktura(p)["id"]),
                                      data_wplywu=date(2026, 9, 10))
-    assert magazyn.wczytaj_wpisy(p).iloc[0]["data"] == "2026-09-10"
+    assert magazyn.wczytaj_wpisy(p).iloc[0]["data"] == date(2026, 9, 10)
 
 
 def test_wpis_wskazuje_numer_faktury(p):
@@ -98,14 +98,14 @@ def test_po_skasowaniu_wpisu_mozna_przeniesc_ponownie(p):
     magazyn.oznacz_fakture_zaplacona(p, faktura_id=numer,
                                      data_wplywu=date(2026, 9, 12))
     assert len(magazyn.wczytaj_wpisy(p)) == 1
-    assert magazyn.wczytaj_wpisy(p).iloc[0]["data"] == "2026-09-12"
+    assert magazyn.wczytaj_wpisy(p).iloc[0]["data"] == date(2026, 9, 12)
 
 
 def test_data_zaplaty_zapisuje_sie_przy_fakturze(p):
     numer = int(_faktura(p)["id"])
     magazyn.oznacz_fakture_zaplacona(p, faktura_id=numer,
                                      data_wplywu=date(2026, 9, 10))
-    assert _faktura(p)["data_zaplaty"] == "2026-09-10"
+    assert _faktura(p)["data_zaplaty"] == date(2026, 9, 10)
 
 
 def test_swiezo_wystawiona_faktura_jest_nieprzeniesiona(p):

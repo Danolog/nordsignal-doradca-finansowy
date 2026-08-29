@@ -728,7 +728,7 @@ E  + ziernika; pozycja schodzi z osi w całości
 - **Nie mutowano `_wejscia_planu`** — funkcji wydzielonej w tym zadaniu z `zbuduj`. Wydzielenie jest
   neutralne (suita przed i po: 880 passed), ale **żaden test nie pilnuje, że oba wołania dostają tę
   samą listę**; gdyby ktoś rozdzielił je z powrotem, nic by się nie zaczerwieniło. Etykieta jawna:
-  **niepotwierdzone**. Próg: przy pierwszej zmianie reguły dnia płatności (`_dzien_pozycji`).
+  **niepotwierdzone**. Próg: przy pierwszej zmianie reguły dnia płatności (`dzien_pozycji`).
 - **Nie ma strażnika na zdanie w przeglądarce.** Testy czytają odpowiedź trasy, nie wyrenderowany
   ekran. Że wiersz z `po: null` rysuje się jako etykieta + wyjaśnienie, wiadomo z Z1 — nie
   z pomiaru wykonanego dziś.
@@ -985,3 +985,802 @@ i potwierdził. Przy każdym strażniku zawartości stoi kontrola liczności:
   `docs/PRD.md` §6.3 p.3 i rozdz. 13.
 - **Nie mutowano ścieżki podpięcia silnika pod rejestr** — nie istnieje. To jest dokładnie to,
   czego pilnuje strażnik progu M6.
+
+---
+
+## Przebieg 2026-08-29 (W1) — `testy/test_schemat_dwa_dialekty.py`
+
+**Co pilnuje strażnik.** Dwa nośniki schematu bazy: dialekt SQLite
+(`magazyn._SCHEMAT` + `rejestr.SCHEMAT_SQLITE`, nośnik żywy — z niego stoi baza)
+i dialekt PostgreSQL (`silnik.baza.schemat_postgresql()` = `silnik/baza/schemat.sql`
++ `rejestr.SCHEMAT`, cel migracji). Do 2026-08-29 nic ich nie porównywało; pomiar
+przyrządem `testy/porownanie_schematu.py` na commicie `0b282cc` dał **24 miejsca rozjazdu**
+(plan sesji mówił o dziewięciu). Po W1 zostaje ich **9**, wszystkie w rejestrach
+`WIEZY_TYLKO_POSTGRESQL` i `INDEKSY_TYLKO_POSTGRESQL` plus świadomy rozdział `rejestr_stawek`.
+
+**Ile porównuje — liczby stoją w asercjach, nie w nazwach testów:**
+
+| Wymiar | Ile |
+|---|---|
+| tabel po każdej stronie | 14 (asercja `== ILE_TABEL`, plus niezależne policzenie poleceń `CREATE TABLE`) |
+| kolumn wspólnych | 95, każda w czterech wymiarach: typ, obowiązkowość, wartość domyślna, dziedzina |
+| kolumn kwotowych z `_KWOTOWE` | 16 (asercja `== ILE_KOLUMN_KWOTOWYCH`) |
+| więzów jednoznaczności | 4 (asercja `== ILE_WIEZOW_JEDNOZNACZNOSCI`) |
+| dziedzin wyliczeniowych | 5 (`wpisy_budzetu.zrodlo`, `forma`, `kategorie.typ`, `status` i `jednostka` stawki) |
+| więzów/indeksów tylko po stronie PostgreSQL | 5 + 3, wpisane imiennie do rejestru |
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mut2`, `rsync` bez `.git`
+i `.venv`), `PYTHONDONTWRITEBYTECODE=1` przy każdym przebiegu — dwie mutacje tej samej
+długości w tej samej sekundzie potrafią uruchomić stary skompilowany kod i zameldować
+cudzy wynik. Po każdej mutacji plik przywracany z kopii sprzed mutacji.
+
+Kontrola przed mutacjami: **17 passed** (plik strażnika).
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `schemat.sql`: `zysk_netto NUMERIC(14,2) NOT NULL` → `NUMERIC(14,2)` | `test_OBOWIAZKOWOSC_kolumn_jest_ta_sama` | **czerwony** (1 failed, 16 passed) |
+| **M2** | `schemat.sql`: `zaplacony_zus` → `zaplacony_zus_x` | `test_oba_dialekty_MAJA_te_same_kolumny` · `test_KAZDA_kolumna_kwotowa_jest_NUMERYCZNA_po_stronie_PostgreSQL` | **czerwony** (2 failed, 15 passed) |
+| **M3** | `schemat.sql`: `forma IN ('SKALA','RYCZALT')` → `('SKALA','LINIOWY','RYCZALT')` | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_dziedzina_formy_ZGADZA_SIE_z_FORMY_ZAPISYWALNE` | **czerwony** (2 failed, 15 passed) |
+| **M4** | `schemat.sql`: `wpisy_budzetu.kwota NUMERIC(14,2)` → `DOUBLE PRECISION` (§3.1) | `test_TYPY_kolumn_odpowiadaja_sobie_rodzina_po_rodzinie` · `test_KAZDA_kolumna_kwotowa_jest_NUMERYCZNA_po_stronie_PostgreSQL` · `test_ZADNA_kolumna_nie_uzywa_typu_zmiennoprzecinkowego` | **czerwony** (3 failed, 14 passed) |
+| **M5** | `porownanie_schematu._ciala_tabel` zwraca pusty słownik — przyrząd ślepnie | `test_parser_WIDZI_oba_napisy_a_nie_porownuje_pustki` + 12 dalszych | **czerwony** (13 failed, 4 passed) |
+| **M6** | `magazyn._SCHEMAT`: zdjęty `CONSTRAINT forma_znana` z żywego nośnika SQLite | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_dziedzina_formy_ZGADZA_SIE_z_FORMY_ZAPISYWALNE` · `test_wiezy_TYLKO_PostgreSQL_sa_te_z_rejestru` · `test_swieza_baza_ODRZUCA_forme_spoza_dwojki` | **czerwony** (4 failed, 27 passed) |
+| **M7** | `schemat.sql`: powrót `DEFAULT ''` do `godziny.pkwiu` | `test_WARTOSCI_DOMYSLNE_sa_te_same` | **czerwony** (1 failed, 16 passed) |
+| **M8** | `porownanie_schematu._ciala_tabel` gubi **jedną** tabelę po cichu (`wynik.pop("godziny")`) | `test_parser_WIDZI_oba_napisy_a_nie_porownuje_pustki` + 7 dalszych | **czerwony** (8 failed, 9 passed) |
+| **M9** | `magazyn._SCHEMAT`: zdjęty `CONSTRAINT typ_znany` | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_wiezy_TYLKO_PostgreSQL_sa_te_z_rejestru` | **czerwony** (2 failed, 15 passed) |
+
+Kontrola po cofnięciu wszystkich dziewięciu mutacji (`diff -q` wobec kopii sprzed mutacji:
+trzy pliki zgodne z oryginałem): **936 passed, 3 deselected, 0 skipped**.
+
+### Co pokazały M5 i M8 — najważniejsze pozycje tej tabeli
+
+**M5:** gdy przyrząd pomiarowy przestaje cokolwiek widzieć, **cztery testy z siedemnastu
+nadal są zielone**. Jeden z nich, `test_oba_dialekty_MAJA_te_same_tabele`, jest zielony
+**dlatego, że porównuje pustkę z pustką** — dokładnie ta klasa strażnika-atrapy, która przy
+zielonej suicie nie strzeże niczego. Łapie ją wyłącznie kontrola liczności, która żąda
+**dokładnie 14 tabel** po każdej stronie.
+
+**M8:** cichej utraty **jednej** tabeli kontrola „czy zbiór niepusty" **by nie złapała** —
+13 tabel to nadal niepusty zbiór. Łapie ją dopiero **niezależne policzenie poleceń
+`CREATE TABLE`** (`ile_polecen_create_table`), dołożone w przeglądzie samokrytycznym.
+Parser sprawdzający sam siebie nie sprawdza niczego.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano treści więzu `CHECK` innego niż `IN (...)`.** Parser porównuje takie więzy
+  **po nazwie**, nie po treści: zmiana `CHECK (kwota >= 0)` na `CHECK (kwota >= -1)` przy tej
+  samej nazwie **nie zaczerwieni niczego**. Luka nazwana, nie zamknięta.
+- **Nie mutowano kolumn ani warunku `WHERE` indeksu częściowego** — parser widzi wyłącznie
+  nazwę indeksu. Ta sama klasa luki.
+- **Nie mutowano zachowania PostgreSQL na żywej bazie.** Baza w Neonie jest pusta do W4, więc
+  cały ten strażnik porównuje **napisy DDL**, nie dwie działające bazy. Błąd składni w
+  `schemat.sql` przeszedłby przez wszystkie siedemnaście testów. Jedyne testy pytające żywą
+  bazę to `test_swieza_baza_ODRZUCA_forme_spoza_dwojki` i
+  `test_swieza_baza_PRZYJMUJE_kazdy_typ_z_budzet_TYPY` — obydwa na SQLite.
+- **Nie mutowano `_KWOTOWE`** jako nośnika listy kolumn pieniężnych. Nie jest listą pełną:
+  `forma_opodatkowania.stawka_ryczaltu` i `zobowiazania.oprocentowanie` idą przez `Decimal`
+  ręcznie, poza `_wczytaj`. Domyka je od drugiej strony
+  `test_ZADNA_kolumna_nie_uzywa_typu_zmiennoprzecinkowego`.
+
+---
+
+## Przebieg 2026-08-29 — rozdział „otwórz" od „zmigruj" (W2)
+
+**Co pilnują strażnicy.** `magazyn.polacz()` do tego dnia stawiało cały schemat przy każdym
+wywołaniu, a połączenie jest zależnością **na żądanie HTTP** (`api/wspolne.polaczenie`). Pomiar
+sondą `sqlite3.set_trace_callback` na świeżej bazie, commit `65baac3`:
+
+```
+LACZNIE polecen: 98
+wg pierwszego slowa: {'PRAGMA': 12, 'SELECT': 21, 'CREATE': 15, 'BEGIN': 3, 'INSERT': 44, 'COMMIT': 3}
+PISZACYCH/DDL: 59
+```
+
+Po rozdzieleniu `polacz()` wykonuje **jedno** polecenie — `PRAGMA user_version`, odczyt.
+Plan sesji mówił o „dwunastu rzeczach"; pomiar mówi o 98 poleceniach, z czego 59 piszących.
+
+**Dlaczego strażnik nie jest `grep`-em.** DDL wchodziło do `polacz()` **przez wywołania w środku**
+(`_dopisz_kolumny`, `zasiej_kategorie`, `_przebuduj_plan_budzetu`), więc funkcja mogła nie zawierać
+ani jednego słowa `CREATE` i nadal stawiać czternaście tabel. Strażnik mierzy to, co **dotarło do
+sterownika**. Mutacja M3 poniżej odtwarza dokładnie ten kształt wady.
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mutW2`, `rsync` bez `.git`,
+`.venv`, `node_modules`), `PYTHONDONTWRITEBYTECODE=1` przy każdym przebiegu, jedna mutacja naraz,
+plik przywracany z kopii sprzed mutacji. Kontrola przed mutacjami: **953 passed, 3 deselected**.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `zmigruj()`: usunięty `polaczenie.executescript(_SCHEMAT)` — migracja przestaje stawiać tabele | `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` · `test_start_aplikacji_MIGRUJE_baze` · `test_polacz_PRZYJMUJE_baze_zmigrowana` + 50 dalszych | **czerwony** (53 failed, 616 passed, 284 errors) |
+| **M2** | `api/index.cykl_zycia`: usunięte `magazyn.zmigruj()` — uchwyt startowy przestaje migrować | `test_start_aplikacji_MIGRUJE_baze` | **czerwony** (1 failed, **952 passed**) |
+| **M3** | `polacz()`: DDL wraca **wywołaniem w środku** (`zmigruj(sciezka)` przed otwarciem) — bez słowa `CREATE` w funkcji | `test_polacz_NIE_WYKONUJE_ani_jednego_polecenia_piszacego` · `test_polacz_ODMAWIA_otwarcia_bazy_niezmigrowanej` · `test_bez_startu_zadanie_ODMAWIA_zamiast_pokazac_zera` · `test_zdejmowanie_kolumn_NIE_BIEGNIE_przy_otwarciu` | **czerwony** (4 failed, 949 passed) |
+| **M4** | `_wymagaj_zmigrowanej`: warunek `wersja == WERSJA_SCHEMATU` → `True` — bramka przestaje odmawiać | `test_polacz_ODMAWIA_otwarcia_bazy_niezmigrowanej` · `test_bez_startu_zadanie_ODMAWIA_zamiast_pokazac_zera` | **czerwony** (2 failed, 951 passed) |
+| **M5** | `_wymagaj_niesprzecznych_kolumn`: `sprzeczne = []` — strażnik nieodwracalnego `DROP COLUMN` milknie | `test_kolumna_naraz_dopisywana_i_zdejmowana_JEST_ODMOWA` | **czerwony** (1 failed, 952 passed) |
+| **M6** | `ustaw_aktywnosc_kategorii`: zdjęty `polaczenie.rollback()` przed `raise` | `test_ZADNA_funkcja_nie_zglasza_bledu_po_zapisie_bez_rollback` · `test_odmowa_dezaktywacji_NIE_ZOSTAWIA_otwartej_transakcji` | **czerwony** (2 failed, 951 passed) |
+| **M7** | `_podsluchaj` w strażniku zwraca pustą listę — **przyrząd pomiarowy ślepnie** | `test_polacz_NIE_WYKONUJE_ani_jednego_polecenia_piszacego` · `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` | **czerwony** (2 failed, 8 passed w pliku strażnika) |
+| **M8** | `zmigruj()`: `stawek = zasiej_rejestr_stawek(...)` → `stawek = 0` — zasiew rejestru znika | `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` · 7 testów `test_rejestr_sqlite.py` | **czerwony** (8 failed) |
+
+Kontrola po cofnięciu wszystkich ośmiu mutacji (`diff -q` wobec repozytorium — cztery pliki
+zgodne): **953 passed, 3 deselected, 0 skipped**.
+
+### Co pokazała M2 — najważniejsza pozycja tej tabeli
+
+**Migracja przy starcie aplikacji ma w całej suicie DOKŁADNIE JEDNEGO strażnika.** Po usunięciu
+`magazyn.zmigruj()` z uchwytu cyklu życia **952 testy z 953 pozostały zielone** — łącznie ze
+wszystkimi testami HTTP, bo budują one `TestClient(aplikacja)` **bez** `with`, więc uchwytu
+w ogóle nie uruchamiają, a bazę migrują sobie same w fiksturze.
+
+To jest dokładnie ten kształt awarii, przed którym ostrzegała bramka zadania: *rozdzielić tak, że
+migracja przestaje działać w produkcji, a suita jest zielona, bo fikstura stawia schemat inaczej*.
+Jedynym testem, który przechodzi przez uchwyt startowy, jest
+`test_start_aplikacji_MIGRUJE_baze` — i to on jako jedyny się zaczerwienił.
+
+**Wniosek do W4:** przy podmianie sterownika ten test zostaje jedynym pomiarem drogi produkcyjnej.
+Jeśli miałby zostać wyłączony albo przepisany, wyłączenie jest decyzją do zgłoszenia, nie
+porządkiem.
+
+### Co pokazała M3
+
+Mutacja przywraca DDL do `polacz()` **przez wywołanie w środku**, nie przez wpisanie polecenia SQL.
+Funkcja po mutacji nie zawiera ani jednego słowa `CREATE`, `ALTER` ani `INSERT` — `grep` na jej
+ciele daje zero trafień, a baza dostaje 101 poleceń przy każdym otwarciu. Łapie to wyłącznie pomiar
+na sterowniku.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano czterech z sześciu miejsc uzupełnionych o `rollback()`** (`zapisz_plan`,
+  `ustaw_ustawienie`, `zapisz_forme`, `zapisz_stan_konta`). Ich gałąź `except sqlite3.Error` jest
+  osiągalna tylko przez awarię sterownika. Pilnuje ich **strażnik źródłowy**
+  (`test_ZADNA_funkcja_nie_zglasza_bledu_po_zapisie_bez_rollback`), zaczerwieniony mutacją M6 na
+  piątym miejscu tej samej klasy — nie ich własną mutacją behawioralną. Luka nazwana.
+- **Nie mutowano zachowania na PostgreSQL.** Cały ten przebieg stoi na SQLite; baza w Neonie jest
+  pusta do W4. Zdanie „w PostgreSQL zachowanie będzie inne" pozostaje **niezweryfikowane
+  pomiarem** — jest przesłanką planu, nie ustaleniem tego przebiegu.
+- **Nie mutowano atomowości `zapisz_koszt` i `oznacz_fakture_zaplacona`** — świadomie odłożone do
+  W4, ze strażnikami opisującymi stan dzisiejszy i jawnym progiem
+  (`testy/test_transakcje_przed_postgresql.py`, nagłówek).
+
+---
+
+## Przebieg 2026-08-29 (W3) — strażnicy **przed** migracją na PostgreSQL
+
+**Co pilnują.** Trzy wady, które po podmianie sterownika SQLite → psycopg **nie dałyby żadnego
+sygnału**, bo dzisiejsze asercje mierzą coś, co po migracji przestaje o nich mówić. Strażnicy
+powstali, **póki jeszcze widać stan poprawny**:
+
+| Plik | Wada | Ile obejmuje |
+|---|---|---|
+| `testy/test_kwoty_pozostaja_dziesietne.py` | kwota wraca jako `float64` zamiast `Decimal` | **16 kolumn w 9 tabelach** (asercja `== ILE_KOLUMN_KWOTOWYCH`, stała wołana z `test_schemat_dwa_dialekty.py` — jeden nośnik) |
+| `testy/test_komunikat_duplikatu_faktury.py` | zdanie „Faktura o tym numerze już jest" wisi na treści komunikatu sterownika | 2 gałęzie tłumaczenia + **10 klauzul `except sqlite3.…`** i **1 dopasowanie po treści** (pomiar) + 34 pliki `.py` przeszukane |
+| `testy/test_null_nie_udaje_liczby.py` | `NULL` → `NaN`, prawdziwy w warunku `if` | **3 składy kolumny** × 3 wiersze + **9 kształtów wejścia sterownika** (4 braki, 5 liczb) |
+
+**Pomiar, na którym stoi cały przebieg** (pandas 3.0.5, 2026-08-29). `pandas.read_sql` ma
+`coerce_float=True` w **wartości domyślnej**. Sterownik oddający `Decimal` — czyli dokładnie to,
+co poda psycopg na kolumnie `NUMERIC`:
+
+```
+surowy kursor: [('Decimal', Decimal('7034.72')), ('Decimal', Decimal('1234567890123456.8'))]
+read_sql domyslnie -> dtypes: {'kwota': dtype('float64')}
+coerce_float=False -> dtypes: {'kwota': dtype('O')}
+```
+
+Ten sam eksperyment stoi w suicie jako `test_sterownik_oddajacy_Decimal_ZAPALA_straznika` —
+nie jako cytat z raportu, tylko jako wykonywalny przypadek.
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mutW3`, `rsync` bez `.git`
+i `.venv`), `PYTHONDONTWRITEBYTECODE=1` i czyszczenie `__pycache__` przed każdym przebiegiem.
+Po każdej mutacji plik przywracany z kopii `scratchpad/mutW3-oryginal`.
+Kontrola przed mutacjami: **28 passed** (trzy nowe pliki), **981 passed, 3 deselected** (cała suita).
+
+| # | Mutacja (`silnik/rdzen/magazyn.py`) | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `_wczytaj` przestaje zamieniać kolumny kwotowe na `Decimal` (zdjęta cała pętla po `_KWOTOWE`) | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M2** | `_wczytaj` mapuje `float(x)` zamiast `Decimal(str(x))` | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M3** | `_KWOTOWE` gubi po cichu jedną kolumnę (`koszty_jdg.kwota_vat`, 16 → 15) | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M4** | `_SCHEMAT`: `wpisy_budzetu.kwota TEXT` → `REAL` — sterownik zaczyna oddawać liczbę | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` | **czerwony** (1 failed, 5 passed; **na całej suicie 2 failed, 979 passed**) |
+| **M5** | `if "numer_faktury" in str(e)` → `if "faktura_numer" in str(e)` | `test_duplikat_numeru_MOWI_o_numerze_a_nie_o_bazie` | **czerwony** (1 failed, 5 passed) |
+| **M6** | `if "numer_faktury" in str(e)` → `if True` — gałąź łapie każde naruszenie więzu | `test_INNE_naruszenie_wiezu_daje_komunikat_OGOLNY` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` · `test_ZADEN_INNY_modul_nie_rozstrzyga_po_tresci_komunikatu` | **czerwony** (3 failed, 3 passed) |
+| **M7** | `except sqlite3.IntegrityError` → `except Exception` | `test_tlumaczenie_wyjatkow_OBEJMUJE_WYLACZNIE_sterownik_sqlite3` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` | **czerwony** (2 failed, 4 passed) |
+| **M8** | `wczytaj_zobowiazania`: normalizacja `NaN` → `None` wyłączona (`if False`) | `test_kontrakt_trzyma_sie_przy_KAZDYM_skladzie_kolumny[mieszany]` · `test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN` | **czerwony** (2 failed, 14 passed; na całej suicie 4 failed, 977 passed) |
+| **M9** | `oprocentowanie_z_wiersza` przestaje rozpoznawać `NaN` (zdjęty człon `isinstance(w, float) and w != w`) | `test_oprocentowanie_z_wiersza_ROZUMIE_kazdy_ksztalt[nan-None-pandas po coerce_float na NULL]` | **czerwony** (1 failed, 15 passed) |
+| **M10** | `_wczytaj` omija `pd.read_sql` (`cursor.fetchall()` + `pd.DataFrame`) — kształt zapowiedziany w W4 | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` · `test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN` | **czerwony** (2 failed, 20 passed) |
+
+Kontrola po cofnięciu wszystkich dziesięciu mutacji (`diff -r` wobec kopii sprzed mutacji: różni się
+wyłącznie `.pytest_cache`): **981 passed, 3 deselected, 0 skipped**.
+
+### Co pokazała M4 — najważniejsza pozycja tej tabeli
+
+Mutacja zmienia typ **jednej kolumny kwotowej** z `TEXT` na `REAL`, czyli robi to, co migracja zrobi
+z szesnastoma naraz: sterownik zaczyna oddawać liczbę zmiennoprzecinkową. **979 testów z 981
+pozostaje zielonych.** Zielony pozostaje też `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal`
+z tego samego pliku — bo `_wczytaj` opakowuje liczbę z powrotem w `Decimal` **po** odczycie i strata
+staje się niewidoczna dla każdej asercji patrzącej na wynik.
+
+Łapie to wyłącznie strażnik podglądający `pandas.read_sql` **w locie**, czyli patrzący na ramkę
+**taką, jaka wyszła ze sterownika**. To jest odpowiedź na pytanie „czy ten test zaczerwieni się po
+podmianie sterownika": zaczerwieni, i wiadomo to **z pomiaru na stanie wytworzonym dzisiaj**,
+nie z przypuszczenia.
+
+### Co pokazała M10
+
+Obydwa przyrządy — szpieg nad `pd.read_sql` i podstawiona ramka po-migracyjna — **wykrywają własne
+oślepienie**. Gdy `_wczytaj` przestaje wołać `pd.read_sql` (a tak właśnie zapowiada W4: pandas nie
+wspiera surowych połączeń psycopg), strażnik nie melduje sukcesu przy pustym pomiarze, tylko pada
+z komunikatem „szpieg nie zobaczył ani jednego odczytu". Kontrola liczności działa.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano zachowania na PostgreSQL** — baza w Neonie jest pusta do W4. Wszystkie stany
+  po-migracyjne są **wytworzone**: raz sterownikiem SQLite z konwerterem oddającym `Decimal`
+  (`test_sterownik_oddajacy_Decimal_ZAPALA_straznika`), raz podstawioną ramką `float64`
+  (`test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN`), raz zmianą typu kolumny w schemacie
+  (M4). Mechanizm jest ten sam — `coerce_float` w pandas — ale **zdanie „psycopg zachowa się tak
+  samo" pozostaje niezweryfikowane pomiarem na żywej bazie**.
+- **Nie zamknięto wady 2, tylko ją opisano.** Naprawa (tłumaczenie wyjątków psycopg) należy do W4.
+  Znalezisko na przyszłość: PostgreSQL nada więzowi `numer_faktury TEXT NOT NULL UNIQUE`
+  (`schemat.sql:86`, więz **bez nazwy własnej**) nazwę automatyczną
+  `przychody_jdg_numer_faktury_key`, więc napis `"numer_faktury"` **będzie w komunikacie nadal** —
+  dopasowanie po treści może przeżyć **przypadkiem**, opierając się na nazwie, której nikt nie
+  wybrał. Zawiedzie natomiast klauzula `except sqlite3.IntegrityError`, bo `psycopg.errors.
+  UniqueViolation` nie dziedziczy z `sqlite3.Error` — i razem z nią **zapasowe** „Zapis odrzucony
+  przez bazę". To pilnuje `test_tlumaczenie_wyjatkow_OBEJMUJE_WYLACZNIE_sterownik_sqlite3`,
+  **tripwire**: po naprawie w W4 zaczerwieni się raz, świadomie.
+- **Nie objęto kolumn pieniężnych spoza `_KWOTOWE`** — `forma_opodatkowania.stawka_ryczaltu`
+  i `zobowiazania.oprocentowanie` idą przez `Decimal` ręcznie, poza `_wczytaj`. Pierwszej pilnuje
+  `test_forma_opodatkowania.py`, drugiej `test_null_nie_udaje_liczby.py`; **żadna z nich nie wchodzi
+  do liczby 16**.
+- **Nie mutowano `_stawka_z_wiersza`** (13 pozycji indeksowanych liczbą, sparowanych z ręcznie
+  wypisaną kolejnością w `SELECT`) — to nazwane ryzyko W4, bez strażnika po tej stronie.
+- **Nie mutowano ścieżki HTTP.** Wszystkie trzy strażniki kończą się na granicy magazynu. Czy
+  `Decimal` przeżywa drogę przez `api/` i z powrotem, mówią inne pliki — ten przebieg tego nie
+  mierzył.
+
+---
+
+## Przebieg 2026-08-29 — W4: podmiana sterownika SQLite → PostgreSQL
+
+**Kontrola przed mutacjami** (kopia drzewa poza repozytorium, `PYTHONDONTWRITEBYTECODE=1`,
+`__pycache__` czyszczone przed każdym przebiegiem): **991 passed, 3 deselected** na PostgreSQL 16
+w kontenerze `doradca-postgres` (port 5434, baza `doradca_test`, przestrzeń nazw na test).
+
+**Pułapka przyrządu, zmierzona przy tym przebiegu.** Pierwsze pięć mutacji uruchomiono z jawnym
+`-q` w komendzie. `pytest.ini` ma `-q` w `addopts`, więc powstało `-qq` — i **linia podsumowania
+zniknęła**; raport pokazywał wyłącznie nazwy testów, bez liczb. Przebieg powtórzono bez dodatkowego
+`-q`. Liczby poniżej pochodzą z powtórzenia.
+
+| # | Mutacja | Który test padł | Wynik | Kontrola po cofnięciu |
+|---|---|---|---|---|
+| **M-W4-1** | `magazyn._ramka`: ramka rzutowana na `float64` po odczycie (odtworzenie tego, co robi `coerce_float`) | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` | `1 failed, 5 passed` | `6 passed` |
+| **M-W4-2** | `magazyn.WIEZ_NUMER_FAKTURY` → `"przychody_jdg_numer_faktury_key"` (nazwa **automatyczna**, czyli ta, której nikt nie wybrał) | `test_PRAWDZIWA_baza_podaje_te_sama_nazwe_wiezu` · `test_duplikat_numeru_MOWI_o_numerze_a_nie_o_bazie` · `test_nazwa_wiezu_z_KODU_zgadza_sie_z_nazwa_z_BAZY` · `test_rozpoznanie_NIE_TRAFIA_w_wiez_o_nazwie_AUTOMATYCZNEJ` · `test_wiez_numeru_faktury_MA_NAZWE_ktora_zna_kod` | `5 failed, 18 passed` | `23 passed` |
+| **M-W4-3** | `silnik/baza/schemat.sql`: `NOT NULL` → `NOT NUL` (błąd składni) | 16 testów `test_schemat_wobec_bazy.py`, w tym `test_napis_DDL_DA_SIE_wykonac_a_nie_tylko_sparsowac` | `3 failed, 13 errors` | `16 passed` |
+| **M-W4-4** | `magazyn._kopia_przed_migracja`: zawsze `return None` (kopia po cichu nie powstaje) | `test_migracja_ZOSTAWIA_kopie_w_wersji_sprzed` · `test_kopia_PRZENOSI_WSZYSTKIE_wiersze_a_nie_same_tabele` · `test_kopia_DA_SIE_odtworzyc` · `test_kopia_ISTNIEJACA_zatrzymuje_migracje_zanim_ruszy` · `test_nazwa_kopii_niesie_ZNACZNIK_CZASU_co_do_minuty` · `test_nazwa_kopii_niesie_nazwe_KOPIOWANEJ_przestrzeni` · `test_migracja_z_OSEMKI_doklada_tabele_i_ZOSTAWIA_kopie` | `7 failed, 14 passed` | `21 passed` |
+| **M-W4-5** | `magazyn.odtworz_z_kopii`: pętla wgrywająca wiersze zamieniona na `pass` (kopia jest, odtworzyć się nie da) | `test_kopia_DA_SIE_odtworzyc` | `1 failed, 11 passed` | `12 passed` |
+| **M-W4-6** | `magazyn.zapisz_koszt`: powrót do DWÓCH osobnych zapisów z zatwierdzeniem każdego | `test_zapisz_koszt_ZATWIERDZA_RAZ_a_nie_dwa_razy` · `test_zapisz_koszt_NIE_ZOSTAWIA_osieroconego_wpisu_gdy_drugi_zapis_padnie` · `test_lista_ATOMOWYCH_jest_KOMPLETNA` | `3 failed, 5 passed` | `8 passed` |
+| **M-W4-7** | `magazyn._zapisz`: rozpoznanie duplikatu z powrotem po TREŚCI komunikatu (`if "numer_faktury" in str(e)`) | `test_rozpoznanie_NIE_ZALEZY_od_tresci_komunikatu` · `test_rozpoznanie_NIE_TRAFIA_w_wiez_o_nazwie_AUTOMATYCZNEJ` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` · `test_ZADEN_INNY_modul_nie_rozstrzyga_po_tresci_komunikatu` | `4 failed, 3 passed` | `7 passed` |
+| **M-W4-8** | `magazyn.czy_lokalny`: zawsze `True` (każdy serwer uznany za maszynę lokalną) | `test_pod_pytestem_serwer_ZDALNY_jest_BLEDEM` · `test_opis_bazy_przy_serwerze_ZDALNYM_mowi_ze_produkcyjna` | `2 failed, 14 passed` | `16 passed` |
+| **M-W4-9** | `magazyn.adres_bez_hasla`: zwraca adres SUROWY (z hasłem) | `test_ZADEN_opis_ani_komunikat_NIE_NIESIE_hasla` · `test_podpis_zrodla_NIGDY_nie_niesie_hasla` · `test_opis_bazy_mowi_ktora_baze_otwarto` | `3 failed, 50 passed` | `53 passed` |
+| **M-W4-10** | `magazyn.zmigruj`: DDL znowu wykonywany w całości, PRZED dołożeniem brakujących kolumn | `test_stara_baza_DOSTAJE_kolumny_bez_utraty_wierszy` · `test_stara_baza_znaczy_wiersze_sprzed_migracji_jako_RECZNE` · `test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane` | `3 failed, 7 passed` | `10 passed` |
+| **M-W4-11** | `magazyn._wczytaj`: bramka `_TABELE_ZNANE` wyłączona (`if False`) | `test_ODCZYT_idzie_wylacznie_do_tabel_ze_SCHEMATU` | `1 failed, 15 passed` | `16 passed` |
+| **M-W4-12** | jeden literał SQL wraca do znacznika SQLite (`klucz = %s` → `klucz = ?`) | `test_ZADEN_literal_SQL_nie_niesie_placeholdera_SQLite` | `1 failed, 15 passed` | `16 passed` |
+
+**Dwanaście mutacji, dwanaście czerwonych, zero strażników-atrap w tym zestawie.**
+
+### Trzy progi, które zadziałały — i strażnicy, którzy zaczerwienili się CELOWO
+
+Wszystkie trzy były wcześniej zapisane jako dług z jawnym progiem „przy W4":
+
+1. **`test_transakcje_przed_postgresql.py`** („te dwa strażniki mają wtedy zaczerwienić się
+   CELOWO") → plik przemianowany na `test_transakcje.py`, dwa strażniki **odwrócone**: pilnują
+   teraz, że atomowość JEST, a nie że jej nie ma. Poprzednie brzmienie: `assert ile == 2` oraz
+   `assert po == przed + 1` („osierocony wpis budżetu miał zostać").
+2. **`test_komunikat_duplikatu_faktury.py`** (tripwire `1 / 10 / 1` → „mają zejść do zera") →
+   liczby zeszły do `0 / 0 / 0`, dołożona czwarta: `ILE_KLAUZUL_EXCEPT_PSYCOPG = 17` jako kontrola
+   liczności, żeby trzy zera nie były prawdziwe także dla modułu bez żadnego tłumaczenia błędów.
+3. **`wiedza/rejestr.SCHEMAT_SQLITE`** i **`magazyn._SCHEMAT`** („napis znika w chwili przejścia
+   bazy na PostgreSQL") → oba skasowane; `test_schemat_dwa_dialekty.py` zastąpiony przez
+   `test_schemat_wobec_bazy.py`, który porównuje napis DDL z **bazą postawioną z tego napisu**.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano ścieżki HTTP po podmianie sterownika.** Że `Decimal` przeżywa drogę przez `api/`
+  i z powrotem, mówi `test_trasy_dwa_ekrany.py::test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej`
+  (zielony, z asercją na liczbę odwiedzonych liści) — ale **żadna mutacja W4 nie celowała w tę
+  granicę**. Poprzedni przebieg mutował `kwota()` i pokazał, że pięć z sześciu ścieżek z `float`
+  leży poniżej pierwszego poziomu; ten przebieg tego nie powtórzył.
+- **Nie mutowano bazy produkcyjnej.** Schemat postawiony w Neonie (2026-08-29) jest zweryfikowany
+  odczytem (15 tabel, 24 kategorie, 19 stawek, forma 2026 = `SKALA`), ale **nie mutacją** —
+  mutowanie produkcji nie wchodzi w grę, a strażnicy biegną na bazie lokalnej.
+- **Nie mutowano izolacji testów.** Że każdy test dostaje własną przestrzeń nazw, jest widoczne
+  z zieleni całej suity, ale **nie ma strażnika, który by się zaczerwienił, gdyby izolacja
+  zniknęła** — dwa testy dzielące tabele nie muszą zderzyć się od razu. To jest **nazwana luka
+  dla W5**.
+- **Nie zmierzono czasu zimnego startu** ani liczby jednoczesnych sesji przy prawdziwym ruchu.
+  Suita otwiera połączenie na test; produkcja otwiera je na żądanie HTTP i limit sesji u dostawcy
+  jest zasobem. To należy do W6.
+
+---
+
+## Przebieg W5 — testy migracji (Quinn, 2026-08-29)
+
+Zadanie: audyt pokrycia utraconego przy podmianie sterownika (W4) + domknięcie dwóch luk,
+które wykonawca W4 nazwał sam w sekcji „Czego ten przebieg NIE objął" wyżej.
+
+### Skąd wzięte liczby audytu — pomiar, nie przepisanie z nośnika
+
+Zbiory identyfikatorów testów zebrane `pytest --collect-only` na obu commitach, w kopiach drzewa
+poza repozytorium (`git archive cdd94ed` i `git archive ded8b2a`), i porównane `comm`:
+
+```
+W3 (cdd94ed): 981/984 tests collected (3 deselected)
+W4 (ded8b2a): 993 collected
+zdjęte: 56 · dołożone: 68 · kontrola: 981 − 56 + 68 = 993
+```
+
+**Nośnik twierdzi co innego niż pomiar.** Opis commita `ded8b2a` mówi „zdjęto 64 testy, weszło 75";
+pomiar po identyfikatorach daje **56 i 68**. Plan (`docs/plan-chmura-2026-08-29.md`, W5) mówi
+o „~101 testach w 11 plikach" z „~40 bez odpowiednika 1:1"; pomiar pokazuje **56 zdjętych z 9
+plików**, z czego bez odpowiednika o tej samej nazwie — **35**, a bez jakiegokolwiek następcy —
+**jeden** (niżej). Różnica bierze się z jednostki liczenia: nośniki liczyły testy w plikach
+ruszonych, pomiar liczy identyfikatory, które faktycznie zniknęły z zebrania.
+
+### Znalezisko audytu: jedna reguła została bez strażnika
+
+| | |
+|---|---|
+| **Zdjęty test** | `test_schemat_dwa_dialekty.py::test_WARTOSCI_DOMYSLNE_sa_te_same` |
+| **Czego pilnował** | wartości domyślnych (`DEFAULT`) kolumna po kolumnie, z progiem „co najmniej 90 kolumn" |
+| **Dlaczego przedmiot ISTNIEJE** | baza niesie 22 wartości domyślne, a **trzy kolumny nie mają jej świadomie** i powód stoi przy każdej w `schemat.sql` (`przychody_jdg.pkwiu`, `godziny.pkwiu`, `przebiegi_straznika.kiedy`) |
+| **Dowód, że nie pilnuje nic** | `grep -rn porownaj_domyslna testy silnik api wiedza migracja` → **jedno trafienie, sama definicja**; zero wołających |
+| **Następca** | `testy/test_wartosci_domyslne.py` (nowy, W5) |
+
+### Mutacje W5
+
+| # | Mutacja | Który strażnik padł | Wynik | Po cofnięciu |
+|---|---|---|---|---|
+| **M-A1** | `schemat.sql`: `pkwiu TEXT NOT NULL` → `... NOT NULL DEFAULT ''` (dokładnie ta dziura, dla której zbudowano zdjętego strażnika) | **przed W5: żaden** · po W5: `test_wartosci_domyslne.py::test_kolumna_bez_wartosci_domyslnej_NADAL_jej_nie_ma[przychody_jdg-pkwiu]` · `test_ZBIOR_kolumn_z_wartoscia_domyslna_jest_TEN_z_rejestru` | **przed W5: `993 passed` — zero czerwonych** · po W5: `2 failed, 1013 passed` | `1015 passed` |
+| **M-B1a** | `conftest.py`: `test_{os.getpid()}_{n}` → `test_0_{n}` (numer procesu wypada z nazwy przestrzeni) | `test_izolacja_testow.py::test_przestrzen_NIESIE_numer_TEGO_procesu` (+ `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA` i `test_CUDZE_przestrzenie_NIE_czerwienia_tego_pliku` — obie kontrole liczności rozpoznania) | `3 failed, 4 passed` | `7 passed` |
+| **M-B1b** | `conftest.py`: `_LICZNIK["n"] += 1` → `+= 0` (dwa testy jednego procesu w tej samej przestrzeni) | `test_KAZDY_test_dostaje_INNA_przestrzen` (+ kontrola liczności `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA`) | `2 failed, 5 passed` | `7 passed` |
+| **M-B1c** | `conftest.py`: pętla `DROP SCHEMA` w sprzątaniu zamieniona na `pass` | `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA` — **dokładnie jeden** | `1 failed, 6 passed` | `7 passed` |
+| **M-B2-1** | `api/kwoty.py`: `kwota()` zwraca `float(...)` zamiast `str(...)` — **granica HTTP po podmianie sterownika, luka nazwana wyżej** | `test_trasy_dwa_ekrany.py::test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` + 34 dalsze | `35 failed, 980 passed` | `1015 passed` |
+| **M-B2-2** | `api/kwoty.py`: `kwota()` zwraca `str(float(...))` — **typ zostaje napisem, wartość gubi grosz, kod 200** | **przed W5: `test_kotwica_PRZYJMUJE_kwote_ujemna` — przypadkiem, jednym napisem wpisanym na sztywno** · po W5: `test_kwota_przez_granice.py::test_KAZDA_kwota_przechodzi_granice_z_DWOMA_miejscami_po_kropce` · `test_kwota_ZACHOWUJE_koncowe_zero_bo_to_ONO_znika` · `test_obchod_NAPRAWDE_lapie_kwote_bez_grosza` | **przed W5: `1 failed, 1007 passed`** · po W5: `4 failed, 1011 passed` | `1015 passed` |
+
+Wszystkie mutacje zakładane w **kopii drzewa poza repozytorium**
+(`git archive ded8b2a | tar -x` do katalogu roboczego sesji), z `PYTHONDONTWRITEBYTECODE=1`
+i czyszczeniem `__pycache__` przed każdym przebiegiem. Po M-B1c przestrzenie pozostałe w bazie
+testowej skasowane ręcznie (7 sztuk, wszystkie po martwych procesach — sprawdzone `os.kill(pid, 0)`).
+
+### Drugie znalezisko: granica HTTP pilnowała TYPU, nie WARTOŚCI
+
+M-B2-1 i M-B2-2 różnią się jedną funkcją zewnętrzną, a ich skutek jest zupełnie inny. Pierwsza
+zmienia **typ** i pada na niej strażnik odpowiedzi (`OdpowiedzJSON.render`) z listą ścieżek.
+Druga zostawia **napis**, więc odpowiedź wychodzi z kodem **200** i cicho złą liczbą — dokładnie
+awaria opisana w nagłówku `api/kwoty.py` („`Decimal("8623.10")` → `8623.1`, końcowe zero znikło").
+Przed W5 łapał ją **jeden test i przypadkiem**: `test_kotwica_PRZYJMUJE_kwote_ujemna` porównuje
+`saldoPoDniu` z napisem `"-500.00"` wpisanym na sztywno. Strażnik jednostkowy
+`test_kontrakt_dwa_nosniki.py::test_kwota_wychodzi_NAPISEM_i_zaokragla_sie_RAZ` **przechodził**,
+bo żaden z jego trzech przykładów nie ma **końcowego zera** — a to właśnie ono znika.
+
+### Czego przebieg W5 NIE objął
+
+- **Nie mutowano bazy produkcyjnej w Neonie** — jak w W4, i z tego samego powodu.
+- **Nie sprawdzono zachowania przy DWÓCH równoległych przebiegach naraz.** Strażnik izolacji
+  odróżnia własne przestrzenie od cudzych po numerze procesu i to jest zmierzone jednostkowo
+  (M-B1a), ale **nie odpalono dwóch suit jednocześnie**, żeby zobaczyć to na żywo.
+- **Nie zbadano wartości domyślnych kolumn dokładanych `ALTER TABLE`** na starej bazie poza
+  `_DOPISYWANE_KOLUMNY`; nowy strażnik czyta bazę **po** migracji świeżej, nie po każdej ścieżce
+  migracyjnej.
+- **Nie sprawdzono treści więzów `CHECK` innych niż `IN (...)`** — ta luka była nazwana już
+  w nagłówku `test_schemat_wobec_bazy.py` i W5 jej nie ruszało.
+
+---
+
+## W7 — pasek prowadzi tam, gdzie obiecuje (2026-08-29)
+
+**Stan przed zmianą, zmierzony `curl` na zbudowanej aplikacji (nie odczytany z kodu):**
+dziewięć z dziewięciu odsyłaczy paska = **HTTP 404**, w tym odsyłacz do ekranu Płynności, który
+stał wtedy pod `/`. Cały widoczny tekst strony `/miesiac` brzmiał
+`Doradca Finansowy 404: This page could not be found. 404 This page could not be found.` —
+po angielsku, bez zdania o tym, co się stało i co z tym zrobić (łamie CLAUDE.md §3.7 i §4).
+
+Nowi strażnicy: `testy/test_odsylacze_paska.py` (pięć testów, statyczne) oraz
+`interfejs/narzedzia/straznik-odsylacze-paska.mjs` (przejście przeglądarką po całym nagłówku).
+
+**Wszystkie mutacje wykonane na kopii drzewa poza repozytorium**
+(`scratchpad/kopia-w7`, `PYTHONDONTWRITEBYTECODE=1`, `-p no:cacheprovider`), z kontrolą
+przed i po. Kontrola startowa kopii: `5 passed in 0.20s`.
+
+| # | Co zmieniono | Który strażnik padł (po nazwie) | Wynik |
+|---|---|---|---|
+| **M-W7-1** | skasowana trasa zastępcza `interfejs/app/[ekran]/page.tsx` | `test_kazdy_klucz_paska_MA_GDZIE_prowadzic` **oraz** `test_trasa_bez_ekranu_NIE_MA_wpisanej_listy_ekranow` (`2 failed, 3 passed`) | **czerwony** |
+| **M-W7-2** | skasowany `interfejs/app/plynnosc/page.tsx` — ekran wraca pod `/` | `test_ekran_plynnosci_STOI_POD_swoim_kluczem` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-3** | do trasy zastępczej dopisana gałąź `ekran === "budzet" ? ZNANE[2] : undefined` — klucz ekranu wpisany w kodzie | `test_trasa_bez_ekranu_NIE_MA_wpisanej_listy_ekranow` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-4** | skasowany `interfejs/app/not-found.tsx` | `test_nieznany_adres_MOWI_PO_POLSKU_co_sie_stalo` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-5** | `powloka.tsx`: `href={\`/${e.klucz}\`}` → `href="/plynnosc"` | `test_zaden_odsylacz_naglowka_NIE_JEST_wpisany_recznie` (`1 failed, 4 passed`) | **czerwony** |
+| **M-W7-6** | skasowana trasa zastępcza + przebudowa i przebieg po adresach | `straznik-odsylacze-paska.mjs`, **kod wyjścia 1**, osiem wierszy `NIE PROWADZI — kod 404` | **czerwony** |
+| **M-W7-7** | `powloka.tsx`: `PASEK.map` → `PASEK.slice(0, 3).map` | `straznik-odsylacze-paska.mjs`, **kod wyjścia 2**: „pasek oddał 3 odsyłaczy, mapa ekranów ma 9" | **czerwony (błąd pomiaru)** |
+
+**Kontrola po cofnięciu każdej mutacji:** `5 passed` (testy statyczne) i `kod wyjścia 0`,
+`Sprawdzonych adresów: 11`, `WYNIK: każdy odsyłacz prowadzi` (przejście przeglądarką).
+Pliki kopii porównane `diff` z repozytorium po cofnięciu — identyczne.
+
+### Dlaczego M-W7-7 jest osobną mutacją, a nie odmianą M-W7-6
+
+M-W7-6 sprawdza, że strażnik **znajduje zepsuty odsyłacz**. M-W7-7 sprawdza coś innego: że
+strażnik **wie, ile rzeczy zobaczył**. Bez kontroli liczności pasek okrojony do trzech pozycji
+przeszedłby jako „zero błędnych odsyłaczy" — sprawdzenie, do którego nic nie dociera, melduje
+sukces. Dlatego niekompletny pasek kończy **kodem 2 (błąd pomiaru)**, nie kodem 0 i nie kodem 1.
+
+### Znalezisko po drodze: pierwsze brzmienie mówiło nieprawdę na jednym z jedenastu adresów
+
+Ekran zastępczy mówił początkowo `»X« stoi w pasku, bo ma odpowiadać na pytanie …`. Na
+`/co-mnie-czeka` było to **fałszem**: „Co mnie czeka" jest rozwinięciem otwieranym przyciskiem
+z ekranu Płynności, nie pozycją paska (`makiety/ekrany.py`, `ROZWINIECIA`). Wykryte **odczytem
+wyrenderowanego ekranu**, nie czytaniem kodu i nie przez żaden test — zdanie było poprawne
+składniowo i przechodziło wszystko. Brzmienie skrócone do `»X« ma odpowiadać na pytanie …`,
+prawdziwego dla obu rodzajów pozycji.
+
+### Sprostowanie nośnika przy okazji
+
+`interfejs/lib/ekrany.ts` wskazywał strażnika mapy ekranów pod adresem `testy/test_mapa_ekranow.py`.
+**Pomiar: `ls testy/test_mapa_ekranow.py` → `No such file or directory`.** Strażnik istnieje, ale
+w `testy/test_nosniki.py` (linia 41). Poprawka jest w komentarzu, nie w kodzie — kodu nie trzeba
+było dotykać.
+
+### Czego przebieg W7 NIE objął
+
+- **Nie mierzono na wdrożeniu w chmurze** — wszystkie liczby pochodzą z lokalnej budowy
+  produkcyjnej (`npm run build` + `next start`). Wdrożenie prowadzi Eva.
+- **Nie zbudowano żadnego z siedmiu brakujących ekranów** — to był jawny zakres zadania.
+- **Nie sprawdzono zachowania odsyłaczy przy wyłączonym JavaScript** ani czytnikiem ekranu.
+- **Zaobserwowana, niewyjaśniona chwiejność `not-found.tsx` w trybie deweloperskim
+  (Turbopack, Next 16.3.3):** przy jednym zimnym starcie strona nieznanego adresu oddała pustą
+  powłokę błędu zamiast ekranu, przy kolejnych — poprawny ekran. **Na budowie produkcyjnej
+  nie powtórzyło się ani razu** (trzy niezależne przebiegi strażnika, `kod wyjścia 0`).
+  Przyczyny nie ustalono; zapisane, bo dotyczy tylko trybu deweloperskiego.
+
+---
+
+## Przebieg 2026-08-29 — W8, kontrolka stanu konta
+
+Kontrola przed mutacjami: **41 passed** (`testy/test_ekran_plynnosc.py` +
+`testy/test_ekran_ksiegowanie.py`) · **47 passed** (`npx vitest run`) ·
+**kod wyjścia 0** (`straznik-ekran-wobec-silnika.mjs` na czystej bazie).
+
+Kopia drzewa poza repozytorium (`scratchpad/mutacje-w8`), `PYTHONDONTWRITEBYTECODE=1`.
+Wyjątek nazwany: **M-W8-7 i M-W8-8 wykonano w drzewie roboczym**, bo wymagają zbudowanej
+wersji produkcyjnej i uruchomionego silnika, których kopia nie ma. Oba pliki po cofnięciu
+porównane `diff` z kopią sprzed mutacji — **identyczne bajt w bajt**.
+
+### Mutacje treści
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W8-1** | `kotwica.tsx`: zdjęty `autoFocus` z pola kwoty | `test_zapis_stanu_konta_KOSZTUJE_NAJWYZEJ_TRZY_DOTKNIECIA` | **czerwony** |
+| **M-W8-2** | `kotwica.tsx`: znak gubiony przy składaniu kwoty (`` `-${odczyt.kwota}` `` → `odczyt.kwota`) — debet 1 240,50 zł zapisałby się jako majątek | `test_kwota_stanu_konta_WOLNO_miec_ujemna` | **czerwony** |
+| **M-W8-3** | `kotwica.tsx`: data przestaje być wypełniona z góry (`useState(DANE.odczyt)` → `useState("")`) | `test_zapis_stanu_konta_KOSZTUJE_NAJWYZEJ_TRZY_DOTKNIECIA` | **czerwony** |
+| **M-W8-7** | `lib/kwota.ts`: `odczytajKwote` zdejmuje minus i oddaje stan `ok` zamiast `ujemna` | `odczyt-kwoty.test.ts > kwota UJEMNA jest rozpoznana, a nie odrzucona — konto na debecie` | **czerwony** |
+
+### Mutacje liczności — „ile rzeczy pomiar faktycznie widział"
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W8-4** | `kotwica.tsx`: jedno z jedenastu brzmień przestaje być pokazywane (`setBladKwoty(NAPISY_KOTWICY.kwotaPusta)` → `setBladKwoty(null)`) — pusty formularz milczy | `test_kontrolka_MA_KOMPLET_brzmien_i_zadnego_u_siebie` (`pokazywanych jest 10 z 11 brzmien`) | **czerwony** |
+| **M-W8-5** | `kotwica.tsx`: własna kopia reguły kształtu kwoty zamiast wołania `lib/kwota.ts` — nośnik wołany z jednego miejsca zamiast dwóch | `test_ksztalt_kwoty_MA_JEDEN_nosnik` | **czerwony** |
+| **M-W8-6** | `test_ekran_plynnosc.py`: lista ramek okrojona do zera (`glob("*.dc.html")` → `glob("ZadnaTakaRamka*.dc.html")`) | `test_ZADNA_ramka_NIE_RYSUJE_pola_wpisywania` (`pomiar objal tylko 0 ramek`) | **czerwony** |
+| **M-W8-8** | `kotwica.tsx`: zapis dochodzi do bazy, ale ekran nie dostaje odświeżonych danych (`poZapisie(dane)` usunięte) | `straznik-ekran-wobec-silnika.mjs`, **kod wyjścia 2**: `porównano 1 liczb, próg to 3` | **czerwony (błąd pomiaru)** |
+
+**Kontrola po cofnięciu każdej mutacji:** `41 passed`, `47 passed`, `kod wyjścia 0`
+(`Porównanych liczb: 5`, `WYNIK: zgodne`). Pliki porównane `diff` — identyczne.
+
+### Dlaczego M-W8-8 jest osobną mutacją, a nie odmianą M-W8-2
+
+M-W8-2 sprawdza, że strażnik **widzi złą liczbę**. M-W8-8 sprawdza coś innego: że strażnik
+**wie, ile liczb zobaczył**. Bez kontroli liczności ekran, który nie dostał odświeżonych danych,
+pokazuje pustą księgę i „zero rozjazdów" — czyli sprawdzenie, do którego nic nie dociera,
+melduje sukces. Dokładnie ten wzorzec zmierzono w tej sesji siedem razy.
+
+### Sprostowanie własnego pomiaru
+
+Pierwszy odczyt kodu wyjścia przy M-W8-8 zapisano jako **`KOD WYJSCIA: 0`**. To był pomiar
+**statusu `grep`** w potoku, nie strażnika — a drugi przebieg szedł już na bazie z kotwicą
+zapisaną przez przebieg pierwszy, więc naprawdę był zielony. Powtórzony pomiar bez potoku
+i na wyczyszczonej tabeli `stan_konta`: **`KOD PRZY MUTACJI: 2`**.
+
+### Znalezisko po drodze: strażnik oślepiony sekwencją `/*` w komentarzu liniowym
+
+Pierwsza wersja nagłówka `kotwica.tsx` cytowała komendę zawierającą `makiety/*.dc.html`.
+`pomocnicze.bez_komentarzy` zdejmuje komentarze blokowe wyrażeniem `/\*.*?\*/`, więc ciąg
+`/*` w środku komentarza `//` **otworzył komentarz blokowy** i zjadł 90% pliku. Skutek:
+pięć strażników W8 zaczerwieniło się na kodzie, który był poprawny. Zdanie przepisane bez
+tej sekwencji. Wada jest w treści komentarza, nie w strażniku — ale pokazuje, że narzędzie
+czyszczące kod potrafi oślepić pomiar, a wynik wygląda wtedy jak defekt kodu.
+
+### Znalezisko z OGLĄDANIA EKRANU, którego nie złapał żaden test
+
+Pole `<input type="date">` rysuje sobie przeglądarka według ustawień systemu. Na tym laptopie
+data **2 września 2026** wyświetliła się jako **`09/02/2026`** — zapis, który po polsku czyta
+się jako **9 lutego**. Pomyłka o siedem miesięcy przesuwa punkt startu całej prognozy i nie
+zostawia śladu. Pod polem dopisano tę samą datę słowami (`sformatujOdczyt`, ten sam nośnik,
+którego używa nagłówek ekranu). Wykryte zrzutem ekranu, nie testem — jak w W7.
+
+### Czego przebieg W8 NIE objął
+
+- **Nie mierzono na wdrożeniu w chmurze** — wszystkie liczby z lokalnej budowy produkcyjnej.
+  Wdrożenie prowadzi Eva.
+- **Nie zbudowano wezwania „Odśwież stan konta"** z `TrzyStany.dc.html` — kontrakt nie niesie
+  stanu świeżości odczytu. Dług ze strażnikiem i progiem:
+  `test_wezwanie_ODSWIEZ_Z_RAMKI_NIE_MA_dzis_na_ekranie`.
+- **Nie sprawdzono kontrolki czytnikiem ekranu ani przy wyłączonym JavaScript.**
+- **Nie ma ramki dla rozwiniętej kontrolki** — układ pól powstał bez makiety (odstępstwo od §3.6).
+
+---
+
+## Przebieg 2026-08-29 — W9b, sześć tras ekranu Budżet
+
+**Gdzie.** Kopia drzewa poza repozytorium
+(`scratchpad/mutacje-W9b`), `PYTHONDONTWRITEBYTECODE=1`, `__pycache__` czyszczone przed
+każdym przebiegiem. Po ostatnim cofnięciu `diff -rq` kopii z repozytorium: **bez różnic**.
+
+Kontrola przed mutacjami (`test_trasy_budzet` + `test_nosniki` + `test_trasy_bez_rachunku`
++ `test_kontrakt_dwa_nosniki` + `test_magazyn_budzet`): **212 passed**.
+
+| # | Mutacja | Który test padł (po nazwie) | Klasa | Wynik |
+|---|---|---|---|---|
+| **M-W9b-1** | do spisu `api/trasy.py` dopisana `Trasa("DELETE", "/api/plan/{id}", "budzet", …)` | `test_nosniki.py::test_kosz_planu_KONCZY_regule_a_nie_kasuje` | treść | **czerwony** |
+| **M-W9b-2** | `ekran_budzet.zakoncz_pozycje` woła `magazyn.usun_plan` zamiast `zakoncz_plan` | `test_trasy_budzet.py::test_ekran_budzetu_NIE_WOLA_usun_plan` · `::test_P1_ZAKONCZYC_pozycje_planu_HISTORIA_ZOSTAJE` | treść | **czerwony** |
+| **M-W9b-3** | `pozycje_wykonania` obcina posortowaną listę do jednego wiersza (`[:1]`) | `test_trasy_budzet.py::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` · `::test_najwieksze_odchylenie_STOI_U_GORY` · `::test_wiersz_z_DWOMA_pozycjami_planu_NIE_MA_jednego_numeru` · `::test_procent_bez_planu_to_MYSLNIK_a_nie_zero` · `::test_pasek_postepu_NIE_WYCHODZI_poza_sto` | **liczność** | **czerwony** |
+| **M-W9b-4** | `pozycje_planu` oddaje kwotę przez `str(float(...))` zamiast `napis_kwoty` | `test_trasy_budzet.py::test_kwota_z_ZEREM_NA_KONCU_nie_gubi_go_po_drodze` · `::test_P1_ZMIENIC_pozycje_planu_przez_PUT` · `::test_kopiuj_plan_PRZENOSI_pozycje_do_miesiaca_bez_planu` | treść | **czerwony** |
+| **M-W9b-5** | z `api/trasy_budzet.py` usunięta cała trasa `POST /api/plan` | `test_trasy_bez_rachunku.py::test_straznik_widzi_DOKLADNIE_dwanascie_tras` · `test_trasy_budzet.py::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` · `::test_P1_USTAWIC_pozycje_planu_przez_POST` · `::test_zakonczenie_NIE_JEST_metoda_DELETE` · `::test_kwota_z_ZEREM_NA_KONCU_nie_gubi_go_po_drodze` | **liczność** | **czerwony** |
+| **M-W9b-6** | odmowa rachunku rezerwy zwraca `Decimal("0.00")` zamiast `None` | `test_trasy_budzet.py::test_rezerwa_BEZ_FORMY_nie_jest_zerem_tylko_zdaniem` | treść | **czerwony** |
+| **M-W9b-7** | `magazyn.kopiuj_plan` wraca do stanu sprzed naprawy (wiersze miesiąca zamiast pozycji obowiązujących) | `test_trasy_budzet.py::test_kopiuj_plan_NIE_DOKLADA_pozycji_ktore_juz_obowiazuja` · `::test_kopiuj_plan_PRZENOSI_pozycje_do_miesiaca_bez_planu` | treść | **czerwony** |
+| **M-W9b-8** | z `interfejs/lib/kontrakt.ts` usunięte pole `DaneBudzetu.liczbaPozycjiPlanu` | `test_kontrakt_dwa_nosniki.py::test_nazwy_pol_sie_ZGADZAJA[DaneBudzetu]` · `::test_RAPORT_ile_pol_porownano_po_kazdej_stronie` | **liczność** | **czerwony** |
+
+| **M-W9b-9** | z `ekran_budzet.ustaw_pozycje` zdjęte sprawdzenie kategorii **przed** zapisem | `test_trasy_budzet.py::test_pozycja_planu_BEZ_KATEGORII_nie_dociera_do_bazy` · `::test_pozycja_planu_W_ZLYM_TYPIE_jest_odmowa` | treść | **czerwony** |
+| **M-W9b-10** | `magazyn.ustal_regule_planu` zawsze traktuje pozycję jak nową (`obowiazujaca = None`) — utrata idempotencji | `test_trasy_budzet.py::test_ZAPIS_POWTORZONY_daje_jeden_skutek_a_nie_dwa` · `::test_P1_ZMIENIC_pozycje_planu_przez_PUT` · `::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` | treść | **czerwony** |
+
+Kontrola po cofnięciu wszystkich ośmiu: **212 passed**. Po dołożeniu dwóch strażników
+wejścia i idempotencji (M-9, M-10) kontrola powtórzona: **215 passed**, a `diff -rq` kopii
+z repozytorium — **bez różnic**.
+
+### Dwie klasy mutacji, bo jedna nie wystarcza
+
+Ostrzeżenie z tej samej sesji (W7): mutacja kasująca trasę dowodzi tylko, że strażnik **znajduje
+zepsutą rzecz** — nie że **wie, ile rzeczy zobaczył**. Dlatego trzy z ośmiu mutacji są
+**licznościowe** (M-3 okraja listę wierszy, M-5 zabiera całą trasę, M-8 zabiera pole kontraktu),
+a pięć jest **treściowych**. Gdyby istniały tylko treściowe, obchód odpowiedzi po pustym drzewie
+i asercja „nie ma tu liczby zmiennoprzecinkowej" byłyby zielone przy odpowiedzi, która nie niesie
+nic.
+
+### Wada pieniężna znaleziona po drodze — `magazyn.kopiuj_plan` (M-W9b-7)
+
+**Nie jest to wada wprowadzona w W9b.** Powstała w Z42, gdy pozycja planu stała się **regułą**
+obowiązującą od swojego miesiąca do odwołania, a `kopiuj_plan` dalej czytał **wiersze** miesiąca
+źródłowego. W9b jest pierwszym zadaniem, które wystawia tę funkcję na HTTP (`POST /api/plan/kopiuj`),
+więc wada przestała być teoretyczna.
+
+Pomiar przez trasę, 2026-08-29, przed naprawą — plan października złożony z trzech reguł
+(Kredyty „Alior" 1 305,05 zł, Kredyty „Revolut" 319,76 zł, Czesne 660,00 zł):
+
+```
+LISTOPAD PRZED: [('Czesne','',660.00,d.25), ('Kredyty','Alior',1305.05,d.1), ('Kredyty','Revolut',319.76,d.12)]  plan 2284.81
+WYNIK:          skopiowane 2, pominiete 1
+LISTOPAD PO:    [('Czesne','',660.00,BRAK DNIA), ('Kredyty','',1305.05,BRAK DNIA),
+                 ('Kredyty','Alior',1305.05,d.1), ('Kredyty','Revolut',319.76,d.12)]  plan 3589.86
+```
+
+Plan listopada urósł o **1 305,05 zł**, których nikt nie zaplanował, pojawiła się druga pozycja
+„Kredyty" z pustą nazwą, a „Czesne" straciło dzień płatności — i wszystko to zwróciło meldunek
+sukcesu. Trzy przyczyny naraz: (a) źródło czytane po wierszach, nie przez `budzet.plan_na_miesiac`;
+(b) sprawdzenie „czy już jest" pomijało `opis`, więc kategoria z dwiema pozycjami zwijała się do
+jednej; (c) kopia gubiła `opis`, `dzien`, `powtarzalna` i `co_ile_miesiecy`.
+
+Naprawione: źródło i cel czyta ten sam nośnik co ekran, tożsamość to pełna trójka
+(typ, kategoria, opis), granice okresu nie są kopiowane. Cztery istniejące strażniki
+`test_magazyn_budzet.py` przeszły bez zmian; dołożono dwa nowe, oba z mutacją (M-W9b-7).
+
+### Czego przebieg W9b NIE objął
+
+- **Nie zbudowano ekranu.** Trasy i kontrakt — tak; interfejs Budżetu to zadanie Jacka.
+  Bramka odwzorowania (`PRD` §12.7) dla `Budzet.dc.html` **nie była uruchamiana**.
+- **Nie ma strażnika behawioralnego czytającego liczbę z wyrenderowanej strony** — luka ta sama,
+  co opisana w `conftest.py` przy niezaniesionym `test_ekran_playwright.py`.
+- **Nie sprawdzono zachowania na wdrożeniu w chmurze** — wszystkie liczby z przebiegu lokalnego
+  przez `TestClient`. Wdrożenie prowadzi Eva.
+- **Nie ruszono `magazyn.usun_plan` ani `magazyn.usun_cel`** — obie funkcje żyją w silniku
+  i pozostają świadomie odcięte od warstwy sieciowej (Z-9).
+- **Kontrolka „Wybrany miesiąc"** z ramki jest poza zakresem (rozstrzygnięcie Mili, §7 spisu
+  `docs/2026-08-29-spis-ekran-budzet.md`) — trasa `GET /api/budzet` przyjmuje **jeden** parametr
+  miesiąca.
+
+---
+
+## W9c — ekran Budżet (2026-08-29)
+
+Dwadzieścia siedem mutacji, wszystkie na **kopii drzewa poza repozytorium**
+(`scratchpad/drzewo-mutacji`), z `PYTHONDONTWRITEBYTECODE=1`. Harness sprawdza
+nie „ile testów padło", tylko **czy padł ten, który miał paść** — ostrzeżenie
+z tej sesji mówi wprost, że mutacja potrafi zaczerwienić inny test i wyglądać
+na dowód. Każda z 24 mutacji strażników Budżetu zaczerwieniła **dokładnie
+jeden** test i **dokładnie ten**.
+
+**Kontrola przed i po:** `22 passed in 0.61s` → 24 mutacje → `22 passed in 0.55s`.
+
+### Sam harness mutacyjny był atrapą na pierwszym uruchomieniu
+
+Wart zapisania, bo to trzeci raz w tej sesji, gdy pomiar melduje sukces, nie
+zmierzywszy niczego. Pierwszy przebieg dał **„24 mutacje, 0 trafień, 0 padłych
+testów"** — i wyglądało to jak dowód, że wszyscy strażnicy są atrapami.
+Faktycznie pytest **w ogóle nie zbierał testów**: `conftest.py` odmawia startu
+bez `DATABASE_URL_TESTY`, a harness tej zmiennej nie przekazywał. Zbiór padłych
+testów był pusty z tego samego powodu, z którego jest pusty przy przebiegu
+zielonym.
+
+Druga odsłona tej samej wady: po dodaniu zmiennej harness nadal widział
+`BRAK WYJŚCIA`, bo dokładał `-q` do `-q` z `pytest.ini` — **`-qq` połyka linię
+podsumowania**, więc ani „22 passed", ani „FAILED" nie docierało do pomiaru.
+
+Naprawione **kontrolą liczności w samym harnessie**: przebieg, w którego wyjściu
+nie ma ani „N passed", ani „N failed", kończy się błędem pomiaru, a nie zerem
+padłych. Plus asercja, że kontrola przed mutacjami zbiera **22 strażników**.
+
+### Mutacje treści (15)
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-1 | `zakonczOd` → „Usuń tę pozycję" | `test_kosz_planu_KONCZY_regule_i_MOWI_O_TYM_trzy_razy` |
+| M-W9c-2 | kasowanie wpisu przekierowane na `/api/plan/${id}` | `test_zadna_trasa_planu_NIE_JEST_kasujaca` |
+| M-W9c-3 | `parseFloat(kwotaTekst)` dołożony w panelu | `test_kwota_NIE_STAJE_SIE_liczba_nigdzie_na_ekranie` |
+| M-W9c-4 | kwota `"1 305,05 zł"` wpisana w komponent | `test_ekran_NIE_MA_wpisanej_recznie_kwoty` |
+| M-W9c-5 | gałąź `k.kwota === null` → `false` | `test_odmowa_silnika_NIE_STAJE_SIE_zerem` |
+| M-W9c-6 | tytuł kafelka brany jako `DANE.kafelki[0].tytul` | `test_kafelki_BIERZE_SIE_PO_KLUCZU_nie_po_indeksie` |
+| M-W9c-7 | warunek `idPozycjiPlanu === null` → `false` | `test_link_zmiany_STOI_TYLKO_przy_JEDNEJ_pozycji_planu` |
+| M-W9c-8 | stan pusty znów twierdzi ujemny bilans bezwarunkowo | `test_stan_pusty_NIE_TWIERDZI_ujemnego_bilansu_gdy_bilans_JEST_ZEREM` |
+| M-W9c-9 | gałąź miesiąca bez planu usunięta | `test_miesiac_bez_planu_NIE_PODAJE_zera_jako_wyniku` |
+| M-W9c-10 | „w kolejnych miesiącach" → „w listopadzie i w grudniu" | `test_ekran_NIE_WPISUJE_nazw_miesiecy_na_sztywno` |
+| M-W9c-11 | „Bilans planu (ryczałt)" | `test_ekran_NIE_MOWI_o_formie_opodatkowania` |
+| M-W9c-12 | `var(--atrament-cichy)` → `#4A5267` w arkuszu | `test_styl_NIE_MA_wpisanej_recznie_barwy` |
+| M-W9c-13 | zapis odpytuje `pobierzBudzet` zamiast oddać odpowiedź | `test_zapis_ODDAJE_odswiezony_ekran_zamiast_pytac_drugi_raz` |
+| M-W9c-14 | wycofanie wpisu zwraca `{}` zamiast odświeżyć Budżet | `test_wycofanie_wpisu_ODPYTUJE_BUDZET_bo_trasa_oddaje_inny_ekran` |
+| M-W9c-15 | „Cele oszczędnościowe" → „Cele" | `test_kazda_fraza_z_ramki_JEST_na_ekranie` |
+
+### Mutacje liczności (9)
+
+Pytają nie „czy ta rzecz jest dobra", tylko **„ile rzeczy pomiar zobaczył"**.
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-16 | adres `/api/plan/kopiuj` → `/api/plan/kopiowanie` (trasa bez wołającego) | `test_KAZDA_z_szesciu_tras_Budzetu_MA_WOLAJACEGO_na_ekranie` |
+| M-W9c-17 | wywołanie `kopiujPlan(` skasowane z ekranu (funkcja bez wołającego) | `test_KAZDA_funkcja_danych_Budzetu_MA_WOLAJACEGO_w_komponencie` |
+| M-W9c-18 | `DANE.liczbaWpisow` zastąpione stałą `0` (pole bez czytającego) | `test_KAZDE_pole_kontraktu_Budzetu_MA_CZYTAJACEGO` |
+| M-W9c-19 | trasa `/api/cele` przypisana do innego ekranu (spis oddaje 5, nie 6) | `test_KAZDA_z_szesciu_tras_Budzetu_MA_WOLAJACEGO_na_ekranie` |
+| M-W9c-20 | pole `liczbaWpisow` usunięte z kontraktu (19 → 18) | `test_KAZDE_pole_kontraktu_Budzetu_MA_CZYTAJACEGO` |
+| M-W9c-21 | ramka dostaje odsyłacz „Zmień pozycję planu" (próg odstępstwa) | `test_ramka_Budzetu_NIE_RYSUJE_kontrolki_zmiany_ani_konca_reguly` |
+| M-W9c-22 | do spisu dopisana `PUT /api/wpisy/{id}` (próg długu) | `test_popraw_zaznaczony_CZEKA_na_trase_zmiany_wpisu` |
+| M-W9c-23 | `CelNaEkranie` dostaje `nadpisanyRecznie` (próg długu S-2) | `test_prog_poduszki_CZEKA_na_pole_kontraktu` |
+| M-W9c-24 | „Wybrany miesiąc" dopisane do nośnika brzmień | `test_kontrolka_Wybrany_miesiac_ZOSTAJE_poza_zakresem` |
+
+### Sprostowanie premisy strażnika Płynności (M-W9c-25, M-W9c-26)
+
+`test_ekran_plynnosc.py::test_ekran_NIE_MA_kafelkow_z_innego_pytania` czytał
+**cały** `interfejs/lib/napisy.ts` i miał rację, dopóki plik niósł wyłącznie
+Księgowanie, Płynność i powłokę. Od W9c niesie także Budżet, którego ramka ma
+sekcję „PRZYCHODY I OSZCZĘDNOŚCI" — strażnik zaczerwienił się więc na brzmieniu
+**cudzego** ekranu i mówił o Płynności coś, czego Płynność nie robi.
+
+To ta sama poprawka, którą wcześniej przeszły nazwy typów wpisu (mieszkają
+w `lib/kontrakt.ts`, bo jest wspólny). Zawężone zostało **czytanie**, nie reguła:
+pliki samego ekranu Płynności są nadal czytane w całości, a z nośnika brzmień
+brane są trzy bloki należące do tego ekranu (`NAPISY_PLYNNOSCI`, `NAPISY_KARTY`,
+`NAPISY_KOTWICY`).
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-25 | „Księga płynności — Przychody" w `NAPISY_PLYNNOSCI` (TREŚĆ) | `test_ekran_NIE_MA_kafelkow_z_innego_pytania` |
+| M-W9c-26 | `NAPISY_KARTY` przemianowane — blok znika (LICZNOŚĆ) | `test_ekran_NIE_MA_kafelkow_z_innego_pytania` |
+
+Kontrola: `31 passed` → mutacja → `1 failed, 30 passed` → cofnięcie → `31 passed`.
+
+### Strażnik wzorca Budżetu przeżył własną mutację — i został przepisany (M-W9c-27)
+
+Czwarty w tej sesji przypadek strażnika-atrapy, tym razem świeżo napisanego.
+Pierwsza wersja `wzorzec.test.mjs::wzorzec Budżetu niesie liczby z ramki`
+sprawdzała, że **ramka zawiera kwoty wypisane w teście** — zdanie prawdziwe
+o ramce i **całkowicie milczące o wzorcu**. Mutacja `2614.81 → 2614.82`
+w `dane-wzorcowe.mjs` dała **48 passed** (zmierzone 2026-08-29).
+
+Przepisany tak, żeby kwoty **pochodziły ze wzorca** i były składane **tym samym
+nośnikiem formatowania, którego używa ekran** (`lib/kwota.ts::sformatujKwote`).
+Po przepisaniu ta sama mutacja daje `1 failed, 47 passed`; po cofnięciu
+`48 passed`.
+
+| # | Co zmieniono | Który test padł |
+|---|---|---|
+| M-W9c-27 | kafelek wzorca 2 614,81 → 2 614,82 (rozjazd z ramką o grosz) | `wzorzec Budżetu niesie liczby z ramki` |
+
+### Czego przebieg W9c NIE objął
+
+- **Bramka odwzorowania `Budzet` NIE PRZECHODZI: 26,10% przy progu 2%.** Przyczyna
+  jest nazwana i zmierzona — patrz raport odbiorczy i `docs/2026-08-29-spis-ekran-budzet.md` §6.
+- **Nie ma strażnika behawioralnego czytającego liczbę z wyrenderowanej strony.**
+  Cztery operacje P-1 zmierzono przejściem przez zbudowaną wersję produkcyjną
+  ręcznie prowadzonym Playwrightem; **przebieg nie jest zaniesiony do repozytorium**
+  i nie powtórzy się sam. Ta sama luka, co opisana w `conftest.py`.
+- **Nie mutowano strażników spoza W9c** — poza dwoma z `test_ekran_plynnosc.py`,
+  których premisę ta zmiana naruszyła.
+- **Nie ruszono silnika ani `api/`.** Znalezisko o kafelku rezerwy (niżej,
+  w raporcie) zgłoszone, nie naprawione.
+
+---
+
+## Przebieg W11 · 2026-08-30 — kafelek „Rezerwa na podatki" i strażnik klasy odpowiedzi
+
+Wykonano w kopii drzewa **poza repozytorium**
+(`scratchpad/mutacje-w11`), z `PYTHONDONTWRITEBYTECODE=1` i czyszczeniem
+`__pycache__` przed każdym przebiegiem.
+
+Kontrola przed mutacjami (kopia, stan po naprawie): **1115 passed, 3 deselected, 0 skipped**.
+
+| # | Co zmieniono | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W11-1** | `silnik/ekran_budzet.py:189` — `if rezerwa.miesiace_zus is None:` → `if rezerwa.miesiace_zus == 0:` | `test_trasy_budzet.py::test_rezerwa_BEZ_DATY_DZIALALNOSCI_odmawia_zamiast_pokazac_zero` · `test_trasy_budzet.py::test_rezerwa_PRZED_STARTEM_dzialalnosci_POKAZUJE_liczbe` | **czerwony** — `2 failed, 1113 passed` |
+| **M-W11-2** | `api/trasy_budzet.py:39` — `APIRouter(default_response_class=kwoty.OdpowiedzJSON)` → `APIRouter()` | `test_trasy_dwa_ekrany.py::test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb` | **czerwony** — `1 failed, 1114 passed` |
+
+Kontrola po cofnięciu obu mutacji: **1115 passed, 3 deselected, 0 skipped**.
+
+### M-W11-1 czerwieni się DWUSTRONNIE i to jest cały sens tej naprawy
+
+Mutacja przesuwa granicę odmowy o jedną gałąź i **oba** strażniki reagują, każdy
+z innej strony:
+
+```
+AssertionError: kafelek „Rezerwa na podatki” pokazuje '0.00' — zero pod tym
+tytulem czyta sie jako „nic nie jestes winien urzedowi”
+assert '0.00' is None
+testy/test_trasy_budzet.py:355
+
+AssertionError: data rozpoczecia jest ZNANA — silnik nie ma czego nie wiedziec,
+wiec kafelek ma pokazac liczbe, a nie odmowe
+assert None is not None
+testy/test_trasy_budzet.py:396
+```
+
+Sam pierwszy strażnik dałby się zaspokoić odmową na **każdym** braku ZUS-u —
+łącznie z datą rozpoczęcia leżącą w przyszłości, gdzie zero jest **wiedzą**,
+a nie brakiem wiedzy. Drugi strażnik trzyma tę granicę.
+
+**Kontrola liczności mutacji:** przebieg całej suity z odjętym `test_trasy_budzet.py`
+dał przy mutacji `1086 passed, 32 deselected` — czyli M-W11-1 nie czerwieni
+niczego poza dwoma strażnikami napisanymi dla niej. Mutacja trafiła w regułę,
+nie obok.
+
+### M-W11-2 — strażnik, który przed W11 nie mógł paść
+
+Do W11 `test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb` budował słownik
+dwóch routerów **ręcznie w treści testu** i sprawdzał `len(routery) == 2` na
+słowniku, który sam napisał. Aplikacja miała wtedy **cztery** routery.
+Pomiar Leo: ta sama mutacja M-W11-2 dawała wtedy **1113 passed** — strażnik jej
+nie widział. Po przepisaniu na odkrywanie routerów z `aplikacja` daje
+`1 failed, 1114 passed`.
+
+**Żywej dziury nie było** i trzeba to powiedzieć wprost: `api/index.py:101`
+ustawia `default_response_class` na całej aplikacji, więc router bez własnej klasy
+spada na wartość aplikacji, a tej pilnuje
+`test_kontrakt_dwa_nosniki.py`. To był **dług pokryciowy**, nie wada produkcyjna.
+
+**Co przez to może przestać działać (§3.11).** Odkrywanie idzie przez pole
+`original_router` opakowania `_IncludedRouter` — w FastAPI 0.141
+`include_router` **nie spłaszcza** tras do aplikacji (zmierzone: `aplikacja.routes`
+ma 8 pozycji, z czego **zero** jest `APIRoute`, a cztery są tym opakowaniem).
+Gdyby to pole zniknęło w nowszym FastAPI, odkrycie zwróciłoby pusty słownik,
+a pętla sprawdzająca zameldowałaby sukces nic nie zobaczywszy. Dlatego kontrola
+populacji (`set(routery) == ROUTERY_APLIKACJI`) jest asercją, nie wydrukiem —
+i stoi **po** pętli, żeby piąty router dołożony jutro był sprawdzony już tym
+przebiegiem, zanim ktokolwiek dopisze go do listy.
+
+### Czego przebieg W11 NIE objął
+
+- **Nie mutowano niczego poza dwoma miejscami wyżej.** W szczególności nie
+  sprawdzano mutacyjnie pozostałych gałęzi `podatki.rezerwa_na_podatki`.
+- **Nie ma strażnika behawioralnego** czytającego kafelek z wyrenderowanej strony —
+  odmowa jest zmierzona na odpowiedzi HTTP, obsługa `kwota === null` w widoku
+  potwierdzona **odczytem źródła** (`interfejs/app/budzet/ekran.tsx:176–178`),
+  nie przebiegiem przeglądarki.
+- **Nie ruszono interfejsu, `vercel.json` ani wdrożenia.**

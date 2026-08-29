@@ -2,9 +2,15 @@
 
 **Wersja:** v1.0 · 2026-08-29 · autor: Oliver (COO) · **status: do sign-offu Darka**
 
-> **Na noc 2026-08-29 kolejność niesie `docs/plan-nocy-2026-08-29.md`; ten dokument wraca
-> do roli nośnika po jej zakończeniu.** Dopisane, żeby nie było dwóch nośników tej samej
-> rzeczy bez wskazania, który obowiązuje.
+> **Który nośnik kolejności obowiązuje — stan na 2026-08-29, godz. 10:45.**
+> Noc 2026-08-29 **zakończona**; `docs/plan-nocy-2026-08-29.md` przechodzi do archiwum jako
+> ślad wykonania. **Na najbliższą sesję kolejność niesie `docs/plan-chmura-2026-08-29.md`.**
+> Ten dokument wraca do roli nośnika po jej zakończeniu. Wskazanie stoi tutaj, żeby nie było
+> trzech nośników tej samej rzeczy bez rozstrzygnięcia, który obowiązuje.
+>
+> **Plasterek 1 wykonany w nocy** (Księgowanie + Płynność + podział osi prognozy, D-20/D-61).
+> **Plasterek 0 przesunięty za pomiar wykonalności Vercela** — nikt nie zmierzył, czy silnik
+> z pandas i numpy mieści się w funkcji; ten pomiar jest bramką zerową nowego planu.
 
 **To jest jedyny nośnik KOLEJNOŚCI PRAC.** Nośnikiem wymagań jest `docs/PRD.md` — ten plan go
 **woła**, nie powtarza. Zmiany tutaj: bump wersji i changelog na górze.

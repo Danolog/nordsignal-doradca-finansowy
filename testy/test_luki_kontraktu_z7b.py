@@ -31,7 +31,7 @@ DZIS = date(2026, 10, 6)
 
 @pytest.fixture
 def baza(tmp_path):
-    p = magazyn.polacz(tmp_path / "t.db")
+    p = magazyn.zmigruj_i_polacz()
     yield p
     p.close()
 

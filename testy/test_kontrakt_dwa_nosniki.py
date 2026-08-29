@@ -407,14 +407,19 @@ def test_MINUS_jest_TEN_SAM_po_obu_stronach():
 #: przepusciłby ciche usuniecie pola, a to jest wlasnie ta zmiana, ktorej
 #: ten plik ma nie przepuscic bez decyzji.
 ZMIERZONE = {
-    "ksztaltow": 9,
-    "pol": 48,          # Z5: 47 -> Z7b: 48
-    "pol_kwotowych": 7,
+    "ksztaltow": 14,    # Z7b: 9 -> W9b: 14 (piec ksztaltow ekranu Budzet)
+    "pol": 102,         # Z5: 47 -> Z7b: 48 -> W9b: 102
+    "pol_kwotowych": 7 + 13,   # W9b: +13 (kafelek, tabela, plan, cel, bilans)
     "per_ksztalt": {
         "Kategoria": 3, "WpisDoZapisu": 5, "WierszSkutku": 4,
         "PodgladSkutku": 2, "OstatniWpis": 6,
         "DaneKsiegowania": 9,   # Z7b: +`ostatnieSprawdzenie` (luka kontraktu)
         "PozycjaKsiegi": 5, "PunktWykresu": 2, "DanePlynnosci": 12,
+        # W9b — ekran Budzet. `OstatniWpis` jest WOLANY przez `DaneBudzetu`
+        # (tabela „Historia"), nie powtorzony: to ta sama rzecz co „Ostatnie
+        # wpisy" na Ksiegowaniu, wiec nie dostaje wlasnego ksztaltu.
+        "KafelekBudzetu": 5, "PozycjaWykonania": 10, "PozycjaPlanu": 8,
+        "CelNaEkranie": 12, "DaneBudzetu": 19,
     },
 }
 
@@ -436,7 +441,21 @@ ZMIERZONE = {
 # DO CZASU DECYZJI dlug jest pilnowany tym plikiem i opisany etykieta
 # „prog zadzialal, niesplacony" — zgodnie z `CLAUDE.md` §3.2 etykieta jest
 # dopuszczalna, udawanie splaty nie jest.
-PROG_ZADZIALAL_NIESPLACONY = "Z7b — dopisano DaneKsiegowania.ostatnieSprawdzenie"
+# DRUGIE ZADZIALANIE PROGU — W9b, 2026-08-29. Zapisane, nie przemilczane.
+# Ekran Budzet dolozyl PIEC ksztaltow i 54 pola naraz (48 -> 102). To jest
+# najwieksza jednorazowa zmiana kontraktu w tym projekcie i tym mocniejszy
+# argument za generatorem — a jednoczesnie tym gorszy moment, zeby go pisac
+# w zadaniu o trasach. Sprzecznosc opisana wyzej (prog mowi „`.ts` z `.py`",
+# decyzja o kierunku mowi „wzorcem jest `.ts`") jest NADAL nierozstrzygnieta
+# i to ona blokuje splate, nie brak czasu. Do rozstrzygniecia przez Ethana.
+#
+# CO PRZEZ TO NIE DZIALA: nic sie nie psuje, ale koszt kazdej nastepnej
+# zmiany ksztaltu rosnie — dwa pliki do recznego zrownania zamiast jednego.
+# Pilnuje tego wylacznie ten plik i pilnuje SKUTECZNIE (mutacja niżej).
+PROG_ZADZIALAL_NIESPLACONY = (
+    "Z7b — dopisano DaneKsiegowania.ostatnieSprawdzenie; "
+    "W9b — dopisano piec ksztaltow ekranu Budzet (9 -> 14 ksztaltow, "
+    "48 -> 102 pola)")
 
 
 def test_RAPORT_ile_pol_porownano_po_kazdej_stronie():

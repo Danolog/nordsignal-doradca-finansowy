@@ -13,7 +13,6 @@ rata) broni czego innego: tam kierunek niesie TYP pozycji, tu znak jest
 czescia odczytu z banku.
 """
 
-import sqlite3
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -21,25 +20,26 @@ from pathlib import Path
 import pytest
 
 from silnik.rdzen import budzet, magazyn
+from testy import pomocnicze
 
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "test.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     yield polaczenie
     polaczenie.close()
 
 
-def _baza_w_wersji(sciezka: Path, wersja: int) -> None:
+def _baza_w_wersji(wersja: int) -> None:
     """Realna baza z danymi, ostemplowana podana wersja schematu."""
-    magazyn.polacz(sciezka).close()
-    surowe = sqlite3.connect(str(sciezka))
+    magazyn.zmigruj_i_polacz().close()
+    surowe = pomocnicze.polaczenie_surowe()
     surowe.execute(
         "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, szczegoly) "
-        "VALUES ('2026-08-01', ?, 'Zakupy', '10.00', '')",
+        "VALUES ('2026-08-01', %s, 'Zakupy', 10.00, '')",
         (budzet.TYP_WYDATKI,))
     surowe.execute("DROP TABLE IF EXISTS stan_konta")
-    surowe.execute(f"PRAGMA user_version = {wersja}")
+    surowe.execute("UPDATE wersja_schematu SET wersja = %s", (wersja,))
     surowe.commit()
     surowe.close()
 
@@ -58,7 +58,7 @@ def test_zapisana_kotwica_WRACA_co_do_grosza_jako_Decimal(p):
     assert isinstance(kwota, Decimal), \
         f"kwota wrocila jako {type(kwota).__name__}, nie Decimal"
     assert kwota == Decimal("12345.67")
-    assert kotwice.iloc[0]["data"] == "2026-08-27"
+    assert kotwice.iloc[0]["data"] == date(2026, 8, 27)
 
 
 def test_kotwica_UJEMNA_jest_dopuszczalna(p):
@@ -103,8 +103,11 @@ def test_kotwice_wracaja_od_NAJNOWSZEJ(p):
     magazyn.zapisz_stan_konta(p, data=date(2026, 9, 1), kwota=Decimal("300.00"))
     magazyn.zapisz_stan_konta(p, data=date(2026, 8, 1), kwota=Decimal("200.00"))
 
+    # Obiekty daty, nie napisy: kolumna jest typu `DATE` (W4). Sortowanie
+    # idzie odtad po DACIE, a nie po zapisie tekstowym — dla formatu ISO
+    # wynik jest ten sam, ale dla kazdego innego juz nie.
     assert list(magazyn.wczytaj_kotwice(p)["data"]) \
-        == ["2026-09-01", "2026-08-01", "2026-07-01"]
+        == [date(2026, 9, 1), date(2026, 8, 1), date(2026, 7, 1)]
 
 
 def test_ta_sama_DATA_poprawia_odczyt_zamiast_go_dublowac(p):
@@ -136,28 +139,27 @@ def test_migracja_z_OSEMKI_doklada_tabele_i_ZOSTAWIA_kopie(tmp_path):
     samo — jak dzialajaca aplikacja: tabela powstaje w bazie, ktora juz ma
     dane; kopia sprzed migracji istnieje i jest w wersji 8; dane przezyly.
     """
-    sciezka = tmp_path / "stara.db"
-    _baza_w_wersji(sciezka, 8)
+    _baza_w_wersji(8)
 
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_stan_konta(polaczenie, data=date(2026, 8, 27),
                               kwota=Decimal("1840.55"))
-    assert polaczenie.execute("PRAGMA user_version").fetchone()[0] \
+    assert polaczenie.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny").fetchone()[0] \
         == magazyn.WERSJA_SCHEMATU
     assert polaczenie.execute(
         "SELECT COUNT(*) FROM wpisy_budzetu").fetchone()[0] == 1, \
         "migracja zgubila dane sprzed niej"
-    polaczenie.close()
 
-    kopie = sorted(tmp_path.glob("*-kopia-przed-migracja-*"))
+    kopie = magazyn.kopie(polaczenie)
     assert len(kopie) == 1, f"kopii jest {len(kopie)}, nie jedna (Z53)"
-    stara = sqlite3.connect(str(kopie[0]))
-    assert stara.execute("PRAGMA user_version").fetchone()[0] == 8
-    assert stara.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name='stan_konta'").fetchone() is None, \
+    assert polaczenie.execute(
+        f"SELECT wersja FROM {kopie[0]}.wersja_schematu").fetchone()[0] == 8
+    assert polaczenie.execute(
+        "SELECT 1 FROM information_schema.tables WHERE table_schema = %s"
+        " AND table_name = 'stan_konta'", (kopie[0],)).fetchone() is None, \
         "kopia ma byc stanem SPRZED migracji"
-    stara.close()
+    polaczenie.close()
 
 
 def test_wersja_schematu_OBEJMUJE_kotwice_i_stempluje_baze(p):
@@ -171,5 +173,6 @@ def test_wersja_schematu_OBEJMUJE_kotwice_i_stempluje_baze(p):
     jest stemplowana wersja, ktora zna kod (a nie liczba wpisana obok).
     """
     assert magazyn.WERSJA_SCHEMATU >= 9
-    assert p.execute("PRAGMA user_version").fetchone()[0] \
+    assert p.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny").fetchone()[0] \
         == magazyn.WERSJA_SCHEMATU

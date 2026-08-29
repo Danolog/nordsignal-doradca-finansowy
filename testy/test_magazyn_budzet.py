@@ -6,37 +6,40 @@ wiersze. Bez niego "przeniesiono 3 z 3" bylo by zielone takze wtedy, gdy
 fikstura przestanie cokolwiek wstawiac.
 """
 
-import sqlite3
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
+import psycopg
+
+from silnik import baza
 from silnik.rdzen import budzet, magazyn
+from testy import pomocnicze
 from testy.test_magazyn import TABELE_SCHEMATU
 
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "test.db")
+    return magazyn.zmigruj_i_polacz()
 
 
-def _stara_baza(sciezka, wiersze) -> None:
+def _stara_baza(wiersze) -> None:
     """Buduje baze w schemacie SPRZED Zadania 15 - z tabela `wydatki_osobiste`.
 
     Celowo omija `magazyn.polacz`, bo to wlasnie ono ma te tabele wchlonac.
     """
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.executescript("""
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("""
         CREATE TABLE wydatki_osobiste (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data TEXT NOT NULL, kategoria TEXT NOT NULL, kwota TEXT NOT NULL
-        );
-    """)
+            id BIGSERIAL PRIMARY KEY,
+            data DATE NOT NULL, kategoria TEXT NOT NULL,
+            kwota NUMERIC(14,2) NOT NULL
+        )""")
     for data, kategoria, kwota in wiersze:
         polaczenie.execute(
-            "INSERT INTO wydatki_osobiste (data, kategoria, kwota) VALUES (?,?,?)",
-            (data, kategoria, kwota))
+            "INSERT INTO wydatki_osobiste (data, kategoria, kwota)"
+            " VALUES (%s,%s,%s)", (data, kategoria, kwota))
     polaczenie.commit()
     polaczenie.close()
 
@@ -53,10 +56,7 @@ TRZY_WIERSZE = [
 def test_powstaja_wszystkie_tabele_budzetu(p):
     """Kontrola licznosci przez ROWNOSC zbioru - dzieki temu ten sam test jest
     zarazem straznikiem skasowania `wydatki_osobiste`."""
-    tabele = {w[0] for w in p.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name NOT LIKE 'sqlite_%'").fetchall()}
-    assert tabele == TABELE_SCHEMATU
+    assert pomocnicze.tabele_w_bazie(p) == TABELE_SCHEMATU
 
 
 def test_wydatki_osobiste_nie_wraca_po_ponownym_polaczeniu(tmp_path):
@@ -65,12 +65,10 @@ def test_wydatki_osobiste_nie_wraca_po_ponownym_polaczeniu(tmp_path):
     Gdyby tabela zostala w schemacie, DROP przezylby do najblizszego
     uruchomienia i wrocilaby pusta - wygladajaca jak prawdziwa.
     """
-    sciezka = tmp_path / "wraca.db"
-    _stara_baza(sciezka, TRZY_WIERSZE)
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
-    tabele = {w[0] for w in drugie.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    _stara_baza(TRZY_WIERSZE)
+    magazyn.zmigruj_i_polacz().close()
+    drugie = magazyn.zmigruj_i_polacz()
+    tabele = pomocnicze.tabele_w_bazie(drugie)
     assert "wydatki_osobiste" not in tabele
 
 
@@ -79,17 +77,15 @@ def test_wydatki_osobiste_nie_wraca_po_ponownym_polaczeniu(tmp_path):
 def test_fikstura_naprawde_ma_trzy_wiersze(tmp_path):
     """Kontrola dwustronna. Bez niej test migracji jest zielony takze wtedy,
     gdy fikstura wklada zero wierszy - `0 == 0` to prawda pusta."""
-    sciezka = tmp_path / "kontrola.db"
-    _stara_baza(sciezka, TRZY_WIERSZE)
-    polaczenie = sqlite3.connect(str(sciezka))
+    _stara_baza(TRZY_WIERSZE)
+    polaczenie = pomocnicze.polaczenie_surowe()
     assert polaczenie.execute("SELECT COUNT(*) FROM wydatki_osobiste") \
         .fetchone()[0] == 3
 
 
 def test_migracja_przenosi_wiersze_z_kwotami_i_typem(tmp_path):
-    sciezka = tmp_path / "migracja.db"
-    _stara_baza(sciezka, TRZY_WIERSZE)
-    polaczenie = magazyn.polacz(sciezka)
+    _stara_baza(TRZY_WIERSZE)
+    polaczenie = magazyn.zmigruj_i_polacz()
 
     wpisy = magazyn.wczytaj_wpisy(polaczenie, typ=budzet.TYP_WYDATKI)
     assert len(wpisy) == 3
@@ -103,9 +99,8 @@ def test_migracja_przenosi_wiersze_z_kwotami_i_typem(tmp_path):
 def test_migracja_pustej_bazy_nie_melduje_sukcesu(tmp_path):
     """Zero musi byc widoczne w komunikacie, a nie schowane za wartoscia
     logiczna. Migracja, ktora nic nie przeniosla, melduje ile nic."""
-    sciezka = tmp_path / "pusta.db"
-    _stara_baza(sciezka, [])
-    polaczenie = sqlite3.connect(str(sciezka))
+    _stara_baza([])
+    polaczenie = pomocnicze.polaczenie_surowe()
     raport = magazyn.wchlon_wydatki_osobiste(polaczenie)
     assert raport.przed == 0
     assert raport.przeniesione == 0
@@ -114,20 +109,20 @@ def test_migracja_pustej_bazy_nie_melduje_sukcesu(tmp_path):
 
 
 def test_migracja_raportuje_trzy_liczby(tmp_path):
-    sciezka = tmp_path / "raport.db"
-    _stara_baza(sciezka, TRZY_WIERSZE)
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.executescript(magazyn._SCHEMAT)
+    _stara_baza(TRZY_WIERSZE)
+    polaczenie = pomocnicze.polaczenie_surowe()
+    # Schemat WOLANY z jedynego nosnika, nie przepisany tutaj (W4).
+    polaczenie.execute(baza.schemat_postgresql())
+    polaczenie.commit()
     raport = magazyn.wchlon_wydatki_osobiste(polaczenie)
     assert (raport.przed, raport.przeniesione, raport.po) == (3, 3, 3)
 
 
 def test_migracja_dwa_razy_nie_duplikuje(tmp_path):
-    sciezka = tmp_path / "dwa_razy.db"
-    _stara_baza(sciezka, TRZY_WIERSZE)
-    pierwsze = magazyn.polacz(sciezka)
+    _stara_baza(TRZY_WIERSZE)
+    pierwsze = magazyn.zmigruj_i_polacz()
     pierwsze.close()
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz()
     assert len(magazyn.wczytaj_wpisy(drugie, typ=budzet.TYP_WYDATKI)) == 3
     raport = magazyn.wchlon_wydatki_osobiste(drugie)
     assert raport.przeniesione == 0
@@ -139,14 +134,14 @@ def test_baza_z_nowsza_wersja_schematu_odmawia_zamiast_pokazac_zera(tmp_path):
     Cicha zla liczba jest gorsza niz odmowa - dlatego wersja schematu stoi
     w bazie i jest sprawdzana przy otwarciu.
     """
-    sciezka = tmp_path / "z_przyszlosci.db"
-    magazyn.polacz(sciezka).close()
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.execute(f"PRAGMA user_version = {magazyn.WERSJA_SCHEMATU + 1}")
+    magazyn.zmigruj_i_polacz().close()
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("UPDATE wersja_schematu SET wersja = %s",
+                       (magazyn.WERSJA_SCHEMATU + 1,))
     polaczenie.commit()
     polaczenie.close()
     with pytest.raises(magazyn.BladMagazynu) as blad:
-        magazyn.polacz(sciezka)
+        magazyn.zmigruj_i_polacz()
     assert str(magazyn.WERSJA_SCHEMATU) in str(blad.value)
 
 
@@ -167,9 +162,8 @@ def test_zasiew_daje_komplet_kategorii_ze_slownika(p):
 
 
 def test_zasiew_nie_duplikuje_przy_ponownym_polaczeniu(tmp_path):
-    sciezka = tmp_path / "zasiew.db"
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
+    magazyn.zmigruj_i_polacz().close()
+    drugie = magazyn.zmigruj_i_polacz()
     assert len(magazyn.wczytaj_kategorie(drugie)) == sum(
         len(v) for v in budzet.KATEGORIE_STARTOWE.values())
 
@@ -413,7 +407,11 @@ def test_cel_zapisany_i_odczytany(p):
     cele = magazyn.wczytaj_cele(p)
     assert len(cele) == 1
     assert cele.iloc[0]["kwota_docelowa"] == Decimal("30000.00")
-    assert cele.iloc[0]["termin"] == "2027-12-31"
+    # Kolumna jest typu `DATE`, wiec wraca obiektem daty, a nie napisem
+    # (W4). Porownanie z napisem przechodzilo, dopoki baza trzymala date
+    # jako `TEXT` — i to wlasnie ten ksztalt konczyl sie porownaniami dat
+    # na napisach w calym silniku.
+    assert cele.iloc[0]["termin"] == date(2027, 12, 31)
 
 
 def test_cel_musi_wskazywac_kategorie_OSZCZEDNOSCI(p):
@@ -523,21 +521,50 @@ def test_zapis_z_innego_watku_jest_widoczny_w_glownym(p):
     assert wpisy.iloc[0]["kwota"] == Decimal("12.34")
 
 
-def test_sterownik_sqlite_jest_w_trybie_szeregowanym():
-    """Zalozenie, na ktorym stoi dostep wielowatkowy - nazwane wprost.
+def test_sterownik_pozwala_uzywac_polaczenia_z_INNEGO_watku():
+    """Zalozenie, na ktorym stoi dostep wielowatkowy — nazwane wprost.
 
-    `check_same_thread=False` jest bezpieczne WYLACZNIE dlatego, ze modul
-    sqlite3 zglasza tryb SERIALIZED (threadsafety 3): synchronizacje bierze
-    na siebie sama biblioteka C. Gdyby ten warunek przestal zachodzic na
-    innej maszynie, ten test powie o tym wprost, zamiast zostawic ciche
-    uszkodzenie danych.
+    ZMIENIL SIE PRZEDMIOT, NIE REGULA (W4, 2026-08-29). Poprzednik pytal
+    o `sqlite3.threadsafety == 3`: tamten sterownik BLOKOWAL uzycie
+    polaczenia w innym watku i `magazyn._otworz_surowo` zdejmowalo blokade
+    argumentem `check_same_thread=False` — bezpiecznie WYLACZNIE dlatego,
+    ze biblioteka C brala synchronizacje na siebie.
+
+    psycopg takiej blokady nie ma i nie ma tez odpowiednika `threadsafety`
+    do odczytania. Pytamy wiec o ZACHOWANIE, nie o zadeklarowana stala:
+    czy polaczenie otwarte tutaj da sie uzyc z innego watku. Narzedzia
+    doradcy wykonuja sie w puli watkow SDK, wiec odpowiedz „nie" znaczylaby
+    ciche uszkodzenie albo wyjatek daleko od miejsca wpadki.
+
+    GRANICA, WPROST: to NIE jest zgoda na dwoch pisarzy jednego polaczenia
+    naraz. Warstwa sieciowa bierze polaczenie NA ZADANIE
+    (`api/wspolne.polaczenie`), wiec dwoch uzytkownikow jednego polaczenia
+    w tym samym czasie nie ma.
     """
-    import sqlite3
-    assert sqlite3.threadsafety == 3, (
-        f"sqlite3.threadsafety == {sqlite3.threadsafety}, oczekiwano 3 "
-        "(SERIALIZED). Przy nizszej wartosci wspoldzielenie jednego polaczenia "
-        "miedzy watkami przestaje byc bezpieczne i magazyn.polacz musi "
-        "otwierac osobne polaczenie na watek.")
+    import threading
+
+    polaczenie = magazyn.zmigruj_i_polacz()
+    wynik = {}
+
+    def w_watku():
+        try:
+            wynik["ile"] = polaczenie.execute(
+                "SELECT COUNT(*) FROM kategorie").fetchone()[0]
+        except Exception as e:  # pragma: no cover - sciezka bledu jest asercja
+            wynik["blad"] = repr(e)
+
+    watek = threading.Thread(target=w_watku)
+    watek.start()
+    watek.join()
+    polaczenie.close()
+
+    assert "blad" not in wynik, (
+        f"sterownik odmowil uzycia polaczenia z innego watku: {wynik['blad']}. "
+        f"Narzedzia doradcy wykonuja sie w puli watkow — magazyn musialby "
+        f"otwierac osobne polaczenie na watek.")
+    assert wynik["ile"] > 0, (
+        "kontrola licznosci: odczyt z innego watku ma cos zobaczyc, a nie "
+        "tylko nie wybuchnac")
 
 
 # --- usuwanie pozycji planu -----------------------------------------------
@@ -657,28 +684,33 @@ def test_kopiuj_plan_kontrola_licznosci_zadna_pozycja_nie_ginie(p):
 
 # --- migracja Z42: kolumny okresu obowiazywania ---------------------------
 
-def _baza_schemat_4(sciezka, wiersze) -> None:
+def _baza_schemat_4(wiersze) -> None:
     """Buduje baze w schemacie SPRZED Z42 — `plan_budzetu` bez kolumn okresu.
 
     Celowo omija `magazyn.polacz`, bo to wlasnie ono ma kolumny dolozyc.
     `CREATE TABLE IF NOT EXISTS` nie rusza tabeli, ktora juz jest, wiec bez
     `_DOPISYWANE_KOLUMNY` migracja wygladalaby na wykonana, a kolumny by nie bylo.
     """
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.executescript("""
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("""
         CREATE TABLE plan_budzetu (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            rok INTEGER NOT NULL, miesiac INTEGER NOT NULL, typ TEXT NOT NULL,
-            kategoria TEXT NOT NULL, kwota_planowana TEXT NOT NULL,
-            UNIQUE(rok, miesiac, typ, kategoria)
-        );
-    """)
+            id BIGSERIAL PRIMARY KEY,
+            rok INT NOT NULL, miesiac INT NOT NULL, typ TEXT NOT NULL,
+            kategoria TEXT NOT NULL, kwota_planowana NUMERIC(14,2) NOT NULL,
+            UNIQUE (rok, miesiac, typ, kategoria)
+        )""")
     for rok, miesiac, typ, kategoria, kwota in wiersze:
         polaczenie.execute(
             "INSERT INTO plan_budzetu (rok, miesiac, typ, kategoria, "
-            "kwota_planowana) VALUES (?,?,?,?,?)",
+            "kwota_planowana) VALUES (%s,%s,%s,%s,%s)",
             (rok, miesiac, typ, kategoria, kwota))
-    polaczenie.execute("PRAGMA user_version = 4")
+    # Wersja schematu jedzie do TABELI, nie do naglowka pliku — `PRAGMA
+    # user_version` nie ma w PostgreSQL odpowiednika (W4).
+    polaczenie.execute(
+        "CREATE TABLE wersja_schematu (jedyny BOOLEAN PRIMARY KEY DEFAULT TRUE,"
+        " wersja INT NOT NULL, CONSTRAINT naprawde_jedyny CHECK (jedyny))")
+    polaczenie.execute(
+        "INSERT INTO wersja_schematu (jedyny, wersja) VALUES (TRUE, 4)")
     polaczenie.commit()
     polaczenie.close()
 
@@ -691,10 +723,9 @@ DWA_WIERSZE_PLANU = [
 
 def test_migracja_z42_doklada_kolumny_do_istniejacej_tabeli(tmp_path):
     """Baza Darka ma juz `plan_budzetu` — kolumny musza wejsc przez ALTER TABLE."""
-    sciezka = tmp_path / "schemat4.db"
-    _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
-    kolumny = {w[1] for w in polaczenie.execute("PRAGMA table_info(plan_budzetu)")}
+    _baza_schemat_4(DWA_WIERSZE_PLANU)
+    polaczenie = magazyn.zmigruj_i_polacz()
+    kolumny = pomocnicze.kolumny_tabeli(polaczenie, "plan_budzetu")
     assert {"powtarzalna", "do_roku", "do_miesiaca"} <= kolumny
 
 
@@ -704,15 +735,14 @@ def test_migracja_z42_nie_rusza_wierszy_sprzed_migracji(tmp_path):
     Decyzja Darka nr 2 (2026-08-26): 41 pozycji z importu zostaje
     jednorazowych. `DEFAULT 0` jest jedynym nosnikiem tego znaczenia.
     """
-    sciezka = tmp_path / "dane.db"
-    _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    _baza_schemat_4(DWA_WIERSZE_PLANU)
+    polaczenie = magazyn.zmigruj_i_polacz()
     wiersze = polaczenie.execute(
         "SELECT rok, miesiac, kwota_planowana, powtarzalna, do_roku, "
         "do_miesiaca FROM plan_budzetu ORDER BY rok, miesiac").fetchall()
     assert len(wiersze) == len(DWA_WIERSZE_PLANU)
-    assert wiersze[0] == (2025, 10, "500.00", 0, None, None)
-    assert wiersze[1] == (2025, 11, "300.00", 0, None, None)
+    assert wiersze[0] == (2025, 10, Decimal("500.00"), False, None, None)
+    assert wiersze[1] == (2025, 11, Decimal("300.00"), False, None, None)
 
 
 def test_migracja_z42_podnosi_wersje_schematu_bazy_do_wersji_kodu(tmp_path):
@@ -722,10 +752,10 @@ def test_migracja_z42_podnosi_wersje_schematu_bazy_do_wersji_kodu(tmp_path):
     zmianie, ktora niczego nie psula. Liczba pinowana jest tylko po stronie
     stanu wyjsciowego (baza w wersji 4 ma zostac podniesiona).
     """
-    sciezka = tmp_path / "wersja.db"
-    _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
-    assert polaczenie.execute("PRAGMA user_version").fetchone()[0] == \
+    _baza_schemat_4(DWA_WIERSZE_PLANU)
+    polaczenie = magazyn.zmigruj_i_polacz()
+    assert polaczenie.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny").fetchone()[0] == \
         magazyn.WERSJA_SCHEMATU
     assert magazyn.WERSJA_SCHEMATU > 4
 
@@ -736,7 +766,7 @@ def test_swieza_baza_tez_ma_kolumny_okresu(p):
     Test wyzej broni bazy z danymi, ten — swiezej. Usuniecie wpisu z jednego
     z tych miejsc czerwieni dokladnie jeden z nich.
     """
-    kolumny = {w[1] for w in p.execute("PRAGMA table_info(plan_budzetu)")}
+    kolumny = pomocnicze.kolumny_tabeli(p, "plan_budzetu")
     assert {"powtarzalna", "do_roku", "do_miesiaca"} <= kolumny
 
 
@@ -983,14 +1013,13 @@ def test_kosz_dotyczy_JEDNEJ_pozycji(p):
 def test_migracja_z48_zachowuje_wszystkie_wiersze(tmp_path):
     """Przebudowa tabeli NIE MOZE zgubic ani jednego wiersza — kontrola
     licznosci przed i po, plus wartosci domyslne nowych kolumn."""
-    sciezka = tmp_path / "przed_z48.db"
-    _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    _baza_schemat_4(DWA_WIERSZE_PLANU)
+    polaczenie = magazyn.zmigruj_i_polacz()
     wiersze = polaczenie.execute(
         "SELECT rok, miesiac, kategoria, kwota_planowana, opis, dzien, "
         "co_ile_miesiecy FROM plan_budzetu ORDER BY rok, miesiac").fetchall()
     assert len(wiersze) == len(DWA_WIERSZE_PLANU)
-    assert wiersze[0] == (2025, 10, "Zakupy", "500.00", "", None, 1)
+    assert wiersze[0] == (2025, 10, "Zakupy", Decimal("500.00"), "", None, 1)
 
 
 # --- Z50: kasowanie pozycji — ten miesiac czy takze przyszle ---------------

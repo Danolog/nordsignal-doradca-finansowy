@@ -19,11 +19,12 @@ import pandas as pd
 import pytest
 
 from silnik.rdzen import budzet, magazyn, podatki
+from testy import pomocnicze
 
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "koszty.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 def _faktura(polaczenie) -> None:
@@ -152,7 +153,8 @@ def test_koszty_sa_juz_parametrem_obowiazkowym():
 
 
 def test_schemat_zna_tabele_kosztow(p):
-    tabele = {w[0] for w in p.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    tabele = pomocnicze.tabele_w_bazie(p)
     assert "koszty_jdg" in tabele
-    assert p.execute("PRAGMA user_version").fetchone()[0] == magazyn.WERSJA_SCHEMATU
+    assert p.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny"
+    ).fetchone()[0] == magazyn.WERSJA_SCHEMATU

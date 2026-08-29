@@ -1,0 +1,474 @@
+/* EKRAN BUDZET — uklad przeniesiony wezel po wezle z ramki
+   `makiety/Budzet.dc.html`. Ramka nie ma klas: caly uklad siedzi
+   w atrybutach `style="..."`, wiec przepisuje sie DRZEWO, nie selektory.
+   Wartosci pikselowe doslownie z ramki; barwy podmienione na zmienne
+   z `paleta.css` — jeden nosnik palety.
+
+   MODEL PUDELKA dla kontrolek wraca na `content-box` — przegladarka daje
+   `button`/`a` wlasny `border-box`, a ramka rysuje te ksztalty `span`-ami.
+   Zmierzone w Z1: bez tego kazda kontrolka z obrysem jest o 2 px nizsza.
+
+   JEDNO ODSTEPSTWO OD RAMKI W UKLADZIE, nazwane: stan pusty sekcji
+   „Historia". Ramka wsadza oba akapity stanu pustego do siatki pieciu kolumn
+   (`110px 130px 1fr 160px 160px`) zaprojektowanej pod wiersz danych, wiec
+   zdanie lamie sie w kolumnie 110 px i wyglada jak pionowy slupek liter
+   (zmierzone: dwa akapity 110 px i 130 px szerokosci, po ~290 px wysokosci).
+   Ta sama ramka robi stan pusty POPRAWNIE w sekcji „Przychody i oszczednosci":
+   akapit pelnej szerokosci POZA siatka. Budujemy wg wzorca poprawnego —
+   rozstrzygniecie Mili, `docs/2026-08-29-spis-ekran-budzet.md` §6. */
+
+.przycisk,
+.linkCichy { box-sizing: content-box; }
+
+.ekran {
+  width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  margin: 32px 0 24px;
+}
+
+.blok { display: flex; flex-direction: column; }
+
+/* ---- naglowki sekcji ---- */
+
+.naglowekKarty,
+.naglowekBloku {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.naglowekKarty { padding-bottom: 10px; }
+.naglowekBloku { padding-bottom: 6px; }
+
+/* Swiatlo 0,14 em — etykieta SEKCJI. Etykieta KOLUMNY i etykieta KAFELKA
+   maja 0,12 em; to nie jest niedbalstwo ramki, tylko dwa poziomy. */
+.etykietaSekcji {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.etykietaKolumny {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+.podpis { font-size: 13px; color: var(--atrament-cichy); }
+.rozpychacz { flex: 1; }
+
+/* Selektor okresu. Na ramce jest to SPAN, nie odsylacz — nie da sie w niego
+   kliknac i tak zostaje. Drugi selektor z ramki („Wybrany miesiąc") NIE JEST
+   budowany: fraza ma nosnik wylacznie w opisie Raportow, a element bez
+   opisanej funkcji niczego czlowiekowi nie obiecuje (rozstrzygniecie Mili,
+   spis §7). */
+.selektorOkresu {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* ---- trzy kafelki planu ---- */
+
+.naglowkiKafelkow,
+.kwotyKafelkow,
+.dopiskiKafelkow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: 24px;
+}
+
+.naglowkiKafelkow {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+.kwotyKafelkow { align-items: baseline; padding: 12px 0 4px; }
+.dopiskiKafelkow { align-items: baseline; padding-bottom: 12px; }
+
+.kwotaKafelka {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  white-space: nowrap;
+}
+
+/* ODMOWA SILNIKA MA WLASNY KSZTALT, nie kwote. `kwota: null` znaczy
+   „NIE POLICZYLEM" — zero czytaloby sie jako „nic nie jestes winien
+   urzedowi", czyli najlepsza mozliwa odpowiedz podana wtedy, gdy nie ma
+   zadnej. Zdanie odmowy sklada silnik i stoi w miejscu liczby, stopniem
+   prozy, nie kwoty. */
+.odmowaKafelka { font-size: 15px; color: var(--atrament-cichy); }
+
+.dopisekKafelka { font-size: 13px; color: var(--atrament-cichy); }
+
+/* Liniatura podwojna: 1 px + 3 px przerwy + 1 px. Atrament CICHY —
+   niesie znaczenie, a liniatura wierszy jest dekoracja. */
+.kreska { height: 1px; background: var(--atrament-cichy); }
+.przerwa { height: 3px; }
+
+.zdanieRezerwy { margin: 12px 0 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* ---- bilans planu ---- */
+
+.liniaBilansu { height: 1px; background: var(--liniatura-wierszy); margin-top: 18px; }
+
+.wierszBilansu { display: flex; align-items: baseline; gap: 16px; padding-top: 16px; }
+
+.liczbaBilansu {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  white-space: nowrap;
+}
+
+/* Barwa TYLKO dla liczby ocenianej. Nie jest jedynym nosnikiem: obok stoi
+   znak minus, ktory sklada `sformatujKwote` z osobnego parametru. */
+.bilansPonizejZera { color: var(--saldo-ujemne); }
+
+.podpisBilansu { font-size: 15px; color: var(--atrament-cichy); }
+.prozaBilansu { margin: 6px 0 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* ---- narracja nad tabela ---- */
+
+.narracja { display: flex; flex-direction: column; gap: 8px; }
+.zdanieGlowne { margin: 0; font-size: 20px; line-height: 1.45; }
+.zdaniePoboczne { margin: 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* Nazwa ekranu wewnatrz zdania pisana atramentem pelnym — tak jak w ramce. */
+.akcent { color: var(--atrament); }
+
+/* ---- kontrolki naglowkow ---- */
+
+.przycisk {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.przycisk svg { color: var(--atrament-cichy); }
+.przycisk[disabled] { cursor: progress; opacity: 0.7; }
+
+/* Kontrolka o ksztalcie odsylacza — „Usuń zaznaczone" w Historii i nazwa
+   kategorii w tabeli. Bez tla i bez obrysu, barwa przygaszona: dokladnie to,
+   co ramka rysuje jako `<a>` (jej `a { color: #4A5267 }`). Ze da sie w nia
+   kliknac, mowia wskaznik i podkreslenie przy najechaniu. */
+.linkCichy {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.linkCichy:hover { text-decoration: underline; }
+.linkCichy[disabled] { cursor: default; }
+
+/* ---- rubryka „Plan kontra wykonanie" i „Cele" ---- */
+
+.naglowkiKolumn,
+.wierszTabeli,
+.wierszCelu {
+  display: grid;
+  grid-template-columns: 210px 130px 1fr 130px 190px;
+  column-gap: 24px;
+}
+
+.naglowkiKolumn {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+
+.wierszTabeli {
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--liniatura-wierszy);
+}
+
+/* Cele nie maja naglowkow kolumn — pierwszy wiersz zamyka je od gory
+   liniatura atramentowa, tak jak rysuje to ramka. */
+.wierszCelu {
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--atrament-cichy);
+}
+
+.grupa { padding: 14px 0 6px; }
+
+.doPrawej { text-align: right; }
+
+.komorkaNazwy { font-size: 15px; }
+
+/* Nazwa kategorii jest KONTROLKA — otwiera panel w trybie zmiany (spis Mili
+   §4.1). Ksztalt odsylacza, nie przycisku: siatka `210px 130px 1fr 130px
+   190px` nie ma miejsca na dodatkowa kolumne z ikonami, a dolozony przycisk
+   podnosilby kazdy wiersz. */
+.nazwaJakoLink {
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.nazwaJakoLink:hover { text-decoration: underline; }
+
+.komorkaKwoty {
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.komorkaOdchylenia { color: var(--atrament-cichy); }
+
+.tempoCelu { font-size: 13px; color: var(--atrament-cichy); text-align: right; }
+
+/* ---- pasek postepu ---- */
+
+.pasek { position: relative; display: block; height: 14px; }
+
+.paskoTlo {
+  position: absolute;
+  left: 0;
+  top: 1px;
+  height: 12px;
+  width: 100%;
+  background: var(--liniatura-wierszy);
+  border: 1px solid var(--obrys-kontrolki);
+  box-sizing: border-box;
+}
+
+.paskoWypelnienie {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  height: 8px;
+  background: var(--atrament-cichy);
+}
+
+/* Przekroczenie planu niesie barwe I ZNAK w liczbie odchylenia obok —
+   barwa nie jest jedynym nosnikiem. */
+.paskoPrzekroczone { background: var(--saldo-ujemne); }
+
+/* ---- stany puste ---- */
+
+/* WZORZEC POPRAWNEGO STANU PUSTEGO: akapit pelnej szerokosci, POZA siatka
+   kolumn. Tak robi to ramka w sekcji „Przychody i oszczednosci" i tak samo
+   budujemy stan pusty Historii, mimo ze tam ramka robi inaczej (patrz
+   naglowek pliku). */
+.stanPusty { margin: 0 0 10px; font-size: 15px; color: var(--atrament-cichy); }
+
+.stanPustyHistorii { display: flex; flex-direction: column; }
+.pustyTytul { margin: 6px 0 0; font-size: 20px; line-height: 1.45; }
+.pustyPowod { margin: 8px 0 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* ---- Historia ---- */
+
+.naglowkiHistorii,
+.wierszHistorii {
+  display: grid;
+  grid-template-columns: 110px 130px 1fr 160px 160px;
+  column-gap: 24px;
+}
+
+.naglowkiHistorii {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--atrament-cichy);
+}
+
+.wierszHistorii {
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--liniatura-wierszy);
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Zaznaczenie niesie WYPELNIENIE i obrys po lewej — nie sama barwa tekstu.
+   Po odbarwieniu zostaje jasnosc wypelnienia. */
+.wierszZaznaczony { background: var(--pole-kontrolki); }
+
+.komorkaDnia { font-size: 15px; color: var(--atrament-cichy); }
+.komorkaOpisu { font-size: 15px; }
+
+/* ---- panel pozycji planu (odstepstwo od §3.6, spis Mili §4) ---- */
+
+/* PANEL ZAMKNIETY NIE RYSUJE NICZEGO i to jest warunek, nie estetyka.
+   Zmierzone w W8 na tym samym projekcie: kontrolka dolozona do ukladu
+   w spoczynku zepchnela ekran o 80 px w dol i odwzorowanie skoczylo
+   z 0,07% na 14,38% przy progu 2%. Panel wchodzi do drzewa dopiero po
+   otwarciu, wiec bramka odwzorowania mierzy uklad z ramki, a nie uklad
+   z kontrolka, ktorej ramka nie rysuje. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  margin: 10px 0 6px;
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.wierszPol { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.kolumnaPola { display: flex; flex-direction: column; gap: 8px; }
+.kolumnaKwoty { width: 260px; }
+.kolumnaKategorii { width: 240px; }
+.kolumnaOpisu { width: 240px; }
+.kolumnaLiczby { width: 130px; }
+.kolumnaZapisu { display: flex; align-items: center; gap: 16px; padding-top: 27px; }
+
+/* Miary pol przeniesione z `Ksiegowanie.dc.html`: 52 px wysokosci ramki,
+   26 px stopnia wpisu kwoty. Kwota ma ten sam ciezar co tam, bo to ta sama
+   klasa rzeczy — liczba, ktora czlowiek wpisuje z glowy. */
+.ramkaPola {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px 0 14px;
+  background: var(--papier);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.wpisKwoty {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  text-align: right;
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  color: var(--atrament);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.wpisKwoty:focus { outline: none; }
+
+.wpisTekstu {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--atrament);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.wpisTekstu:focus { outline: none; }
+
+.jednostka { font-size: 15px; color: var(--atrament-cichy); }
+
+.przelacznikTypu { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.kafelekTypu {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--papier);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* Stan wybrany niesie odwrocenie wypelnienia I wage pisma — po odbarwieniu
+   zostaja oba. Barwa nie jest jedynym nosnikiem znaczenia. */
+.kafelekWybrany {
+  font-weight: 600;
+  color: var(--papier);
+  background: var(--atrament);
+  border-color: var(--atrament);
+}
+
+.wezwaniePanelu {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 24px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--papier);
+  background: var(--atrament);
+  border: 1px solid var(--atrament);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.wezwaniePanelu[disabled] { cursor: progress; opacity: 0.7; }
+
+.rezygnuje {
+  min-height: 44px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.rezygnuje:hover { text-decoration: underline; }
+
+/* KONIEC REGULY — kontrolka o ksztalcie odsylacza, stojaca POD polami.
+   Ten sam poziom wizualny co „Usuń zaznaczone" w Historii, ale INNY napis
+   i inne dzialanie: napis niesie miesiac, od ktorego skutek obowiazuje. */
+.koniecReguly {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--liniatura-wierszy);
+}
+
+.zdaniePotwierdzenia { margin: 0; font-size: 15px; color: var(--atrament); }
+.tozsamosc { margin: 0; font-size: 13px; color: var(--atrament-cichy); }
+
+.wierszPotwierdzenia { display: flex; align-items: center; gap: 16px; }
+
+/* Uwaga niesie WIELKOSC, nie samo slowo (§3.5) — brzmienia w `lib/napisy.ts`
+   mowia, czego brakuje i co wpisac zamiast tego. */
+.podpisUwagi { font-size: 13px; color: var(--saldo-ujemne); }
+.uwaga { border-color: var(--saldo-ujemne); }

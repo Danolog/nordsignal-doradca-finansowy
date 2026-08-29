@@ -22,7 +22,11 @@ from decimal import Decimal
 
 import pytest
 
+import psycopg
+
+from silnik import baza
 from silnik.rdzen import budzet, magazyn
+from testy import pomocnicze
 
 TRZY = (
     ("wpisy_budzetu", "zrodlo"),
@@ -33,39 +37,44 @@ TRZY = (
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "kolumny.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 def _kolumny(polaczenie, tabela: str) -> set[str]:
-    return {w[1] for w in polaczenie.execute(f"PRAGMA table_info({tabela})")}
+    return pomocnicze.kolumny_tabeli(polaczenie, tabela)
 
 
-def _stara_baza(sciezka, *, wpisow: int):
+def _stara_baza(*, wpisow: int):
     """Baza w kształcie schematu 11 — BEZ trzech kolumn, Z danymi.
 
     Odtwarza kształt bazy roboczej (kopii poprzednika), na której zespół
     dziś buduje. Bez tego strażnik migracji sprawdzałby wyłącznie ścieżkę
     świeżej bazy, czyli tę, która i tak jest łatwa.
     """
-    import sqlite3
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.executescript("""
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("""
         CREATE TABLE wpisy_budzetu (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data TEXT NOT NULL, typ TEXT NOT NULL, kategoria TEXT NOT NULL,
-            kwota TEXT NOT NULL, szczegoly TEXT NOT NULL DEFAULT '');
+            id BIGSERIAL PRIMARY KEY,
+            data DATE NOT NULL, typ TEXT NOT NULL, kategoria TEXT NOT NULL,
+            kwota NUMERIC(14,2) NOT NULL,
+            szczegoly TEXT NOT NULL DEFAULT '');
         CREATE TABLE kategorie (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             typ TEXT NOT NULL, nazwa TEXT NOT NULL,
-            kolejnosc INTEGER NOT NULL DEFAULT 0,
-            aktywna INTEGER NOT NULL DEFAULT 1, UNIQUE(typ, nazwa));
+            kolejnosc INT NOT NULL DEFAULT 0,
+            aktywna BOOLEAN NOT NULL DEFAULT TRUE, UNIQUE (typ, nazwa));
+        CREATE TABLE wersja_schematu (
+            jedyny BOOLEAN PRIMARY KEY DEFAULT TRUE, wersja INT NOT NULL,
+            CONSTRAINT naprawde_jedyny CHECK (jedyny));
     """)
     for i in range(wpisow):
         polaczenie.execute(
             "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota) "
-            "VALUES (?,?,?,?)",
-            (f"2025-01-{i + 1:02d}", budzet.TYP_WYDATKI, "Zakupy", "100.00"))
-    polaczenie.execute("PRAGMA user_version = 11")
+            "VALUES (%s,%s,%s,%s)",
+            (date(2025, 1, i + 1), budzet.TYP_WYDATKI, "Zakupy",
+             Decimal("100.00")))
+    polaczenie.execute(
+        "INSERT INTO wersja_schematu (jedyny, wersja) VALUES (TRUE, 11)")
     polaczenie.commit()
     polaczenie.close()
 
@@ -82,14 +91,14 @@ def test_swieza_baza_MA_wszystkie_trzy_kolumny(p):
 def test_swieza_baza_ODRZUCA_zrodlo_spoza_trojki(p):
     """Więz `zrodlo_znane` — czwarta wartość byłaby regułą bez nośnika.
 
-    ROZJAZD NAZWANY: ten więz jest WYŁĄCZNIE w bazie świeżej. `ALTER TABLE
-    ADD COLUMN` w SQLite nie potrafi dołożyć `CHECK`, więc baza istniejąca
-    (robocza kopia poprzednika) dostaje kolumnę bez więzu — pilnuje tego
-    `test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane`.
-    PRÓG: więz wraca po obu stronach przy przejściu na PostgreSQL.
+    ROZJAZD ZAMKNIĘTY W W4 (2026-08-29). Do podmiany sterownika ten więz był
+    WYŁĄCZNIE w bazie świeżej: `ALTER TABLE ADD COLUMN` w SQLite nie potrafi
+    dołożyć `CHECK`, więc baza istniejąca dostawała kolumnę bez więzu. Próg
+    brzmiał „więz wraca po obu stronach przy przejściu na PostgreSQL" —
+    i wrócił: `ALTER TABLE ADD COLUMN` w PostgreSQL przyjmuje `CHECK`, a baza
+    produkcyjna i tak startuje pusta, więc obu ścieżek pilnuje jeden schemat.
     """
-    import sqlite3
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(psycopg.errors.CheckViolation):
         p.execute(
             "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, zrodlo)"
             " VALUES ('2026-09-01','Wydatki','Zakupy','10.00','skądinąd')")
@@ -100,7 +109,7 @@ def test_swieza_baza_PRZYJMUJE_trzy_znane_zrodla(p):
     for i, zrodlo in enumerate(("recznie", "historia-2025", "import")):
         p.execute(
             "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, zrodlo)"
-            " VALUES (?,?,?,?,?)",
+            " VALUES (%s,%s,%s,%s,%s)",
             (f"2026-09-0{i + 1}", "Wydatki", "Zakupy", "10.00", zrodlo))
     p.commit()
     assert p.execute("SELECT COUNT(DISTINCT zrodlo) FROM wpisy_budzetu"
@@ -148,9 +157,9 @@ def test_stara_baza_DOSTAJE_kolumny_bez_utraty_wierszy(tmp_path):
     kopia bazy poprzednika przy pierwszym otwarciu nowym kodem.
     """
     sciezka = tmp_path / "stara.db"
-    _stara_baza(sciezka, wpisow=17)
+    _stara_baza(wpisow=17)
 
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz()
     assert polaczenie.execute(
         "SELECT COUNT(*) FROM wpisy_budzetu").fetchone()[0] == 17
     assert "zrodlo" in _kolumny(polaczenie, "wpisy_budzetu")
@@ -166,15 +175,15 @@ def test_stara_baza_znaczy_wiersze_sprzed_migracji_jako_RECZNE(tmp_path):
     DLACZEGO MIMO TO TAK: alternatywą byłoby zgadywanie po dacie, czyli
     migracja danych — a Darek jej zakazał (2026-08-29). Skutku dziś nie ma,
     bo kolumna NIE MA KONSUMENTA (pilnuje tego
-    `test_rejestr_sqlite.py` dla rejestru; dla `zrodlo` — test niżej).
+    `test_rejestr_ddl.py` dla rejestru; dla `zrodlo` — test niżej).
 
     PRÓG: przy pierwszym konsumencie `zrodlo` baza robocza wymaga
     jednorazowego oznaczenia historii albo konsument filtruje po dacie.
     Baza PRODUKCYJNA problemu nie ma: startuje pusta.
     """
     sciezka = tmp_path / "historia.db"
-    _stara_baza(sciezka, wpisow=5)
-    polaczenie = magazyn.polacz(sciezka)
+    _stara_baza(wpisow=5)
+    polaczenie = magazyn.zmigruj_i_polacz()
     zrodla = {w[0] for w in polaczenie.execute(
         "SELECT DISTINCT zrodlo FROM wpisy_budzetu")}
     assert zrodla == {"recznie"}
@@ -188,8 +197,8 @@ def test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane(tmp_path):
     zniknie akapit o rozjeździe w `magazyn._DOPISYWANE_KOLUMNY`.
     """
     sciezka = tmp_path / "bez-wiezu.db"
-    _stara_baza(sciezka, wpisow=1)
-    polaczenie = magazyn.polacz(sciezka)
+    _stara_baza(wpisow=1)
+    polaczenie = magazyn.zmigruj_i_polacz()
     polaczenie.execute(
         "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, zrodlo)"
         " VALUES ('2026-09-01','Wydatki','Zakupy','10.00','skądinąd')")
@@ -204,35 +213,36 @@ def test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane(tmp_path):
 def test_SAM_schemat_swiezej_bazy_NIESIE_trzy_kolumny():
     """DOŁOŻONY PO MUTACJI, KTÓRA PRZESZŁA NA ZIELONO (2026-08-29).
 
-    Mutacja M4 zdjęła `niezbedna INTEGER,` z `magazyn._SCHEMAT` i **cała suita
-    918 testów została zielona**. Powód: kolumna ma DWIE drogi do bazy —
-    `_SCHEMAT` (baza świeża) i `_DOPISYWANE_KOLUMNY` (baza istniejąca) —
-    a `polacz()` wykonuje obie. Test pytający „czy kolumna jest po otwarciu
+    Mutacja M4 zdjęła `niezbedna INTEGER,` ze schematu świeżej bazy i **cała
+    suita 918 testów została zielona**. Powód: kolumna ma DWIE drogi do bazy —
+    napis DDL (baza świeża) i `_DOPISYWANE_KOLUMNY` (baza istniejąca) —
+    a migracja wykonuje obie. Test pytający „czy kolumna jest po otwarciu
     bazy" nie odróżnia, którą drogą przyszła, więc zdjęcie jednej z nich
     było dla niego niewidoczne.
 
-    Ten test pyta o `_SCHEMAT` WPROST, bez `polacz()`. Dzięki temu mutacja
-    zdejmująca kolumnę z jednego nośnika czerwieni się natychmiast, a nie
-    dopiero wtedy, gdy ktoś zdejmie oba.
+    Ten test stawia bazę z SAMEGO napisu DDL, w osobnej przestrzeni nazw
+    i z pominięciem migracji. Dzięki temu mutacja zdejmująca kolumnę z jednego
+    nośnika czerwieni się natychmiast, a nie dopiero wtedy, gdy ktoś zdejmie
+    oba.
 
     CO TEN TEST WIDZI: trzy pary z `TRZY`, sprawdzane w pętli po tabelach,
     z jawną kontrolą, że pętla czegoś dotknęła.
     """
-    import sqlite3
-    polaczenie = sqlite3.connect(":memory:")
-    polaczenie.executescript(magazyn._SCHEMAT)
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("CREATE SCHEMA sam_napis")
+    polaczenie.execute("SET search_path TO sam_napis")
+    polaczenie.execute(baza.schemat_postgresql())
     sprawdzone = 0
     brakujace = []
     for tabela, kolumna in TRZY:
-        istniejace = {w[1] for w in
-                      polaczenie.execute(f"PRAGMA table_info({tabela})")}
-        assert istniejace, f"tabela {tabela} nie powstała z `_SCHEMAT`"
+        istniejace = pomocnicze.kolumny_tabeli(polaczenie, tabela)
+        assert istniejace, f"tabela {tabela} nie powstała z napisu DDL"
         sprawdzone += 1
         if kolumna not in istniejace:
             brakujace.append(f"{tabela}.{kolumna}")
     assert sprawdzone == 3
     assert brakujace == [], (
-        f"`magazyn._SCHEMAT` nie niesie kolumn: {brakujace}. "
+        f"napis DDL nie niesie kolumn: {brakujace}. "
         "Świeża baza dostałaby je tylko przez `_DOPISYWANE_KOLUMNY`, "
         "czyli ścieżką przewidzianą dla baz ISTNIEJĄCYCH."
     )

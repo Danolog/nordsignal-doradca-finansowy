@@ -220,3 +220,147 @@
   text-decoration: none;
 }
 .wezwanie svg { color: var(--atrament-cichy); }
+
+/* ---- kontrolka stanu konta (W8) ---- */
+
+/* WEZWANIE PRZENIESIONE Z RAMKI `NieWiem.dc.html`: przycisk WYPELNIONY
+   atramentem (jedyny taki na tym ekranie) i zdanie obok niego. Wypelnienie
+   jest tu jedynym nosnikiem pierwszenstwa — w stanie startowym nie ma zadnej
+   liczby, wiec nie ma czym pokazac, ktora rzecz jest wazna, poza ta jedna
+   kontrolka.
+
+   CZEGO RAMKA NIE RYSUJE: samego pola wpisywania. Zmierzone — `<input` i
+   `<form` nie wystepuja w zadnej z 49 ramek. Uklad rozwinietej kontrolki
+   ponizej jest ODSTEPSTWEM zgloszonym w raporcie W8; miary przeniesione
+   z ramki `Ksiegowanie.dc.html`, zeby dwa pola tej samej aplikacji nie
+   mialy dwoch roznych wysokosci. */
+
+.blokKotwicy { display: flex; flex-direction: column; gap: 12px; }
+
+.wierszKotwicy { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+/* Wezwanie w stanie startowym — wypelnione, wprost z ramki. */
+.wezwanieKotwicyMocne {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 24px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--papier);
+  background: var(--atrament);
+  border: 1px solid var(--atrament);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* Wezwanie, gdy odczyt juz jest — cichsze. Odswiezenie stanu konta nie jest
+   pilniejsze niz liczba, ktora stoi wyzej przy 56 px; wypelniony przycisk
+   konkurowalby z nia o pierwszenstwo, ktorego nie ma. */
+.wezwanieKotwicy {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.wezwanieKotwicyMocne[disabled] { cursor: progress; opacity: 0.7; }
+
+.obietnica { font-size: 15px; color: var(--atrament-cichy); }
+
+/* Potwierdzenie zapisu. Stopien 13 px — mowi o rzeczy, ktora WLASNIE sie
+   udala, wiec nie ma konkurowac z liczba werdyktu. */
+.potwierdzenieKotwicy { font-size: 13px; color: var(--atrament-cichy); }
+
+.wierszPolKotwicy { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+
+.kolumnaKwotyKotwicy { display: flex; flex-direction: column; gap: 8px; width: 320px; }
+.kolumnaDatyKotwicy { display: flex; flex-direction: column; gap: 8px; }
+.kolumnaZapisuKotwicy { display: flex; align-items: center; gap: 16px; padding-top: 27px; }
+
+/* Miary pola przeniesione z `Ksiegowanie.dc.html`: 52 px wysokosci ramki,
+   26 px stopnia wpisu. Kwota ma ten sam ciezar co tam, bo jest ta sama
+   klasa rzeczy — liczba, ktora czlowiek wpisuje z glowy. */
+.ramkaKwotyKotwicy {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px 0 14px;
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.wpisKwotyKotwicy {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  text-align: right;
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  color: var(--atrament);
+  background: transparent;
+  border: 0;
+  outline-offset: 2px;
+}
+
+.jednostkaKotwicy { font-size: 15px; color: var(--atrament-cichy); }
+
+.wpisDatyKotwicy {
+  min-height: 52px;
+  padding: 0 14px;
+  font-family: var(--kroj-kwot);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--atrament);
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+/* Wyjscie z kontrolki stoi obok zapisu, wiec NIE MOZE wygladac na rownej
+   wadze: podkreslenie w spoczynku czytalo sie jako odsylacz, czyli jako
+   nawigacja, a to jest anulowanie. Podkreslenie wraca przy najechaniu —
+   zmierzone przez ogladanie zrzutu, nie przez test. */
+.rezygnuje {
+  min-height: 44px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.rezygnuje:hover { text-decoration: underline; }
+
+/* Uwaga niesie WIELKOSC, nie samo slowo (CLAUDE.md §3.5): brzmienia w
+   `lib/napisy.ts` mowia, czego brakuje i co wpisac zamiast tego. */
+.podpisUwagi { font-size: 13px; color: var(--saldo-ujemne); }
+
+/* Dopisek kotwicy jest KONTROLKA, a wyglada jak napis — i to jest cala
+   rzecz. `Main.dc.html` rysuje w tym miejscu zwykly tekst; przycisk
+   o wlasnym ksztalcie zepchnalby uklad o 80 px w dol (zmierzone: 14,38%
+   przy progu 2%). Wiec kontrolka bierze ksztalt napisu: ten sam stopien,
+   ta sama barwa, zero obrysu i zero wysciolki. Ze da sie w nia kliknac,
+   mowia wskaznik i podkreslenie przy najechaniu — nie piksele w spoczynku. */
+.dopiseKotwicy {
+  font: inherit;
+  font-size: 13px;
+  color: var(--atrament-cichy);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.dopiseKotwicy:hover { text-decoration: underline; }

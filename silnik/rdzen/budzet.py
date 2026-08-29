@@ -128,8 +128,16 @@ def znak(typ: str) -> int:
     return 1 if typ == "Przychody" else -1
 
 
-def _miesiac(wpisy: pd.DataFrame, rok: int, miesiac: int) -> pd.DataFrame:
-    """Wiersze z danego miesiaca. Daty sa tekstem ISO, wiec filtr po prefiksie."""
+def wpisy_miesiaca(wpisy: pd.DataFrame, rok: int, miesiac: int) -> pd.DataFrame:
+    """Wiersze z danego miesiaca. Daty sa tekstem ISO, wiec filtr po prefiksie.
+
+    PUBLICZNA OD W9b i to nie jest kosmetyka. Ta sama regula („ktore wpisy
+    naleza do tego miesiaca") zyla juz w DRUGIEJ kopii —
+    `ekran_ksiegowanie._wpisy_miesiaca` — a ekran Budzetu potrzebuje jej po
+    raz trzeci, do tabeli „Historia". Trzecia kopia bylaby trzecim nosnikiem
+    reguly, ktora decyduje o tym, ktore wpisy uzytkownik w ogole zobaczy.
+    Nazwa bez podkreslnika, bo wolaja ja teraz takze moduly ekranow.
+    """
     if wpisy.empty:
         return wpisy
     return wpisy[wpisy["data"].astype(str).str.startswith(f"{rok:04d}-{miesiac:02d}")]
@@ -174,7 +182,7 @@ def do_alokacji(wpisy: pd.DataFrame, rok: int, miesiac: int) -> Decimal:
     Glowna liczba budzetu zerowego. Pominiecie skladnika oszczednosci daje
     wynik zawyzony i zacheca do wydania pieniedzy, ktore maja juz przeznaczenie.
     """
-    biezace = _miesiac(wpisy, rok, miesiac)
+    biezace = wpisy_miesiaca(wpisy, rok, miesiac)
     if biezace.empty:
         return Decimal("0.00")
     suma = sum(
@@ -382,7 +390,7 @@ def pozostalo_do_zaplacenia(wpisy: pd.DataFrame, plan: pd.DataFrame,
         if not wybrany.empty:
             for _, w in wybrany[wybrany["typ"] == TYP_WYDATKI].iterrows():
                 zaplanowane += Decimal(str(w["kwota_planowana"]))
-        biezace = bez_podatkow(_miesiac(wpisy, rok, miesiac))
+        biezace = bez_podatkow(wpisy_miesiaca(wpisy, rok, miesiac))
         if not biezace.empty:
             for _, w in biezace[biezace["typ"] == TYP_WYDATKI].iterrows():
                 zaplacone += Decimal(str(w["kwota"]))
@@ -473,7 +481,7 @@ def wydatki_wg_kategorii(wpisy: pd.DataFrame, rok: int,
     wycinka i nikt nie zauważy, że suma udziałów rozjechała się z sumą wpisów.
     Dlatego ta funkcja nie odrzuca ani nie zaokrągla niczego po drodze.
     """
-    biezace = _miesiac(wpisy, rok, miesiac)
+    biezace = wpisy_miesiaca(wpisy, rok, miesiac)
     if biezace.empty:
         return []
     wydatki = biezace[biezace["typ"] == TYP_WYDATKI]
@@ -540,7 +548,7 @@ def sumy_miesieczne(wpisy: pd.DataFrame,
     """
     wynik = {}
     for rok, miesiac in miesiace:
-        biezace = _miesiac(wpisy, rok, miesiac)
+        biezace = wpisy_miesiaca(wpisy, rok, miesiac)
         pozycja = {typ: Decimal("0.00") for typ in TYPY}
         if not biezace.empty:
             for typ in TYPY:
@@ -583,7 +591,7 @@ def wykonanie_planu(wpisy: pd.DataFrame, plan: pd.DataFrame,
     Na liscie sa pary (typ, kategoria) z OBU zrodel: kategoria zaplanowana
     i nietknieta to informacja, nie brak danych.
     """
-    biezace = _miesiac(wpisy, rok, miesiac)
+    biezace = wpisy_miesiaca(wpisy, rok, miesiac)
 
     wykonane: dict[tuple[str, str], Decimal] = {}
     if not biezace.empty:
@@ -641,7 +649,7 @@ def wykonanie_planu_okres(wpisy: pd.DataFrame, plan: pd.DataFrame,
     planowane: dict[tuple[str, str], Decimal] = {}
     wykonane: dict[tuple[str, str], Decimal] = {}
     for rok, miesiac in miesiace:
-        biezace = _miesiac(wpisy, rok, miesiac)
+        biezace = wpisy_miesiaca(wpisy, rok, miesiac)
         if not biezace.empty:
             for _, w in biezace.iterrows():
                 klucz = (w["typ"], w["kategoria"])

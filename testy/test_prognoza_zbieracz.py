@@ -21,7 +21,7 @@ from silnik.rdzen import (budzet, magazyn, podatki, prognoza_plynnosci as progno
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "test.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     yield polaczenie
     polaczenie.close()
 
@@ -265,7 +265,7 @@ def test_stan_roku_ZMIENIA_prognoze_a_nie_tylko_do_niej_wchodzi():
     from pathlib import Path as _Path
 
     katalog = _Path(tempfile.mkdtemp())
-    polaczenie = magazyn.polacz(katalog / "stan.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     try:
         for dzien, netto, numer in ((date(2026, 3, 10), "12000.00", "F/1"),
                                     (date(2026, 4, 10), "14000.00", "F/2"),

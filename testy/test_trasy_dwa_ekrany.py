@@ -22,6 +22,7 @@ from decimal import Decimal
 import dataclasses
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from api import kwoty
@@ -81,8 +82,7 @@ def klient(tmp_path, monkeypatch):
     liczy prognozy w ogole — i to jest zachowanie zamierzone
     (`testy/test_forma_bez_domyslnej.py`), a nie stan do testowania szczescia.
     """
-    monkeypatch.setenv(magazyn.ZMIENNA_BAZY, str(tmp_path / "trasy.db"))
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 9, 1))
     magazyn.zapisz_stan_konta(polaczenie, data=date(2026, 10, 5),
@@ -146,7 +146,7 @@ def test_kategoria_kosztu_firmowego_NIE_STOI_na_tym_ekranie(klient):
     nazwy = [k["nazwa"] for k in dane["kategorie"]]
     assert budzet.KATEGORIA_KOSZTY_JDG not in nazwy
     # kontrola dwustronna: kategoria JEST w bazie, wiec pomiar cos widzial
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     w_bazie = [str(w["nazwa"]) for _, w in
                magazyn.wczytaj_kategorie(polaczenie, "Wydatki").iterrows()]
     polaczenie.close()
@@ -296,7 +296,7 @@ def test_ksiega_bije_saldo_RAZ_NA_DZIEN(klient):
     # regula nie ma na czym zadzialac, a straznik meldowalby sukces, nie
     # widzac ani jednego przypadku. Stoi w tescie, nie w fiksturze: fikstura
     # odwzorowuje ramke (trzy pozycje planu), a to jest przypadek szczegolny.
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.ustal_regule_planu(
         polaczenie, rok=2026, miesiac=10, typ="Wydatki", kategoria="Gaz",
         kwota_planowana=Decimal("150.00"), dzien=10)
@@ -424,6 +424,52 @@ def test_obchod_odpowiedzi_NAPRAWDE_lapie_liczbe_zmiennoprzecinkowa(klient):
     assert lisci >= PROG_LISCI
 
 
+#: Routery, ktore aplikacja MA NIESC — po nazwie modulu, ktory je definiuje.
+#: To jest KONTROLA LICZNOSCI populacji, nie zrodlo listy do sprawdzenia:
+#: sprawdzane sa routery ODKRYTE Z APLIKACJI, a ten zbior tylko krzyczy, gdy
+#: populacja sie zmienila. Piaty router dolozony za miesiac jest sprawdzony
+#: PRZEZ PETLE nizej niezaleznie od tej listy — a ta lista kaze go tu dopisac
+#: razem z powodem, zeby zniknieciE routera tez bylo widac.
+ROUTERY_APLIKACJI = {"api.index", "api.trasy_ksiegowanie", "api.trasy_plynnosc",
+                     "api.trasy_budzet"}
+
+
+def _routery_z_aplikacji() -> dict:
+    """Routery ODKRYTE Z `aplikacja`, nie wypisane z pamieci.
+
+    DLACZEGO NIE PRZEZ `aplikacja.routes` JAKO TRASY. W FastAPI 0.141
+    `include_router` NIE splaszcza tras do aplikacji — wklada opakowanie
+    (`_IncludedRouter`) niosace oryginalny router w polu `original_router`.
+    Zmierzone 2026-08-30 na tej aplikacji: `aplikacja.routes` ma 8 pozycji,
+    z czego ZERO jest `APIRoute`, a cztery sa tym opakowaniem.
+
+    Nazwa routera bierze sie z MODULU jego pierwszej trasy, a nie z napisu
+    podanego przez wolajacego — inaczej byla by to nazwa nadana przez test,
+    czyli kolejna rzecz, ktora test sam o sobie twierdzi.
+
+    CO PRZEZ TO MOZE PRZESTAC DZIALAC (§3.11): `original_router` jest polem
+    wewnetrznym FastAPI. Gdyby zniknelo, odkrycie zwroci PUSTY slownik —
+    a wtedy petla sprawdzajaca nie dotrze do niczego i zameldowala by sukces.
+    Dlatego kontrola licznosci ponizej jest asercja, nie wydrukiem.
+    """
+    znalezione: dict = {}
+
+    def obejdz(pozycje) -> None:
+        for pozycja in pozycje:
+            router = getattr(pozycja, "original_router", None)
+            if router is None:
+                continue
+            trasy_routera = [t for t in router.routes
+                             if isinstance(t, APIRoute)]
+            moduly = sorted({t.endpoint.__module__ for t in trasy_routera})
+            nazwa = ", ".join(moduly) if moduly else f"router bez tras ({id(router)})"
+            znalezione[nazwa] = router
+            obejdz(router.routes)
+
+    obejdz(aplikacja.routes)
+    return znalezione
+
+
 def test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb(  # noqa: N802
         ):
     """RYZYKO NR 1 CALEJ WARSTWY, sprawdzone tam, gdzie naprawde stoi.
@@ -437,16 +483,35 @@ def test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb(  # noqa: N802
     powiedziec wprost: przy zepsutym `kwota()` odpowiedz konczy sie kodem
     500, wiec tamten test czerwieni sie na kodzie, nie na liczbie. Dopiero
     ten straznik pyta o mechanizm, ktory ma tam stac.
-    """
-    from api import trasy_ksiegowanie, trasy_plynnosc
 
-    routery = {"trasy_ksiegowanie": trasy_ksiegowanie.trasy,
-               "trasy_plynnosc": trasy_plynnosc.trasy}
-    assert len(routery) == 2
+    DLUG POKRYCIOWY SPLACONY W W11 (przeglad Leo, 2026-08-30). Do W11 ten
+    test budowal slownik DWOCH routerow recznie i sprawdzal `len(...) == 2`
+    na wlasnym slowniku — kontrola licznosci, ktora nie mogla paść. Aplikacja
+    miala wtedy CZTERY routery, a naglowek testu mowil „KAZDY". Dowod
+    mutacyjny Leo: zdjecie klasy odpowiedzi z `api/trasy_budzet.py` dalo
+    1113 zielonych. Zywej dziury nie bylo, bo `api/index.py` ustawia klase
+    na CALEJ aplikacji, a tego pilnuje `test_kontrakt_dwa_nosniki.py` —
+    ale straznik nie pilnowal tego, co obiecywal.
+
+    NAJPIERW PETLA, POTEM POPULACJA — kolejnosc jest celowa. Router dolozony
+    jutro jest sprawdzony JUZ TYM PRZEBIEGIEM; kontrola populacji na koncu
+    kaze go dopisac do `ROUTERY_APLIKACJI`, ale nie zabiera mu sprawdzenia.
+    """
+    routery = _routery_z_aplikacji()
+
     for nazwa, router in routery.items():
         assert router.default_response_class is kwoty.OdpowiedzJSON, (
             f"{nazwa}: klasa odpowiedzi to {router.default_response_class}, "
             f"a nie OdpowiedzJSON — liczby zmiennoprzecinkowe wyjda z 200")
+
+    # KONTROLA LICZNOSCI POPULACJI. Petla wyzej po pustym slowniku melduje
+    # sukces — to jest dokladnie ta klasa awarii, ktora ten test naprawia.
+    assert set(routery) == ROUTERY_APLIKACJI, (
+        f"populacja routerow sie zmienila: odkryto {sorted(routery)}, "
+        f"spodziewane {sorted(ROUTERY_APLIKACJI)}. Dopisz nowy router do "
+        f"`ROUTERY_APLIKACJI` RAZEM Z POWODEM — albo sprawdz, czy odkrywanie "
+        f"przez `original_router` jeszcze dziala.")
+
     # Kontrola dwustronna: klasa naprawde odmawia, a nie tylko sie nazywa.
     with pytest.raises(TypeError) as blad:
         kwoty.OdpowiedzJSON(content={"ksiega": [{"saldoPoDniu": 8295.98}]})
@@ -468,7 +533,7 @@ def test_FORMA_OPODATKOWANIA_dojezdza_az_do_odpowiedzi_HTTP(klient):
     """
     skala = klient.get(f"/api/plynnosc?dzis={DZIS}").json()["saldoMinimalne"]
 
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_RYCZALT,
                          stawka_ryczaltu=Decimal("0.085"))
     polaczenie.close()

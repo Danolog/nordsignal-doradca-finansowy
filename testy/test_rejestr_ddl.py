@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Strażnicy tabeli `rejestr_stawek` w bazie SQLite (schemat 12).
+"""Strażnicy tabeli `rejestr_stawek` — napis DDL i jego skutek w bazie.
+
+NAZWA PLIKU ZMIENIONA W W4 (2026-08-29): `test_rejestr_sqlite.py` →
+`test_rejestr_ddl.py`. Stara nazwa mówiła o dialekcie, którego już nie ma —
+a nazwa pliku jest pierwszą rzeczą, którą ktoś czyta, szukając strażnika.
 
 DLACZEGO TA TABELA W OGÓLE MA STRAŻNIKÓW. Do 2026-08-29 rejestr istniał jako
-kształt bez tabeli: `wiedza/rejestr.py` niósł napis SQL w dialekcie
-PostgreSQL, `wiedza/stawki_poczatkowe.py` niósł 19 wartości, a baza, na której
-aplikacja stoi, nie miała ani jednego wiersza. Zatwierdzenie stawki przez
-człowieka nie zmieniało wtedy żadnej liczby, bo nie było gdzie jej zapisać.
+kształt bez tabeli: `wiedza/rejestr.py` niósł napis SQL, `wiedza/
+stawki_poczatkowe.py` niósł 19 wartości, a baza, na której aplikacja stoi,
+nie miała ani jednego wiersza. Zatwierdzenie stawki przez człowieka nie
+zmieniało wtedy żadnej liczby, bo nie było gdzie jej zapisać.
 
 CO KAŻDY STRAŻNIK TU WIDZI — liczba stoi w asercji, nie w nazwie. Pusta baza
 jest dla strażników groźna: test, który nic nie znalazł, bo nic nie ma,
@@ -19,7 +23,10 @@ from pathlib import Path
 
 import pytest
 
+import psycopg
+
 from silnik.rdzen import magazyn
+from testy import pomocnicze
 from wiedza import rejestr, stawki_poczatkowe
 
 KORZEN = Path(__file__).resolve().parent.parent
@@ -27,7 +34,7 @@ KORZEN = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "rejestr.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 def _kolumny_z_napisu(sql: str) -> set[str]:
@@ -51,31 +58,29 @@ def _kolumny_z_napisu(sql: str) -> set[str]:
 
 # --- jeden nośnik nazw kolumn, dwa dialekty -------------------------------
 
-def test_oba_dialekty_niosa_DOKLADNIE_kolumny_z_jednego_nosnika():
-    """Świadomy drugi nośnik (§3.2) — dopuszczalny WYŁĄCZNIE z tym strażnikiem.
+def test_napis_DDL_niesie_DOKLADNIE_kolumny_z_jednego_nosnika():
+    """Nazwy kolumn mają JEDEN nośnik (`rejestr.KOLUMNY`); napis DDL go woła.
 
-    `SCHEMAT` jest w dialekcie PostgreSQL, `SCHEMAT_SQLITE` w dialekcie bazy,
-    która dziś naprawdę działa. Rozjazd między nimi nie objawiłby się błędem —
-    objawiłby się kolumną, która jest po jednej stronie i której nie ma po
-    drugiej, czyli danymi ginącymi przy migracji na PostgreSQL.
+    SPROSTOWANIE W4 (2026-08-29): dialekty są już nie dwa, tylko JEDEN.
+    `SCHEMAT_SQLITE` był świadomym drugim nośnikiem z jawnym progiem („znika
+    w chwili przejścia bazy na PostgreSQL"); próg zadziałał i napis został
+    skasowany. Ten test pilnuje więc tego, co zostało: że jedyny napis DDL
+    niesie DOKŁADNIE kolumny z `rejestr.KOLUMNY` — ani jednej mniej (kolumna
+    zapowiedziana i niezałożona), ani jednej więcej (kolumna w bazie, o której
+    nikt nie wie).
 
-    KONTROLA LICZNOŚCI: obie strony muszą coś zobaczyć. Parser, który zwrócił
-    pusty zbiór, porównałby pustkę z pustką i zameldował zgodność.
+    KONTROLA LICZNOŚCI: parser musi coś zobaczyć. Parser, który zwrócił pusty
+    zbiór, porównałby pustkę z pustką i zameldował zgodność.
     """
     pg = _kolumny_z_napisu(rejestr.SCHEMAT)
-    lite = _kolumny_z_napisu(rejestr.SCHEMAT_SQLITE)
-    assert len(pg) >= 10, f"parser wyciął z dialektu PostgreSQL {len(pg)} kolumn"
-    assert len(lite) >= 10, f"parser wyciął z dialektu SQLite {len(lite)} kolumn"
+    assert len(pg) >= 10, f"parser wyciął z napisu DDL {len(pg)} kolumn"
     assert pg == set(rejestr.KOLUMNY)
-    assert lite == set(rejestr.KOLUMNY)
 
 
 # --- tabela powstaje i ma dane --------------------------------------------
 
 def test_swieza_baza_MA_tabele_rejestru(p):
-    tabele = {w[0] for w in p.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'")}
-    assert "rejestr_stawek" in tabele
+    assert "rejestr_stawek" in pomocnicze.tabele_w_bazie(p)
 
 
 def test_rejestr_dostaje_WSZYSTKIE_pozycje_zasilenia(p):
@@ -136,10 +141,10 @@ def test_jawna_watpliwosc_przezywa_droge_do_bazy(p):
 
 def test_baza_ODRZUCA_zatwierdzona_bez_podpisu(p):
     """`zatwierdzona_ma_podpis` — jedyny mechanizm, który nie wpuści do rachunku
-    stawki bez podpisu człowieka. SQLite egzekwuje `CHECK` bez żadnej `PRAGMA`,
-    inaczej niż klucze obce."""
-    import sqlite3
-    with pytest.raises(sqlite3.IntegrityError):
+    stawki bez podpisu człowieka. PostgreSQL egzekwuje `CHECK` zawsze — nie ma
+    tu odpowiednika `PRAGMA foreign_keys`, którą u poprzednika trzeba było
+    włączać per połączenie."""
+    with pytest.raises(psycopg.errors.CheckViolation):
         p.execute(
             "INSERT INTO rejestr_stawek (klucz, wartosc, jednostka,"
             " obowiazuje_od, zrodlo_url, data_odczytu, status)"
@@ -148,8 +153,7 @@ def test_baza_ODRZUCA_zatwierdzona_bez_podpisu(p):
 
 
 def test_baza_ODRZUCA_nieznany_stan(p):
-    import sqlite3
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(psycopg.errors.CheckViolation):
         p.execute(
             "INSERT INTO rejestr_stawek (klucz, wartosc, jednostka,"
             " obowiazuje_od, zrodlo_url, data_odczytu, status)"
@@ -173,8 +177,8 @@ def test_baza_PRZYJMUJE_zatwierdzona_z_podpisem(p):
 def test_ponowne_otwarcie_NIE_DUBLUJE_rejestru(tmp_path):
     """`polacz` wykonuje zasiew przy KAŻDYM otwarciu bazy."""
     sciezka = tmp_path / "dwa-razy.db"
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
+    magazyn.zmigruj_i_polacz().close()
+    drugie = magazyn.zmigruj_i_polacz()
     ile = drugie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     assert ile == len(stawki_poczatkowe.WSZYSTKIE)
 
@@ -188,7 +192,7 @@ def test_zasiew_NIE_WSKRZESZA_propozycji_po_zatwierdzeniu(tmp_path):
     zatwierdzałby ją w kółko.
     """
     sciezka = tmp_path / "podpisana.db"
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz()
     przed = polaczenie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     polaczenie.execute(
         "UPDATE rejestr_stawek SET status='zatwierdzona', zatwierdzil='Darek',"
@@ -196,7 +200,7 @@ def test_zasiew_NIE_WSKRZESZA_propozycji_po_zatwierdzeniu(tmp_path):
     polaczenie.commit()
     polaczenie.close()
 
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz()
     po = drugie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     assert przed > 0
     assert po == przed

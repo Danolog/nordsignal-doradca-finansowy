@@ -1,6 +1,26 @@
 # Doradca Finansowy — dokument wymagań produktu (PRD)
 
-**Wersja:** v1.7 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
+**Wersja:** v1.8 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
+
+**Changelog v1.7 → v1.8 — uzgodnienie dwóch nośników schematu bazy (zadanie W1).**
+`magazyn._SCHEMAT` (SQLite, nośnik żywy) i `silnik/baza/schemat.sql` (PostgreSQL, cel migracji)
+rozjechały się w **24 miejscach** — pomiar przyrządem `testy/porownanie_schematu.py` na commicie
+`0b282cc`; plan sesji mówił o dziewięciu. Po W1 zostaje ich **9** i każde jest wpisane do rejestru
+różnic świadomych w `testy/test_schemat_dwa_dialekty.py`. Trzy zmiany, które dotykają tego
+dokumentu:
+**(1)** Więz `data_obowiazku_vat NOT NULL` **zdjęty** ze schematu PostgreSQL. `zapisz_fakture`
+tej kolumny nie wypełnia (i nie ma jej wypełniać — nośnik decyzji:
+`test_data_obowiazku_vat_startuje_pusta_a_nie_zgadnieta`), więc więz nie wymuszałby daty, tylko
+odrzucał **każdy** zapis faktury. Rozdział 13 poz. 18 bez zmian — konsumenta kolumny nadal nie ma.
+**(2)** Dziedzina `forma_opodatkowania.forma` **zwężona do `('SKALA','RYCZALT')`** po obu stronach.
+Wcześniej PostgreSQL dopuszczał `LINIOWY`, którego `forma_na_rok` odrzuca — baza wpuszczała stan,
+na którym rachunek wybucha. Podatek liniowy zostaje wyłącznie jako opcja **porównania form**.
+**(3)** Rozdział 6.2 pozostaje prawdziwy co do 14 tabel, ale **sam `schemat.sql` niesie 13**:
+`rejestr_stawek` mieszka w `wiedza/rejestr.py`, a pełny napis DDL składa
+`silnik.baza.schemat_postgresql()`. Postawienie bazy z samego pliku daje bazę, która wygląda na
+kompletną i nie ma ani jednej stawki.
+Strażnik: `testy/test_schemat_dwa_dialekty.py` (17 testów, 14 tabel × 95 kolumn × 4 wymiary).
+Mutacje: `testy/MUTACJE.md`, przebieg „2026-08-29 (W1)".
 
 **Changelog v1.6 → v1.7 — trzy zdania stanu faktycznego z v1.6 przestały być prawdziwe,
 bo je naprawiono. Plus jedna nowa luka, nazwana wprost.**
@@ -16,16 +36,20 @@ sqlite3 <pusta-baza> "PRAGMA user_version;"
 12
 ```
 
-Napis SQL mieszka w `wiedza/rejestr.py` jako `SCHEMAT_SQLITE` — `magazyn.polacz` go **woła**,
-nie powtarza. Zasilenie: 19 pozycji z `wiedza/stawki_poczatkowe.py`, **wszystkie w statusie
+Napis SQL mieszka w `wiedza/rejestr.py` jako `SCHEMAT_SQLITE` — `magazyn.zmigruj` go **woła**,
+nie powtarza (do W2, 2026-08-29, wołało go `magazyn.polacz`; od rozdzielenia „otwórz" od
+„zmigruj" `polacz` nie wykonuje żadnego polecenia piszącego). Zasilenie: 19 pozycji z `wiedza/stawki_poczatkowe.py`, **wszystkie w statusie
 `proponowana`, żadna zatwierdzona**. Droga maszynowa do statusu `zatwierdzona` nie istnieje
 (§3.4 konstytucji projektu); pilnuje tego `test_rejestr_sqlite.py::test_ZADNA_stawka_nie_jest_zatwierdzona`.
 
 **(2) Trzy kolumny z rozdziału 6.3 ISTNIEJĄ.** v1.6 twierdziła, że „nie istnieją w schemacie
 (`0` trafień)". Po zmianie `wpisy_budzetu.zrodlo`, `kategorie.niezbedna`
 i `przychody_jdg.data_obowiazku_vat` są w `magazyn._SCHEMAT` **i** w `_DOPISYWANE_KOLUMNY`,
-więc dostaje je zarówno baza świeża, jak i istniejąca. Trzy rozjazdy wobec
-`silnik/baza/schemat.sql` (PostgreSQL) są **nazwane z progiem** przy `_DOPISYWANE_KOLUMNY`.
+więc dostaje je zarówno baza świeża, jak i istniejąca. Rozjazdy wobec
+`silnik/baza/schemat.sql` (PostgreSQL) są **nazwane z progiem** przy `_DOPISYWANE_KOLUMNY`
+i w `_SCHEMAT`. **Sprostowanie v1.8:** trzeci z nich — `data_obowiazku_vat NOT NULL` po stronie
+PostgreSQL — nie był rozjazdem do przeczekania, tylko więzem, który odrzuciłby każdy zapis
+faktury; zdjęty w W1.
 
 **(3) Konsumenta rejestru NADAL NIE MA — i to jest teraz jedyna otwarta część tej sprawy.**
 Silnik liczy z `silnik/rdzen/stawki.py`. Zatwierdzenie stawki przez Darka **nadal nie zmienia
@@ -1481,7 +1505,8 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
 
 17. **[ZAMKNIĘTA 2026-08-29, schemat 12]** ~~Trzy kolumny opisane w rozdziale 6.3 jako „nowe" nie istnieją w schemacie.~~
     **Istnieją** — w `magazyn._SCHEMAT` (baza świeża) i w `_DOPISYWANE_KOLUMNY` (baza istniejąca).
-    Trzy rozjazdy wobec `silnik/baza/schemat.sql` są nazwane z progiem przy `_DOPISYWANE_KOLUMNY`.
+    Rozjazdy wobec `silnik/baza/schemat.sql` są nazwane z progiem przy `_DOPISYWANE_KOLUMNY`
+    i w `_SCHEMAT`; ich pełną listę trzyma rejestr w `testy/test_schemat_dwa_dialekty.py` (W1).
     Strażnicy: `testy/test_trzy_kolumny.py` (10 testów). Stare brzmienie zostaje jako ślad:
     `wpisy_budzetu.zrodlo`, `kategorie.niezbedna`, `przychody_jdg.data_obowiazku_vat` — każda
     daje `0` trafień w 14 poleceniach `CREATE TABLE` (pomiar 2026-08-29). Rozdział 6.3 opisuje
