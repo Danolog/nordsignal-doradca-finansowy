@@ -207,7 +207,12 @@ CREATE TABLE IF NOT EXISTS kategorie (
     -- poduszki jest PRZEDZIALEM 29 651–63 649 zl, nie liczba. NULL znaczy
     -- "Darek jeszcze nie rozstrzygnal" — stan rozny od "nie jest niezbedna".
     niezbedna INTEGER,
-    UNIQUE(typ, nazwa)
+    UNIQUE(typ, nazwa),
+    -- W1 (2026-08-29): dziedzina typu kategorii zwezona do `budzet.TYPY`.
+    -- Regule egzekwuje dzis `magazyn._wymagaj_typu`, ale slownik kategorii
+    -- zasiewa sie i migruje takze poza ta funkcja. Piaty nazwany rozjazd
+    -- (baza swieza dostaje wiez, robocza nie) — PROG jak przy `zrodlo_znane`.
+    CONSTRAINT typ_znany CHECK (typ IN ('Przychody','Wydatki','Oszczędności'))
 );
 CREATE TABLE IF NOT EXISTS cele_oszczednosciowe (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,7 +239,21 @@ CREATE TABLE IF NOT EXISTS godziny (
 CREATE TABLE IF NOT EXISTS forma_opodatkowania (
     rok INTEGER PRIMARY KEY,
     forma TEXT NOT NULL,
-    stawka_ryczaltu TEXT
+    stawka_ryczaltu TEXT,
+    -- W1 (2026-08-29): dziedzina formy zwezona do tego, co silnik UNIESIE.
+    -- `forma_na_rok` odrzuca kazda wartosc spoza `FORMY_ZAPISYWALNE`, wiec
+    -- baza dopuszczajaca wiecej dopuszczala stan, na ktorym rachunek wybucha.
+    -- Lista wartosci jest SWIADOMYM drugim nosnikiem `FORMY_ZAPISYWALNE` —
+    -- pilnuje jej `testy/test_schemat_dwa_dialekty.py`.
+    --
+    -- CZWARTY NAZWANY ROZJAZD, dokladnie ten sam co przy `zrodlo_znane`:
+    -- `CREATE TABLE IF NOT EXISTS` nie rusza tabeli, ktora juz jest, a
+    -- `ALTER TABLE` w SQLite nie potrafi dolozyc `CHECK`. Wiez dostaje wiec
+    -- baza SWIEZA; baza robocza sprzed tej zmiany zostaje bez niego.
+    -- Roznica dotyczy WYLACZNIE odrzucania wartosci spoza dwojki i nie
+    -- zmienia zadnej liczby. PROG: wiez jest po obu stronach od przejscia
+    -- na PostgreSQL (`silnik/baza/schemat.sql` juz go niesie).
+    CONSTRAINT forma_znana CHECK (forma IN ('SKALA','RYCZALT'))
 );
 CREATE TABLE IF NOT EXISTS stan_konta (
     data TEXT PRIMARY KEY,
@@ -326,9 +345,17 @@ _DOPISYWANE_KOLUMNY = (
     # Bez `NOT NULL`: `ALTER TABLE ADD COLUMN ... NOT NULL` bez wartosci
     # domyslnej SQLite odrzuca, a data domyslna bylaby ZMYSLENIEM daty
     # obowiazku podatkowego. NULL = "nie wiem" i tak zostaje faktura z bazy
-    # roboczej. `silnik/baza/schemat.sql` (PostgreSQL) niesie tu `NOT NULL`
-    # — to trzeci nazwany rozjazd, znika przy migracji na PostgreSQL,
-    # bo tam kolumne zaklada sie razem z tabela.
+    # roboczej.
+    #
+    # SPROSTOWANIE W1 (2026-08-29): do tego dnia stalo tu, ze
+    # `silnik/baza/schemat.sql` niesie `NOT NULL` i ze jest to "trzeci
+    # nazwany rozjazd, ktory znika przy migracji". To bylo nieprawdziwe
+    # w skutkach: `zapisz_fakture` tej kolumny NIE WYPELNIA, wiec wiez po
+    # stronie PostgreSQL nie wymuszal by daty, tylko odrzucal KAZDY zapis
+    # faktury. Wiez zdjety z `schemat.sql`; oba nosniki maja tu teraz
+    # kolumne dopuszczajaca NULL i pilnuje tego
+    # `testy/test_schemat_dwa_dialekty.py::test_OBOWIAZKOWOSC_kolumn_jest_ta_sama`.
+    # PROG POWROTU WIEZU: pierwszy pisarz, ktory te date wyliczy.
     ("przychody_jdg", "data_obowiazku_vat", "TEXT"),
 )
 

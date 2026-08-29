@@ -120,10 +120,26 @@ def test_SKALA_ZE_stawka_ryczaltu_jest_bledem(p):
 def test_wpis_USZKODZONY_w_bazie_jest_bledem_przy_odczycie(p):
     """Wiersz z forma spoza zbioru mogl powstac przed dolozeniem walidacji
     albo recznie. Cichy powrot NIEROZSTRZYGNIETA zamienilby „mam zla forme"
-    w „nie mam formy" — dwa rozne stany pod jedna odpowiedzia."""
+    w „nie mam formy" — dwa rozne stany pod jedna odpowiedzia.
+
+    ZMIANA W1 (2026-08-29): od dolozenia wiezu `forma_znana` do `_SCHEMAT`
+    baza SWIEZA takiego wiersza nie wpusci — i to jest cel, nie przeszkoda.
+    Ale wiez dostaje wylacznie baza swieza (`CREATE TABLE IF NOT EXISTS` nie
+    rusza tabeli, ktora juz jest, a `ALTER TABLE` w SQLite nie dolozy
+    `CHECK`), wiec baza ROBOCZA Darka nadal moze taki wiersz niesc. Ta
+    sciezka musi zostac sprawdzona — `PRAGMA ignore_check_constraints`
+    odtwarza ksztalt bazy bez wiezu na czas samego wstawienia.
+    Odczyt idzie juz normalnie, z wiezem wlaczonym z powrotem.
+    """
+    p.execute("PRAGMA ignore_check_constraints = ON")
     p.execute("INSERT INTO forma_opodatkowania (rok, forma) VALUES (2029, ?)",
               ("KARTA_PODATKOWA",))
     p.commit()
+    p.execute("PRAGMA ignore_check_constraints = OFF")
+    assert p.execute(
+        "SELECT forma FROM forma_opodatkowania WHERE rok = 2029"
+    ).fetchone()[0] == "KARTA_PODATKOWA", (
+        "wiersz uszkodzony nie wszedl do bazy — test nie sprawdzilby niczego")
     with pytest.raises(magazyn.BladMagazynu) as blad:
         magazyn.forma_na_rok(p, 2029)
     assert "KARTA_PODATKOWA" in str(blad.value)

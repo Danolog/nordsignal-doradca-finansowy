@@ -985,3 +985,78 @@ i potwierdził. Przy każdym strażniku zawartości stoi kontrola liczności:
   `docs/PRD.md` §6.3 p.3 i rozdz. 13.
 - **Nie mutowano ścieżki podpięcia silnika pod rejestr** — nie istnieje. To jest dokładnie to,
   czego pilnuje strażnik progu M6.
+
+---
+
+## Przebieg 2026-08-29 (W1) — `testy/test_schemat_dwa_dialekty.py`
+
+**Co pilnuje strażnik.** Dwa nośniki schematu bazy: dialekt SQLite
+(`magazyn._SCHEMAT` + `rejestr.SCHEMAT_SQLITE`, nośnik żywy — z niego stoi baza)
+i dialekt PostgreSQL (`silnik.baza.schemat_postgresql()` = `silnik/baza/schemat.sql`
++ `rejestr.SCHEMAT`, cel migracji). Do 2026-08-29 nic ich nie porównywało; pomiar
+przyrządem `testy/porownanie_schematu.py` na commicie `0b282cc` dał **24 miejsca rozjazdu**
+(plan sesji mówił o dziewięciu). Po W1 zostaje ich **9**, wszystkie w rejestrach
+`WIEZY_TYLKO_POSTGRESQL` i `INDEKSY_TYLKO_POSTGRESQL` plus świadomy rozdział `rejestr_stawek`.
+
+**Ile porównuje — liczby stoją w asercjach, nie w nazwach testów:**
+
+| Wymiar | Ile |
+|---|---|
+| tabel po każdej stronie | 14 (asercja `== ILE_TABEL`, plus niezależne policzenie poleceń `CREATE TABLE`) |
+| kolumn wspólnych | 95, każda w czterech wymiarach: typ, obowiązkowość, wartość domyślna, dziedzina |
+| kolumn kwotowych z `_KWOTOWE` | 16 (asercja `== ILE_KOLUMN_KWOTOWYCH`) |
+| więzów jednoznaczności | 4 (asercja `== ILE_WIEZOW_JEDNOZNACZNOSCI`) |
+| dziedzin wyliczeniowych | 5 (`wpisy_budzetu.zrodlo`, `forma`, `kategorie.typ`, `status` i `jednostka` stawki) |
+| więzów/indeksów tylko po stronie PostgreSQL | 5 + 3, wpisane imiennie do rejestru |
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mut2`, `rsync` bez `.git`
+i `.venv`), `PYTHONDONTWRITEBYTECODE=1` przy każdym przebiegu — dwie mutacje tej samej
+długości w tej samej sekundzie potrafią uruchomić stary skompilowany kod i zameldować
+cudzy wynik. Po każdej mutacji plik przywracany z kopii sprzed mutacji.
+
+Kontrola przed mutacjami: **17 passed** (plik strażnika).
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `schemat.sql`: `zysk_netto NUMERIC(14,2) NOT NULL` → `NUMERIC(14,2)` | `test_OBOWIAZKOWOSC_kolumn_jest_ta_sama` | **czerwony** (1 failed, 16 passed) |
+| **M2** | `schemat.sql`: `zaplacony_zus` → `zaplacony_zus_x` | `test_oba_dialekty_MAJA_te_same_kolumny` · `test_KAZDA_kolumna_kwotowa_jest_NUMERYCZNA_po_stronie_PostgreSQL` | **czerwony** (2 failed, 15 passed) |
+| **M3** | `schemat.sql`: `forma IN ('SKALA','RYCZALT')` → `('SKALA','LINIOWY','RYCZALT')` | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_dziedzina_formy_ZGADZA_SIE_z_FORMY_ZAPISYWALNE` | **czerwony** (2 failed, 15 passed) |
+| **M4** | `schemat.sql`: `wpisy_budzetu.kwota NUMERIC(14,2)` → `DOUBLE PRECISION` (§3.1) | `test_TYPY_kolumn_odpowiadaja_sobie_rodzina_po_rodzinie` · `test_KAZDA_kolumna_kwotowa_jest_NUMERYCZNA_po_stronie_PostgreSQL` · `test_ZADNA_kolumna_nie_uzywa_typu_zmiennoprzecinkowego` | **czerwony** (3 failed, 14 passed) |
+| **M5** | `porownanie_schematu._ciala_tabel` zwraca pusty słownik — przyrząd ślepnie | `test_parser_WIDZI_oba_napisy_a_nie_porownuje_pustki` + 12 dalszych | **czerwony** (13 failed, 4 passed) |
+| **M6** | `magazyn._SCHEMAT`: zdjęty `CONSTRAINT forma_znana` z żywego nośnika SQLite | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_dziedzina_formy_ZGADZA_SIE_z_FORMY_ZAPISYWALNE` · `test_wiezy_TYLKO_PostgreSQL_sa_te_z_rejestru` · `test_swieza_baza_ODRZUCA_forme_spoza_dwojki` | **czerwony** (4 failed, 27 passed) |
+| **M7** | `schemat.sql`: powrót `DEFAULT ''` do `godziny.pkwiu` | `test_WARTOSCI_DOMYSLNE_sa_te_same` | **czerwony** (1 failed, 16 passed) |
+| **M8** | `porownanie_schematu._ciala_tabel` gubi **jedną** tabelę po cichu (`wynik.pop("godziny")`) | `test_parser_WIDZI_oba_napisy_a_nie_porownuje_pustki` + 7 dalszych | **czerwony** (8 failed, 9 passed) |
+| **M9** | `magazyn._SCHEMAT`: zdjęty `CONSTRAINT typ_znany` | `test_DZIEDZINY_WARTOSCI_sa_te_same` · `test_wiezy_TYLKO_PostgreSQL_sa_te_z_rejestru` | **czerwony** (2 failed, 15 passed) |
+
+Kontrola po cofnięciu wszystkich dziewięciu mutacji (`diff -q` wobec kopii sprzed mutacji:
+trzy pliki zgodne z oryginałem): **936 passed, 3 deselected, 0 skipped**.
+
+### Co pokazały M5 i M8 — najważniejsze pozycje tej tabeli
+
+**M5:** gdy przyrząd pomiarowy przestaje cokolwiek widzieć, **cztery testy z siedemnastu
+nadal są zielone**. Jeden z nich, `test_oba_dialekty_MAJA_te_same_tabele`, jest zielony
+**dlatego, że porównuje pustkę z pustką** — dokładnie ta klasa strażnika-atrapy, która przy
+zielonej suicie nie strzeże niczego. Łapie ją wyłącznie kontrola liczności, która żąda
+**dokładnie 14 tabel** po każdej stronie.
+
+**M8:** cichej utraty **jednej** tabeli kontrola „czy zbiór niepusty" **by nie złapała** —
+13 tabel to nadal niepusty zbiór. Łapie ją dopiero **niezależne policzenie poleceń
+`CREATE TABLE`** (`ile_polecen_create_table`), dołożone w przeglądzie samokrytycznym.
+Parser sprawdzający sam siebie nie sprawdza niczego.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano treści więzu `CHECK` innego niż `IN (...)`.** Parser porównuje takie więzy
+  **po nazwie**, nie po treści: zmiana `CHECK (kwota >= 0)` na `CHECK (kwota >= -1)` przy tej
+  samej nazwie **nie zaczerwieni niczego**. Luka nazwana, nie zamknięta.
+- **Nie mutowano kolumn ani warunku `WHERE` indeksu częściowego** — parser widzi wyłącznie
+  nazwę indeksu. Ta sama klasa luki.
+- **Nie mutowano zachowania PostgreSQL na żywej bazie.** Baza w Neonie jest pusta do W4, więc
+  cały ten strażnik porównuje **napisy DDL**, nie dwie działające bazy. Błąd składni w
+  `schemat.sql` przeszedłby przez wszystkie siedemnaście testów. Jedyne testy pytające żywą
+  bazę to `test_swieza_baza_ODRZUCA_forme_spoza_dwojki` i
+  `test_swieza_baza_PRZYJMUJE_kazdy_typ_z_budzet_TYPY` — obydwa na SQLite.
+- **Nie mutowano `_KWOTOWE`** jako nośnika listy kolumn pieniężnych. Nie jest listą pełną:
+  `forma_opodatkowania.stawka_ryczaltu` i `zobowiazania.oprocentowanie` idą przez `Decimal`
+  ręcznie, poza `_wczytaj`. Domyka je od drugiej strony
+  `test_ZADNA_kolumna_nie_uzywa_typu_zmiennoprzecinkowego`.

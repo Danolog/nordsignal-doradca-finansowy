@@ -1,9 +1,24 @@
--- SCHEMAT BAZY — PostgreSQL. Przeniesienie schematu 11 z SQLite plus rejestr stawek.
+-- SCHEMAT BAZY — PostgreSQL. Odpowiednik schematu 12 z SQLite (`magazyn._SCHEMAT`).
+--
+-- TEN PLIK NIE JEST CALYM SCHEMATEM I TO JEST DECYZJA, NIE UBYTEK.
+-- Niesie TRZYNASCIE tabel. Czternasta — `rejestr_stawek` — mieszka w
+-- `wiedza/rejestr.py` (`SCHEMAT`, dialekt PostgreSQL), bo tam mieszka regula
+-- "silnik czyta wylacznie stawki zatwierdzone przez czlowieka" (CLAUDE.md
+-- §3.3/§3.4). Przepisanie jej tutaj byloby DRUGIM NOSNIKIEM liczb z ustaw.
+-- Pelny napis DDL sklada `silnik.baza.schemat_postgresql()` — dokladnie tak,
+-- jak `magazyn.polacz()` sklada `_SCHEMAT` + `rejestr.SCHEMAT_SQLITE`.
+-- NIGDY nie stawiaj bazy z samego tego pliku: rejestr zostanie pusty,
+-- a aplikacja nie ma skad wziac ani jednej stawki.
 --
 -- TRZY ZMIANY TYPOW WOBEC POPRZEDNIKA, wszystkie w jedna strone — mniej obejsc:
 --   kwota TEXT   -> NUMERIC(14,2)  (SQLite nie ma typu dziesietnego)
 --   data  TEXT   -> DATE           (koniec porownan dat na napisach)
 --   flaga INTEGER-> BOOLEAN        (koniec pytania "czy 0 znaczy nie, czy brak")
+--
+-- ROZJAZD Z DIALEKTEM SQLite JEST PILNOWANY, NIE ZAKLADANY:
+-- `testy/test_schemat_dwa_dialekty.py` porownuje oba nosniki kolumna po
+-- kolumnie — typ, obowiazkowosc, wartosc domyslna, dziedzina wartosci —
+-- i trzyma jawny rejestr roznic swiadomych (wiezy, ktorych SQLite nie uniesie).
 
 -- ── slownik kategorii ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS kategorie (
@@ -12,7 +27,11 @@ CREATE TABLE IF NOT EXISTS kategorie (
     nazwa       TEXT    NOT NULL,
     kolejnosc   INT     NOT NULL DEFAULT 0,
     aktywna     BOOLEAN NOT NULL DEFAULT TRUE,
-    systemowa   BOOLEAN NOT NULL DEFAULT FALSE,
+    -- `systemowa` NIE MA TU KOLUMNY i to jest decyzja (2026-08-29, W1).
+    -- To wlasnosc SLOWNIKA STARTOWEGO, nie stan wiersza: wylicza ja
+    -- `silnik/ekran_ksiegowanie.py` z `budzet.KATEGORIE_SPOZA_ARKUSZA`.
+    -- Kolumna w bazie byla by drugim nosnikiem tej samej reguly — i pierwsza,
+    -- ktora sie rozjedzie, bo nikt jej nie zapisuje.
     -- NOWE (PRD §6.3 p.1): czy kategoria liczy sie do progu poduszki.
     -- Bez tego prog poduszki jest PRZEDZIALEM 29 651–63 649 zl, nie liczba.
     -- NULL znaczy "Darek jeszcze nie rozstrzygnal" — i to jest stan rozny
@@ -75,8 +94,39 @@ CREATE TABLE IF NOT EXISTS przychody_jdg (
     -- Faktura wystawiona 5 X za wrzesien nalezy do okresu PAZDZIERNIK,
     -- termin 25 XI. Poprzednia aplikacja sumowala VAT ze WSZYSTKICH faktur
     -- bez wzgledu na okres — kwota siedziala w zlym miesiacu.
-    data_obowiazku_vat DATE      NOT NULL,
-    pkwiu          TEXT          NOT NULL DEFAULT '',
+    -- BEZ `NOT NULL` — i to jest decyzja W1 (2026-08-29), nie przeoczenie.
+    -- `zapisz_fakture` tej kolumny NIE WYPELNIA, bo data domyslna byla by
+    -- ZMYSLENIEM daty powstania obowiazku podatkowego (nosnik decyzji:
+    -- `testy/test_trzy_kolumny.py::test_data_obowiazku_vat_startuje_pusta_a_nie_zgadnieta`).
+    -- Wiez `NOT NULL` nie wymuszal by tu daty — odrzucal by KAZDY zapis
+    -- faktury, co do jednego. NULL znaczy "nie wiem".
+    -- PROG POWROTU WIEZU: pierwszy pisarz, ktory te date wyliczy.
+    data_obowiazku_vat DATE,
+    -- BEZ `DEFAULT ''` (W1). `_wymagaj_pkwiu` odrzuca pusty napis powolujac
+    -- sie na art. 12 ust. 3, wiec wartosc domyslna jest dziura obok drogi
+    -- sprawdzanej: pozwala wstawic wiersz, ktorego pisarz nigdy by nie zapisal.
+    pkwiu          TEXT          NOT NULL,
+    -- CZTERY KOLUMNY POLICZONE PRZY WYSTAWIENIU FAKTURY (W1, 2026-08-29).
+    -- Nie byly tu wczesniej, a `zapisz_fakture` (`magazyn.py:835`) zapisuje
+    -- je od poczatku — postawienie bazy z poprzedniej wersji tego pliku
+    -- wywracalo by KAZDY zapis faktury na nieznanej kolumnie.
+    --
+    -- `stawka_ryczaltu` — ULAMEK, ta sama jednostka co `stawka_vat`.
+    --   UWAGA, TO JEST TA KOLUMNA: dzis NIKT JEJ NIE CZYTA. Wszystkie
+    --   odczyty `stawka_ryczaltu` w silniku ida z `forma_opodatkowania`,
+    --   nie stad. Jej ISTNIENIE nie jest wada — wada byloby liczenie z niej
+    --   czegokolwiek DOMYSLNIE, bo Darek jest na SKALI (CLAUDE.md §2).
+    --   Zostaje jako slad, czym policzono te konkretna fakture.
+    stawka_ryczaltu NUMERIC(6,4) NOT NULL,
+    -- `zaplacony_zus` — czytana: `magazyn.czy_skladki_naliczone_w_miesiacu`,
+    --   `narzedzia` (suma skladek), `podatki.ryczalt_z_faktury`.
+    zaplacony_zus  NUMERIC(14,2) NOT NULL,
+    -- `zysk_netto` — czytana: `narzedzia` (co zostaje), `podatki`.
+    zysk_netto     NUMERIC(14,2) NOT NULL,
+    -- `stawki_wersja` — slad audytowy: ktora wersja rejestru stawek dala te
+    --   liczby. Dzis bez czytelnika, i to jest w porzadku: sladu nie czyta
+    --   sie codziennie, czyta sie go, gdy kwota okaze sie sporna.
+    stawki_wersja  TEXT          NOT NULL,
     wpis_budzetu_id BIGINT REFERENCES wpisy_budzetu(id) ON DELETE SET NULL
 );
 
@@ -98,7 +148,10 @@ CREATE TABLE IF NOT EXISTS godziny (
     -- PKWiU zostaje w schemacie, ale SCHODZI Z EKRANU (D-25): przy skali
     -- jedna stawka od calosci dochodu, wiec rozdzielanie czynnosci nie sluzy
     -- kwalifikacji. Kolumny nie kasujemy — sluzy porownaniu form.
-    pkwiu            TEXT          NOT NULL DEFAULT ''
+    -- BEZ `DEFAULT ''` (W1) — z tego samego powodu co w `przychody_jdg`:
+    -- `_wymagaj_pkwiu` odrzuca pusty napis, wiec wartosc domyslna byla by
+    -- obejsciem wlasnej reguly.
+    pkwiu            TEXT          NOT NULL
 );
 
 -- ── majatek i dlugi ───────────────────────────────────────────────────────
@@ -144,11 +197,17 @@ CREATE TABLE IF NOT EXISTS cele_oszczednosciowe (
     nazwa          TEXT          NOT NULL UNIQUE,
     kategoria      TEXT          NOT NULL,
     kwota_docelowa NUMERIC(14,2) NOT NULL,
-    termin         DATE,
-    -- PRD §10.3 S-2: prog poduszki jest LICZONY (6 x wydatki niezbedne).
-    -- Ta flaga oznacza wartosc nadpisana recznie — ekran ma pokazac obok
-    -- wynik rachunku, zeby odstepstwo bylo widoczne, a nie ciche.
-    nadpisana_recznie BOOLEAN NOT NULL DEFAULT FALSE
+    -- `NOT NULL` (W1, 2026-08-29). `zapisz_cel` przyjmuje `termin: date`
+    -- jako argument obowiazkowy i wola na nim `.isoformat()` — droga do
+    -- zapisania celu bez terminu nie istnieje. Kolumna dopuszczajaca NULL
+    -- obiecywala stan, ktorego aplikacja nie potrafi wytworzyc.
+    termin         DATE          NOT NULL
+    -- `nadpisana_recznie` NIE MA TU KOLUMNY (W1). PRD §10.3 S-2 zapowiada
+    -- prog poduszki liczony z mozliwoscia nadpisania, ale dzis nie istnieje
+    -- ani pisarz, ani czytelnik tej flagi. Kolumna bez obu jest obietnica
+    -- w ksztalcie danych: przy migracji przyjdzie pusta i bedzie wygladac
+    -- jak odpowiedz "nie nadpisano" na pytanie, ktorego nikt nie zadal.
+    -- PROG POWROTU: razem z pisarzem, czyli przy wdrozeniu S-2.
 );
 
 -- ── nastawy ───────────────────────────────────────────────────────────────
@@ -156,7 +215,17 @@ CREATE TABLE IF NOT EXISTS forma_opodatkowania (
     rok             INT PRIMARY KEY,
     forma           TEXT NOT NULL,
     stawka_ryczaltu NUMERIC(6,4),   -- ULAMEK. Wypelniona TYLKO przy ryczalcie.
-    CONSTRAINT forma_znana CHECK (forma IN ('SKALA','LINIOWY','RYCZALT')),
+    -- BEZ 'LINIOWY' (W1, 2026-08-29). `magazyn.forma_na_rok` ODRZUCA kazda
+    -- forme spoza `magazyn.FORMY_ZAPISYWALNE` = ('SKALA','RYCZALT'), a
+    -- `zapisz_forme` nie potrafi jej nawet zapisac. Dziedzina szersza od
+    -- tego, co rachunek obsluguje, to ten sam mechanizm wady, ktory
+    -- w poprzedniej aplikacji dawal kwoty liczone forma, ktorej Darek nie ma:
+    -- baza dopuszcza stan, na ktorym silnik wybucha.
+    -- Podatek liniowy ZOSTAJE jako opcja POROWNANIA form
+    -- (`stawki.STAWKA_ZDROWOTNEJ_LINIOWY`) — porownanie nic nie zapisuje.
+    -- Ta lista jest SWIADOMYM drugim nosnikiem `FORMY_ZAPISYWALNE`; pilnuje
+    -- jej `test_dziedzina_formy_ZGADZA_SIE_z_FORMY_ZAPISYWALNE`.
+    CONSTRAINT forma_znana CHECK (forma IN ('SKALA','RYCZALT')),
     -- Stawka ryczaltu przy skali jest sprzecznoscia, a nie pustym polem.
     -- To jest ta sama klasa wady, ktora w poprzedniej aplikacji dawala
     -- kwoty liczone forma, ktorej Darek nie ma.
@@ -174,7 +243,11 @@ CREATE TABLE IF NOT EXISTS ustawienia (
 -- ── cichy straznik ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS przebiegi_straznika (
     id                    BIGSERIAL PRIMARY KEY,
-    kiedy                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- BEZ `DEFAULT now()` (W1). `magazyn.zapisz_przebieg_straznika` podaje
+    -- `kiedy` zawsze i jawnie. Wartosc domyslna byla by drugim nosnikiem
+    -- odpowiedzi "kiedy strażnik biegl" — i przy przenoszeniu wierszy
+    -- z SQLite ostemplowala by je godzina MIGRACJI zamiast godzina przebiegu.
+    kiedy                 TIMESTAMPTZ NOT NULL,
     stan_prognozy         TEXT        NOT NULL,
     pierwszy_dzien_ujemny DATE,
     pilnych               INT         NOT NULL,
