@@ -40,3 +40,7 @@ kopie/
 .DS_Store
 .remember/
 .playwright-mcp/
+
+# powiazanie katalogu z projektem Vercel (identyfikatory, nie sekrety) —
+# powstaje przy `vercel link` i nie ma czego szukac w repozytorium
+.vercel/
