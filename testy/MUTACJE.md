@@ -1707,3 +1707,80 @@ Po przepisaniu ta sama mutacja daje `1 failed, 47 passed`; po cofnięciu
   których premisę ta zmiana naruszyła.
 - **Nie ruszono silnika ani `api/`.** Znalezisko o kafelku rezerwy (niżej,
   w raporcie) zgłoszone, nie naprawione.
+
+---
+
+## Przebieg W11 · 2026-08-30 — kafelek „Rezerwa na podatki" i strażnik klasy odpowiedzi
+
+Wykonano w kopii drzewa **poza repozytorium**
+(`scratchpad/mutacje-w11`), z `PYTHONDONTWRITEBYTECODE=1` i czyszczeniem
+`__pycache__` przed każdym przebiegiem.
+
+Kontrola przed mutacjami (kopia, stan po naprawie): **1115 passed, 3 deselected, 0 skipped**.
+
+| # | Co zmieniono | Który test padł | Wynik |
+|---|---|---|---|
+| **M-W11-1** | `silnik/ekran_budzet.py:189` — `if rezerwa.miesiace_zus is None:` → `if rezerwa.miesiace_zus == 0:` | `test_trasy_budzet.py::test_rezerwa_BEZ_DATY_DZIALALNOSCI_odmawia_zamiast_pokazac_zero` · `test_trasy_budzet.py::test_rezerwa_PRZED_STARTEM_dzialalnosci_POKAZUJE_liczbe` | **czerwony** — `2 failed, 1113 passed` |
+| **M-W11-2** | `api/trasy_budzet.py:39` — `APIRouter(default_response_class=kwoty.OdpowiedzJSON)` → `APIRouter()` | `test_trasy_dwa_ekrany.py::test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb` | **czerwony** — `1 failed, 1114 passed` |
+
+Kontrola po cofnięciu obu mutacji: **1115 passed, 3 deselected, 0 skipped**.
+
+### M-W11-1 czerwieni się DWUSTRONNIE i to jest cały sens tej naprawy
+
+Mutacja przesuwa granicę odmowy o jedną gałąź i **oba** strażniki reagują, każdy
+z innej strony:
+
+```
+AssertionError: kafelek „Rezerwa na podatki” pokazuje '0.00' — zero pod tym
+tytulem czyta sie jako „nic nie jestes winien urzedowi”
+assert '0.00' is None
+testy/test_trasy_budzet.py:355
+
+AssertionError: data rozpoczecia jest ZNANA — silnik nie ma czego nie wiedziec,
+wiec kafelek ma pokazac liczbe, a nie odmowe
+assert None is not None
+testy/test_trasy_budzet.py:396
+```
+
+Sam pierwszy strażnik dałby się zaspokoić odmową na **każdym** braku ZUS-u —
+łącznie z datą rozpoczęcia leżącą w przyszłości, gdzie zero jest **wiedzą**,
+a nie brakiem wiedzy. Drugi strażnik trzyma tę granicę.
+
+**Kontrola liczności mutacji:** przebieg całej suity z odjętym `test_trasy_budzet.py`
+dał przy mutacji `1086 passed, 32 deselected` — czyli M-W11-1 nie czerwieni
+niczego poza dwoma strażnikami napisanymi dla niej. Mutacja trafiła w regułę,
+nie obok.
+
+### M-W11-2 — strażnik, który przed W11 nie mógł paść
+
+Do W11 `test_KAZDY_router_ma_klase_odpowiedzi_ODMAWIAJACA_liczb` budował słownik
+dwóch routerów **ręcznie w treści testu** i sprawdzał `len(routery) == 2` na
+słowniku, który sam napisał. Aplikacja miała wtedy **cztery** routery.
+Pomiar Leo: ta sama mutacja M-W11-2 dawała wtedy **1113 passed** — strażnik jej
+nie widział. Po przepisaniu na odkrywanie routerów z `aplikacja` daje
+`1 failed, 1114 passed`.
+
+**Żywej dziury nie było** i trzeba to powiedzieć wprost: `api/index.py:101`
+ustawia `default_response_class` na całej aplikacji, więc router bez własnej klasy
+spada na wartość aplikacji, a tej pilnuje
+`test_kontrakt_dwa_nosniki.py`. To był **dług pokryciowy**, nie wada produkcyjna.
+
+**Co przez to może przestać działać (§3.11).** Odkrywanie idzie przez pole
+`original_router` opakowania `_IncludedRouter` — w FastAPI 0.141
+`include_router` **nie spłaszcza** tras do aplikacji (zmierzone: `aplikacja.routes`
+ma 8 pozycji, z czego **zero** jest `APIRoute`, a cztery są tym opakowaniem).
+Gdyby to pole zniknęło w nowszym FastAPI, odkrycie zwróciłoby pusty słownik,
+a pętla sprawdzająca zameldowałaby sukces nic nie zobaczywszy. Dlatego kontrola
+populacji (`set(routery) == ROUTERY_APLIKACJI`) jest asercją, nie wydrukiem —
+i stoi **po** pętli, żeby piąty router dołożony jutro był sprawdzony już tym
+przebiegiem, zanim ktokolwiek dopisze go do listy.
+
+### Czego przebieg W11 NIE objął
+
+- **Nie mutowano niczego poza dwoma miejscami wyżej.** W szczególności nie
+  sprawdzano mutacyjnie pozostałych gałęzi `podatki.rezerwa_na_podatki`.
+- **Nie ma strażnika behawioralnego** czytającego kafelek z wyrenderowanej strony —
+  odmowa jest zmierzona na odpowiedzi HTTP, obsługa `kwota === null` w widoku
+  potwierdzona **odczytem źródła** (`interfejs/app/budzet/ekran.tsx:176–178`),
+  nie przebiegiem przeglądarki.
+- **Nie ruszono interfejsu, `vercel.json` ani wdrożenia.**

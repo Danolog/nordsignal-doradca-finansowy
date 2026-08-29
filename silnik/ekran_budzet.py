@@ -14,7 +14,10 @@ FORMA OPODATKOWANIA NIE MA TU WARTOSCI DOMYSLNEJ I MIEC NIE BEDZIE.
 Kafelek „Rezerwa na podatki" idzie przez `podatki.rezerwa_z_bazy`, ktory
 czyta forme z bazy i ODMAWIA liczenia, gdy jej nie zna. Ten plik odmowy nie
 lata: zamienia ja na kafelek bez kwoty i ze zdaniem silnika w calosci
-(`CLAUDE.md` §3.7). W poprzedniej aplikacji ryczalt byl wartoscia domyslna
+(`CLAUDE.md` §3.7). OD W11 dotyczy to takze braku DATY ROZPOCZECIA
+dzialalnosci — bez niej ZUS nie zostaje policzony w ogole, wiec rezerwa
+i suma „Plan miesiaca razem" nie maja kwoty; granica opisana przy
+`_rezerwa_albo_odmowa`. W poprzedniej aplikacji ryczalt byl wartoscia domyslna
 w trzech miejscach i podawal kwoty wyliczone forma, ktorej Darek nie ma —
 slowo „RYCZALT" nie pada w tym pliku ani razu i to nie jest przypadek.
 
@@ -153,11 +156,38 @@ def _rezerwa_albo_odmowa(polaczenie, *, wpisy: pd.DataFrame, dzis: date
 
     ZERO NIE ZASTEPUJE BRAKU WIEDZY (regula D11). `None` idzie do kafelka
     jako brak kwoty; zero czytaloby sie jako „nic nie jestes winien".
+
+    DWA BRAKUJACE WEJSCIA, JEDNA ODPOWIEDZ (naprawa W11, przeglad Leo).
+    Do W11 odmawiala tylko gorna galaz — brak FORMY opodatkowania. Brak DATY
+    ROZPOCZECIA dzialalnosci przechodzil dolem i kafelek „Rezerwa na podatki"
+    pokazywal `0,00 zl` tam, gdzie prawda na nastawach Darka wynosila
+    4 718,60 zl (pomiar Leo, 6 X 2026). Dwa rownie brakujace wejscia byly
+    traktowane odwrotnie, a docstring tej funkcji nazywal regule, ktora
+    funkcja lamala.
+
+    GRANICA ODMOWY JEST OSTRA I PRZECHODZI PRZEZ `miesiace_zus`:
+
+    * `miesiace_zus is None` — ZUS NIE ZOSTAL POLICZONY W OGOLE, bo silnik
+      nie zna daty rozpoczecia. To JEDYNY dyskryminator tego stanu (naglowek
+      pola w `podatki.RezerwaPodatkowa`) i tu odmawiamy. Samo `zus == 0` nie
+      odroznia „nie liczylem" od „policzylem i wyszlo zero".
+    * `miesiace_zus == 0` — data rozpoczecia jest ZNANA i lezy w przyszlosci.
+      Miesiac przed rozpoczeciem dzialalnosci naprawde nie niesie skladek,
+      wiec zero jest tu WIEDZA, nie brakiem wiedzy, i kafelek ma pokazac
+      liczbe razem z zastrzezeniem silnika przy niej (§3.5).
+
+    Ta sama granica stoi w `prezentacja.podpis_rezerwy` i pochodzi z tego
+    samego pola — zdania odmowy nie skladamy tutaj, tylko oddajemy
+    zastrzezenia silnika w calosci (§3.7). Zastrzezenie przy braku daty NIE
+    MOZE podac wielkosci zanizenia, bo bez daty nie zna liczby miesiecy —
+    i to jest argument ZA odmowa, a nie za zerem z dopiskiem (§3.5).
     """
     try:
         rezerwa = podatki.rezerwa_z_bazy(polaczenie, wpisy=wpisy, dzis=dzis)
     except magazyn.BladMagazynu as blad:
         return None, str(blad)
+    if rezerwa.miesiace_zus is None:
+        return None, " ".join(rezerwa.zastrzezenia)
     if rezerwa.zastrzezenia:
         return rezerwa.saldo, " ".join(rezerwa.zastrzezenia)
     return rezerwa.saldo, None

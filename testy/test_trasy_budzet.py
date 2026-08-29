@@ -86,6 +86,25 @@ def klient():
     polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 9, 1))
+    _plan_z_ramki(polaczenie)
+    polaczenie.close()
+    return TestClient(aplikacja)
+
+
+#: SUMA PLANU WYDATKOW Z RAMKI — jedna liczba, jeden nosnik. Stoi tu, a nie
+#: przepisana w kazdej asercji, bo trzy fikstury zakladaja ten sam plan i
+#: rozjazd byl by widac dopiero jako zla liczba w jednym z testow.
+PLAN_WYDATKOW = Decimal("2614.81")
+
+
+def _plan_z_ramki(polaczenie) -> None:
+    """Plan pazdziernika 2026 z `makiety/Budzet.dc.html` — JEDEN nosnik.
+
+    Wolaja go TRZY fikstury tego pliku (`klient`, `klient_bez_daty_
+    dzialalnosci`, `klient_przed_startem_dzialalnosci`). Przepisany w kazdej
+    z osobna bylby trzema nosnikami tych samych czterech kwot, a rozjazd
+    zobaczylby dopiero czytelnik nieudanej asercji.
+    """
     # Kredyty: DWIE pozycje w jednej kategorii — 1 305,05 + 319,76 = 1 624,81.
     magazyn.ustal_regule_planu(
         polaczenie, rok=2026, miesiac=10, typ="Wydatki", kategoria="Kredyty",
@@ -103,8 +122,6 @@ def klient():
     magazyn.zapisz_cel(
         polaczenie, nazwa="Poduszka finansowa", kategoria="Poduszka finansowa",
         kwota_docelowa=Decimal("30000.00"), termin=date(2028, 1, 6))
-    polaczenie.close()
-    return TestClient(aplikacja)
 
 
 @pytest.fixture
@@ -124,6 +141,46 @@ def klient_bez_formy():
     # Bez tego skasowania ten test sprawdzalby stan, ktorego nie ma.
     polaczenie.execute("DELETE FROM forma_opodatkowania")
     polaczenie.commit()
+    polaczenie.close()
+    return TestClient(aplikacja)
+
+
+@pytest.fixture
+def klient_bez_daty_dzialalnosci():
+    """Baza z forma, ale BEZ daty rozpoczecia dzialalnosci — stan STARTOWY.
+
+    To nie jest przypadek brzegowy: migracja daty rozpoczecia NIE ZACZEPIA
+    (inaczej niz forme — `magazyn._zaczep_formy`), a aplikacja nie ma jeszcze
+    trasy, ktora pozwalalaby te date ustawic. Kazda swieza baza stoi wiec
+    dokladnie tutaj i stoi tak dopoki, dopoki `PUT /api/dzialalnosc` nie
+    powstanie.
+
+    Plan miesiaca jest ten sam co w fiksturze `klient` (2 614,81 zl), zeby
+    kafelek „razem" mial z czego byc policzony, gdyby ktos podstawil zero
+    za nieznana rezerwe.
+    """
+    polaczenie = magazyn.zmigruj_i_polacz()
+    magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
+    assert magazyn.odczytaj_dzialalnosc_od(polaczenie) is None, (
+        "fikstura mierzy stan, ktorego nie ma: migracja zaczepila date "
+        "rozpoczecia dzialalnosci")
+    _plan_z_ramki(polaczenie)
+    polaczenie.close()
+    return TestClient(aplikacja)
+
+
+@pytest.fixture
+def klient_przed_startem_dzialalnosci():
+    """Data rozpoczecia ZNANA i lezaca w przyszlosci — GRANICA naprawy W11.
+
+    Tu zero jest WIEDZA, nie brakiem wiedzy: miesiac przed rozpoczeciem
+    dzialalnosci naprawde nie niesie skladek ZUS. Kafelek ma pokazac liczbe
+    razem z zastrzezeniem silnika przy niej, a nie odmowic.
+    """
+    polaczenie = magazyn.zmigruj_i_polacz()
+    magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
+    magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 12, 1))
+    _plan_z_ramki(polaczenie)
     polaczenie.close()
     return TestClient(aplikacja)
 
@@ -275,6 +332,79 @@ def test_rezerwa_BEZ_FORMY_nie_jest_zerem_tylko_zdaniem(klient_bez_formy):
     # kafelka nie ma prawa wygasic calego ekranu.
     assert dane["bilansPlanu"] == "0.00"
     assert dane["kafelki"][0]["kwota"] == "0.00"
+
+
+def test_rezerwa_BEZ_DATY_DZIALALNOSCI_odmawia_zamiast_pokazac_zero(
+        klient_bez_daty_dzialalnosci):
+    """NAPRAWA W11. Bez daty rozpoczecia ZUS nie jest policzony W OGOLE —
+    a kafelek pokazywal `0,00 zl` pod tytulem „Rezerwa na podatki".
+
+    POMIAR, KTORY TO ZNALAZL (Leo, dzien 6 X 2026, nastawy Darka): przy
+    dacie nieznanej kafelek dawal 0,00 zl, przy dacie 2026-09-01 — 4 718,60 zl
+    (ZUS za dwa miesiace). Roznica nie byla niedokladnoscia raportu: to jest
+    kwota, ktorej Darek by nie odlozyl.
+
+    ZERO NIE ZASTEPUJE BRAKU WIEDZY (D11). Zastrzezenie silnika nie moze przy
+    tym podac WIELKOSCI zanizenia (§3.5), bo bez daty nie zna liczby miesiecy
+    — i to jest argument ZA odmowa, nie za zerem z dopiskiem.
+    """
+    dane = _budzet(klient_bez_daty_dzialalnosci)
+    kafelki = {k["klucz"]: k for k in dane["kafelki"]}
+    assert set(kafelki) == {"wydatkiZPlanu", "rezerwa", "razem"}
+
+    assert kafelki["rezerwa"]["kwota"] is None, (
+        f"kafelek „{kafelki['rezerwa']['tytul']}” pokazuje "
+        f"{kafelki['rezerwa']['kwota']!r} — zero pod tym tytulem czyta sie "
+        f"jako „nic nie jestes winien urzedowi”")
+    assert kafelki["razem"]["kwota"] is None, \
+        "suma z nieznanym skladnikiem udaje, ze skladnik zna"
+
+    zdanie = kafelki["rezerwa"]["wyjasnienie"]
+    assert zdanie, "odmowa bez zdania zostawia w kafelku pusta dziure"
+    assert "ZUS" in zdanie, zdanie
+    assert "daty rozpoczęcia" in zdanie, zdanie
+    assert "Ustawieniach" in zdanie, \
+        "zdanie ma mowic, CO ZROBIC, a nie tylko, ze sie nie da"
+    assert kafelki["razem"]["wyjasnienie"] == zdanie, \
+        "suma odmawia bez powodu — czytelnik nie wie, ktorego skladnika brak"
+
+    # KONTROLA DWUSTRONNA: odmowa JEDNEGO kafelka nie gasi ekranu. Plan
+    # wydatkow liczy sie normalnie i to jest ta sama liczba co z ramki.
+    assert kafelki["wydatkiZPlanu"]["kwota"] == str(PLAN_WYDATKOW)
+    assert dane["planWydatkow"] == str(PLAN_WYDATKOW)
+    assert dane["bilansPlanu"] == f"-{PLAN_WYDATKOW}"
+    assert len(dane["pozycjePlanu"]) == 4, (
+        f"pomiar widzial {len(dane['pozycjePlanu'])} pozycji planu — "
+        f"ekran policzony na pustym planie nie dowodzi niczego")
+
+
+def test_rezerwa_PRZED_STARTEM_dzialalnosci_POKAZUJE_liczbe(
+        klient_przed_startem_dzialalnosci):
+    """GRANICA NAPRAWY W11 — i ona jest ostra.
+
+    Data rozpoczecia ZNANA i lezaca w przyszlosci daje `miesiace_zus == 0`.
+    Tu zero jest WIEDZA: miesiac przed rozpoczeciem dzialalnosci naprawde
+    nie niesie skladek. Kafelek ma pokazac LICZBE razem z zastrzezeniem
+    silnika przy niej, a suma „razem" ma te liczbe policzyc.
+
+    Ten test jest strazykiem granicy: rozszerzenie odmowy na `miesiace_zus
+    == 0` zamienia wiedze w brak wiedzy i czerwieni sie TUTAJ.
+    """
+    dane = _budzet(klient_przed_startem_dzialalnosci)
+    kafelki = {k["klucz"]: k for k in dane["kafelki"]}
+
+    assert kafelki["rezerwa"]["kwota"] is not None, (
+        "data rozpoczecia jest ZNANA — silnik nie ma czego nie wiedziec, "
+        "wiec kafelek ma pokazac liczbe, a nie odmowe")
+    assert Decimal(kafelki["rezerwa"]["kwota"]) == Decimal("0.00")
+    assert (Decimal(kafelki["razem"]["kwota"])
+            == PLAN_WYDATKOW + Decimal(kafelki["rezerwa"]["kwota"]))
+
+    # Zastrzezenie STOI PRZY LICZBIE (§3.5) i podaje WIELKOSC — tu date,
+    # od ktorej skladki zaczna sie naliczac.
+    zdanie = kafelki["rezerwa"]["wyjasnienie"]
+    assert zdanie and "2026-12-01" in zdanie, zdanie
+    assert "przyszłości" in zdanie, zdanie
 
 
 def test_slowo_RYCZALT_nie_pada_na_tym_ekranie(klient):
