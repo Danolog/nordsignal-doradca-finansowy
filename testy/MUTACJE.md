@@ -1295,3 +1295,77 @@ Wszystkie trzy były wcześniej zapisane jako dług z jawnym progiem „przy W4"
 - **Nie zmierzono czasu zimnego startu** ani liczby jednoczesnych sesji przy prawdziwym ruchu.
   Suita otwiera połączenie na test; produkcja otwiera je na żądanie HTTP i limit sesji u dostawcy
   jest zasobem. To należy do W6.
+
+---
+
+## Przebieg W5 — testy migracji (Quinn, 2026-08-29)
+
+Zadanie: audyt pokrycia utraconego przy podmianie sterownika (W4) + domknięcie dwóch luk,
+które wykonawca W4 nazwał sam w sekcji „Czego ten przebieg NIE objął" wyżej.
+
+### Skąd wzięte liczby audytu — pomiar, nie przepisanie z nośnika
+
+Zbiory identyfikatorów testów zebrane `pytest --collect-only` na obu commitach, w kopiach drzewa
+poza repozytorium (`git archive cdd94ed` i `git archive ded8b2a`), i porównane `comm`:
+
+```
+W3 (cdd94ed): 981/984 tests collected (3 deselected)
+W4 (ded8b2a): 993 collected
+zdjęte: 56 · dołożone: 68 · kontrola: 981 − 56 + 68 = 993
+```
+
+**Nośnik twierdzi co innego niż pomiar.** Opis commita `ded8b2a` mówi „zdjęto 64 testy, weszło 75";
+pomiar po identyfikatorach daje **56 i 68**. Plan (`docs/plan-chmura-2026-08-29.md`, W5) mówi
+o „~101 testach w 11 plikach" z „~40 bez odpowiednika 1:1"; pomiar pokazuje **56 zdjętych z 9
+plików**, z czego bez odpowiednika o tej samej nazwie — **35**, a bez jakiegokolwiek następcy —
+**jeden** (niżej). Różnica bierze się z jednostki liczenia: nośniki liczyły testy w plikach
+ruszonych, pomiar liczy identyfikatory, które faktycznie zniknęły z zebrania.
+
+### Znalezisko audytu: jedna reguła została bez strażnika
+
+| | |
+|---|---|
+| **Zdjęty test** | `test_schemat_dwa_dialekty.py::test_WARTOSCI_DOMYSLNE_sa_te_same` |
+| **Czego pilnował** | wartości domyślnych (`DEFAULT`) kolumna po kolumnie, z progiem „co najmniej 90 kolumn" |
+| **Dlaczego przedmiot ISTNIEJE** | baza niesie 22 wartości domyślne, a **trzy kolumny nie mają jej świadomie** i powód stoi przy każdej w `schemat.sql` (`przychody_jdg.pkwiu`, `godziny.pkwiu`, `przebiegi_straznika.kiedy`) |
+| **Dowód, że nie pilnuje nic** | `grep -rn porownaj_domyslna testy silnik api wiedza migracja` → **jedno trafienie, sama definicja**; zero wołających |
+| **Następca** | `testy/test_wartosci_domyslne.py` (nowy, W5) |
+
+### Mutacje W5
+
+| # | Mutacja | Który strażnik padł | Wynik | Po cofnięciu |
+|---|---|---|---|---|
+| **M-A1** | `schemat.sql`: `pkwiu TEXT NOT NULL` → `... NOT NULL DEFAULT ''` (dokładnie ta dziura, dla której zbudowano zdjętego strażnika) | **przed W5: żaden** · po W5: `test_wartosci_domyslne.py::test_kolumna_bez_wartosci_domyslnej_NADAL_jej_nie_ma[przychody_jdg-pkwiu]` · `test_ZBIOR_kolumn_z_wartoscia_domyslna_jest_TEN_z_rejestru` | **przed W5: `993 passed` — zero czerwonych** · po W5: `2 failed, 1013 passed` | `1015 passed` |
+| **M-B1a** | `conftest.py`: `test_{os.getpid()}_{n}` → `test_0_{n}` (numer procesu wypada z nazwy przestrzeni) | `test_izolacja_testow.py::test_przestrzen_NIESIE_numer_TEGO_procesu` (+ `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA` i `test_CUDZE_przestrzenie_NIE_czerwienia_tego_pliku` — obie kontrole liczności rozpoznania) | `3 failed, 4 passed` | `7 passed` |
+| **M-B1b** | `conftest.py`: `_LICZNIK["n"] += 1` → `+= 0` (dwa testy jednego procesu w tej samej przestrzeni) | `test_KAZDY_test_dostaje_INNA_przestrzen` (+ kontrola liczności `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA`) | `2 failed, 5 passed` | `7 passed` |
+| **M-B1c** | `conftest.py`: pętla `DROP SCHEMA` w sprzątaniu zamieniona na `pass` | `test_przestrzen_POPRZEDNIEGO_testu_ZNIKNELA` — **dokładnie jeden** | `1 failed, 6 passed` | `7 passed` |
+| **M-B2-1** | `api/kwoty.py`: `kwota()` zwraca `float(...)` zamiast `str(...)` — **granica HTTP po podmianie sterownika, luka nazwana wyżej** | `test_trasy_dwa_ekrany.py::test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` + 34 dalsze | `35 failed, 980 passed` | `1015 passed` |
+| **M-B2-2** | `api/kwoty.py`: `kwota()` zwraca `str(float(...))` — **typ zostaje napisem, wartość gubi grosz, kod 200** | **przed W5: `test_kotwica_PRZYJMUJE_kwote_ujemna` — przypadkiem, jednym napisem wpisanym na sztywno** · po W5: `test_kwota_przez_granice.py::test_KAZDA_kwota_przechodzi_granice_z_DWOMA_miejscami_po_kropce` · `test_kwota_ZACHOWUJE_koncowe_zero_bo_to_ONO_znika` · `test_obchod_NAPRAWDE_lapie_kwote_bez_grosza` | **przed W5: `1 failed, 1007 passed`** · po W5: `4 failed, 1011 passed` | `1015 passed` |
+
+Wszystkie mutacje zakładane w **kopii drzewa poza repozytorium**
+(`git archive ded8b2a | tar -x` do katalogu roboczego sesji), z `PYTHONDONTWRITEBYTECODE=1`
+i czyszczeniem `__pycache__` przed każdym przebiegiem. Po M-B1c przestrzenie pozostałe w bazie
+testowej skasowane ręcznie (7 sztuk, wszystkie po martwych procesach — sprawdzone `os.kill(pid, 0)`).
+
+### Drugie znalezisko: granica HTTP pilnowała TYPU, nie WARTOŚCI
+
+M-B2-1 i M-B2-2 różnią się jedną funkcją zewnętrzną, a ich skutek jest zupełnie inny. Pierwsza
+zmienia **typ** i pada na niej strażnik odpowiedzi (`OdpowiedzJSON.render`) z listą ścieżek.
+Druga zostawia **napis**, więc odpowiedź wychodzi z kodem **200** i cicho złą liczbą — dokładnie
+awaria opisana w nagłówku `api/kwoty.py` („`Decimal("8623.10")` → `8623.1`, końcowe zero znikło").
+Przed W5 łapał ją **jeden test i przypadkiem**: `test_kotwica_PRZYJMUJE_kwote_ujemna` porównuje
+`saldoPoDniu` z napisem `"-500.00"` wpisanym na sztywno. Strażnik jednostkowy
+`test_kontrakt_dwa_nosniki.py::test_kwota_wychodzi_NAPISEM_i_zaokragla_sie_RAZ` **przechodził**,
+bo żaden z jego trzech przykładów nie ma **końcowego zera** — a to właśnie ono znika.
+
+### Czego przebieg W5 NIE objął
+
+- **Nie mutowano bazy produkcyjnej w Neonie** — jak w W4, i z tego samego powodu.
+- **Nie sprawdzono zachowania przy DWÓCH równoległych przebiegach naraz.** Strażnik izolacji
+  odróżnia własne przestrzenie od cudzych po numerze procesu i to jest zmierzone jednostkowo
+  (M-B1a), ale **nie odpalono dwóch suit jednocześnie**, żeby zobaczyć to na żywo.
+- **Nie zbadano wartości domyślnych kolumn dokładanych `ALTER TABLE`** na starej bazie poza
+  `_DOPISYWANE_KOLUMNY`; nowy strażnik czyta bazę **po** migracji świeżej, nie po każdej ścieżce
+  migracyjnej.
+- **Nie sprawdzono treści więzów `CHECK` innych niż `IN (...)`** — ta luka była nazwana już
+  w nagłówku `test_schemat_wobec_bazy.py` i W5 jej nie ruszało.
