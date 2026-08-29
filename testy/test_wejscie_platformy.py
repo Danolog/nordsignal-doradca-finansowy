@@ -13,10 +13,14 @@ zmiane zachowania na produkcji:
    ANI JEDNEJ TRASY, z kodem 404 na wszystkim. Straznik pyta wiec o
    TOZSAMOSC obiektu, nie o istnienie nazwy.
 
-2. **Region funkcji.** Dane finansowe maja byc przetwarzane w UE (PRD §13 R7).
-   Do W6 funkcje stawaly w `iad1` (Waszyngton), a baza stoi we Frankfurcie.
-   Zmiana regionu z powrotem na amerykanski jest jedna linia w `vercel.json`
-   i nie zepsulaby ani jednego testu.
+2. **Region funkcji — W OBU PROJEKTACH.** Dane finansowe maja byc
+   przetwarzane w UE (PRD §13 R7). Do W6 funkcje stawaly w `iad1`
+   (Waszyngton), a baza stoi we Frankfurcie. Zmiana regionu z powrotem na
+   amerykanski jest jedna linia w `vercel.json` i nie zepsulaby ani jednego
+   testu. Produkt ma DWA projekty Vercela i do W12 straznik czytal tylko
+   jeden z nich (korzen) — mutacja Leo M-L12 na `interfejs/vercel.json` dala
+   `1113 passed`, czyli zielono. Od W12 pyta o kazdy plik ze spisu
+   `PROJEKTY_VERCELA`, a osobny straznik pilnuje, ze spis pokrywa drzewo.
 
 3. **Adres silnika ma JEDEN nosnik** — zmienna `ADRES_SILNIKA`. Adres wpisany
    na sztywno w `next.config.mjs` bylby drugim zrodlem odpowiedzi „gdzie stoi
@@ -67,14 +71,90 @@ def test_app_JEST_TYM_SAMYM_obiektem_co_aplikacja():
 
 
 # --- 2. konfiguracja platformy --------------------------------------------
+#
+# JEDEN NOSNIK ODPOWIEDZI „ile projektow Vercela ma ten produkt i gdzie stoja
+# ich pliki konfiguracji". Rozstrzygniecie W6: DWA projekty, bo budowniczy
+# Pythona i budowniczy Next.js nie mieszcza sie w jednym katalogu glownym —
+# silnik stoi w korzeniu, interfejs w `interfejs/`.
+#
+# DLACZEGO TA KROTKA W OGOLE ISTNIEJE (W12, 2026-08-30). Do W12 straznik
+# regionu czytal WYLACZNIE `vercel.json` z korzenia. Mutacja Leo M-L12 —
+# `interfejs/vercel.json`, "fra1" -> "iad1" — dala `1113 passed`: NIC nie
+# padlo. A to projekt interfejsu renderuje ekrany po stronie serwera i
+# przepuszcza przez siebie kwoty Darka, wiec przeniesienie JEGO regionu poza
+# UE cofa polowe tego, co zrobil W6 (PRD par. 13 R7: dostawcy w UE), nie
+# czerwieniac niczego. Straznik patrzacy na jeden z dwoch plikow jest
+# straznikiem polowy drzwi.
+
+PROJEKTY_VERCELA = ("vercel.json", "interfejs/vercel.json")
+
+#: Katalogi, w ktorych `vercel.json` NIE jest nasza konfiguracja: paczki
+#: zewnetrzne, wytwory budowania, srodowisko Pythona. Bez tego pomiar
+#: policzylby cudze pliki i sam by sie zaczerwienil.
+_POMIJANE_KATALOGI = frozenset({
+    "node_modules", ".next", ".venv", "__pycache__", ".git", ".pytest_cache",
+    ".vercel", "zrzuty",
+})
+
+
+def _znalezione_konfiguracje() -> set[str]:
+    """Wszystkie NASZE pliki `vercel.json` w drzewie, sciezkami wzglednymi."""
+    znalezione = set()
+    for plik in KORZEN.rglob("vercel.json"):
+        wzgledna = plik.relative_to(KORZEN)
+        if _POMIJANE_KATALOGI & set(wzgledna.parts):
+            continue
+        znalezione.add(wzgledna.as_posix())
+    return znalezione
+
+
+def test_spis_projektow_OBEJMUJE_KAZDY_plik_konfiguracji():
+    """KONTROLA LICZNOSCI STRAZNIKA REGIONU — pyta, ILE plikow konfiguracji
+    istnieje, a nie ILE z nich znalazl `fra1`.
+
+    Bez tego straznika kazdy nastepny projekt Vercela wchodzi poza pomiar po
+    cichu: jego region nikt nie sprawdza, a suita jest zielona. Dokladnie tak
+    `interfejs/vercel.json` zyl poza pomiarem od W6 do W12.
+
+    Mutacja czerwieniaca: dopisz trzeci `vercel.json` gdziekolwiek w drzewie
+    (albo usun pozycje z `PROJEKTY_VERCELA`).
+    """
+    znalezione = _znalezione_konfiguracje()
+    assert znalezione, (
+        "Pomiar nie zobaczyl ANI JEDNEGO pliku `vercel.json`. Straznik "
+        "regionu patrzy w pustke — to nie jest zielone, to jest slepe.")
+    oczekiwane = set(PROJEKTY_VERCELA)
+    assert znalezione == oczekiwane, (
+        f"Spis projektow rozjechal sie z drzewem.\n"
+        f"  w drzewie ({len(znalezione)}): {sorted(znalezione)}\n"
+        f"  w spisie  ({len(oczekiwane)}): {sorted(oczekiwane)}\n"
+        f"Plik konfiguracji spoza spisu NIE JEST sprawdzany pod katem regionu "
+        f"— dopisz go do `PROJEKTY_VERCELA` albo usun z drzewa.")
+
 
 @pytest.fixture(scope="module")
-def konfiguracja_silnika() -> dict:
-    plik = KORZEN / "vercel.json"
-    assert plik.exists(), (
-        "Nie ma `vercel.json` w korzeniu. Bez niego funkcja Pythona nie ma "
-        "ani jawnego limitu czasu, ani wskazanego regionu.")
-    return json.loads(plik.read_text(encoding="utf-8"))
+def konfiguracje_platformy() -> dict:
+    """Wszystkie konfiguracje projektow, wczytane naraz.
+
+    Sam fikstur jest kontrola licznosci: jesli ktorykolwiek plik ze spisu
+    zniknie, czerwieni sie tutaj, a nie „przechodzi, bo nie bylo czego czytac".
+    """
+    wczytane = {}
+    for wzgledna in PROJEKTY_VERCELA:
+        plik = KORZEN / wzgledna
+        assert plik.exists(), (
+            f"Nie ma `{wzgledna}`. Bez niego projekt nie ma wskazanego regionu "
+            f"— funkcja stanie tam, gdzie zechce platforma.")
+        wczytane[wzgledna] = json.loads(plik.read_text(encoding="utf-8"))
+    assert len(wczytane) == len(PROJEKTY_VERCELA), (
+        f"Wczytano {len(wczytane)} konfiguracji z {len(PROJEKTY_VERCELA)} "
+        f"zapowiedzianych.")
+    return wczytane
+
+
+@pytest.fixture(scope="module")
+def konfiguracja_silnika(konfiguracje_platformy) -> dict:
+    return konfiguracje_platformy["vercel.json"]
 
 
 def test_funkcja_silnika_MA_JAWNY_limit_czasu(konfiguracja_silnika):
@@ -93,19 +173,32 @@ def test_funkcja_silnika_MA_JAWNY_limit_czasu(konfiguracja_silnika):
             f"Funkcja {nazwa}: `maxDuration` poza zakresem planu.")
 
 
-def test_funkcja_silnika_STOI_W_UNII(konfiguracja_silnika):
-    """Dane finansowe przetwarzane w UE — PRD §13 R7.
+#: Frankfurt, Sztokholm, Paryz, Dublin. JEDEN NOSNIK — obie strony granicy
+#: (funkcja Pythona i renderowanie Next.js) pytaja o te sama liste.
+REGIONY_W_UNII = frozenset({"fra1", "arn1", "cdg1", "dub1"})
 
-    Mutacja czerwieniaca: zmien `regions` na `["iad1"]`.
+
+@pytest.mark.parametrize("wzgledna", PROJEKTY_VERCELA)
+def test_projekt_STOI_W_UNII(konfiguracje_platformy, wzgledna):
+    """Dane finansowe przetwarzane w UE — PRD par. 13 R7. KAZDY projekt, nie
+    tylko silnik: interfejs renderuje po stronie serwera i kwoty Darka
+    przechodza takze przez jego lambdy.
+
+    Mutacje czerwieniace (obie obowiazkowe, osobno):
+      `vercel.json`          regions -> ["iad1"]
+      `interfejs/vercel.json` regions -> ["iad1"]
     """
-    regiony = konfiguracja_silnika.get("regions")
-    assert regiony, "`vercel.json` nie wskazuje regionu — funkcja stanie tam, gdzie zechce platforma."
-    DOZWOLONE = {"fra1", "arn1", "cdg1", "dub1"}  # Frankfurt, Sztokholm, Paryz, Dublin
-    assert len(regiony) >= 1, "Pomiar nie zobaczyl ani jednego regionu."
+    konfiguracja = konfiguracje_platformy[wzgledna]
+    regiony = konfiguracja.get("regions")
+    assert regiony, (
+        f"`{wzgledna}` nie wskazuje regionu — funkcja stanie tam, gdzie "
+        f"zechce platforma.")
+    assert len(regiony) >= 1, (
+        f"`{wzgledna}`: pomiar nie zobaczyl ani jednego regionu.")
     for r in regiony:
-        assert r in DOZWOLONE, (
-            f"Region {r} lezy poza UE. Baza stoi w `eu-central-1`, a dane sa "
-            f"finansami osoby fizycznej.")
+        assert r in REGIONY_W_UNII, (
+            f"`{wzgledna}`: region {r} lezy poza UE. Baza stoi w "
+            f"`eu-central-1`, a dane sa finansami osoby fizycznej.")
 
 
 # --- 3. jeden nosnik adresu silnika ---------------------------------------
