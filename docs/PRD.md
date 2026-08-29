@@ -1,6 +1,20 @@
 # Doradca Finansowy — dokument wymagań produktu (PRD)
 
-**Wersja:** v1.3 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
+**Wersja:** v1.4 · 2026-08-29 · autor: Ethan (CTO) · bump: Sophia (Product Owner) · **status: do sign-offu Darka**
+
+**Changelog v1.3 → v1.4 — sześć decyzji produktowych z recenzji zadania Z3, jedno sprostowanie
+cudzej przesłanki, trzy nowe pozycje niezweryfikowane. Zero zmian zakresu poza kartą „Co mam
+zrobić".** Recenzja pracy Mili (commit `2d5587d`) przez Sophię (PO). **D-54** wpuszcza kartę
+„Co mam zrobić" do v1; **D-56** zawęża jej zakres do C1. **D-55 blokuje jeden element tamtej
+pracy**: linia „Ile mogę jeszcze rozdysponować we wrześniu" wróciła na ekran Płynność na
+przesłance *„Sophia już raz zdecydowała, że zostaje"* — przesłanka sprawdzona w nośniku
+pierwotnym i **obalona**: decyzja D-10 istniała, ale została **uchylona przez D-16 Darka** tego
+samego dnia o 16:50. **D-57** rozstrzyga znak słowny na `FINANSE` i wskazuje **jedną** wartość
+wiążącą dla wykonawcy, bo ramki i kod mówiły dziś co innego. **D-58** rozstrzyga znak minus na
+korzyść ramki. **D-59** odrzuca brzmienie sekcji „Gdzie leżą dane" — dane o położeniu danych mają
+być **odczytem, nie obietnicą**. Pozycje 11–13 rozdziału 17 opisują trzy rzeczy, których dziś nikt
+nie pilnuje: nieustalony region bazy, narzędzie pomiarowe drukujące zawyżony zapas i drugi nośnik
+treści karty poza bramką.
 
 **Changelog v1.2 → v1.3 — trzy sprostowania jawne i jedna nowa decyzja. Zero zmian zakresu.**
 Wszystkie trzy pozycje wykryto **pomiarem**, nie lekturą, i wszystkie trzy obalają przesłankę,
@@ -1014,6 +1028,12 @@ Numeracja kontynuuje D-1…D-36 z przekazania poprzednika.
 | D-51 | **S-2: próg poduszki jest liczony**, ręczne nadpisanie widoczne jako odstępstwo | 2026-08-28 |
 | D-52 | **S-3: sekcja „gdzie leżą dane" w Ustawieniach do przeprojektowania** pod chmurę | 2026-08-28 |
 | D-53 | **Typografia: krój z ramki, rozmiar 15 px.** Krój bezszeryfowy dokładnie jak w ramkach; podstawa **15 px** zamiast 13 px z ramki; bramka „≥ 11 pt" **zostaje w mocy**, bo 15 px = 11,25 pt | 2026-08-29 |
+| D-54 | **Karta „Co mam zrobić" wchodzi do v1** — na ekranie Płynność, jako komponent podrzędny wobec wiersza zamknięcia. Najwyżej trzy działania, każde z **kwotą** i **nazwanym kosztem**; karta jest widoczna **zawsze**, także w miesiącu bez deficytu | 2026-08-29 |
+| D-55 | **Linia „Ile mogę jeszcze rozdysponować…" NIE wraca na ekran Płynność.** D-16 (Darek, 28.08 16:50) uchyliła D-10 (Sophia, 28.08 01:19); miejscem docelowym jest ekran **Budżet**, jak wskazała D-16 | 2026-08-29 |
+| D-56 | **Zakres karty w v1 to wyłącznie C1** („ile mogę odłożyć w tym miesiącu"). C2 (nadpłata kredytu) poza zakresem do czasu, aż zobowiązania poniosą oprocentowanie; C3 nie wchodzi do karty; C4 poza v1 (D-42). **Niewykorzystane miejsca zostają puste** | 2026-08-29 |
+| D-57 | **Znak słowny w nagłówku brzmi `FINANSE`** — dopuszczalne wykonanie D-47, nie odstępstwo od niego: D-47 nazywa aplikację, nie napis w pasku. Pełna nazwa stoi w tytule okna | 2026-08-29 |
+| D-58 | **Minus typograficzny (U+2212) jest wiążący dla każdej kwoty ujemnej** na ekranie; jedynym nośnikiem formatowania kwot zostaje `silnik/prezentacja.py`, a widok go **woła** | 2026-08-29 |
+| D-59 | **Sekcja „Gdzie leżą dane" pokazuje ODCZYT, nie obietnicę** — dostawca, region, kraj i data odczytu pochodzą z konfiguracji połączenia. Dopóki region nie jest znany, ekran mówi to wprost | 2026-08-29 |
 
 **D-53 — koszt nazwany.** 15 px zamiast 13 px **przesuwa wysokości bloków tekstu**, więc ramka
 i ekran **nie zejdą się dokładnie w pionie**. Bramka odwzorowania (12.7, próg ≤ 2% różniących się
@@ -1024,6 +1044,99 @@ położenia elementów**. Podniesienie progu dla położenia byłoby zdjęciem b
 **Czego D-53 nie rozstrzyga:** 804 deklaracji 13 px w samych ramkach (rozdział 10.4) oraz kroju
 szeryfowego na kwotach, obecnego w 37 z 41 ramek i nieobecnego dziś w `powloka.css`. Pierwsze —
 pytanie P11; drugie — do przeniesienia w zadaniu Z1, bez osobnej decyzji.
+
+**D-54 — czego karta nie robi i jak zmierzono pierwszeństwo.** Karta nie powtarza werdyktu
+z wiersza „Najniżej" — nazywa **działanie**, nie fakt. Pierwszeństwo wiersza zamknięcia zmierzone
+na `makiety/Main.dc.html`: wiersz zamknięcia **56 px**, największy stopień pisma wewnątrz karty
+po D-55 **15 px**, stosunek **3,73×** wobec progu Kruga ≥ 1,5×. Ramka wiążąca dla ekranu:
+`makiety/Main.dc.html`; ramka opisująca **oba stany karty** (jest co robić / wszystko w porządku):
+`makiety/CoMamZrobic.dc.html`.
+
+**Powód, dla którego karta nie znika w dobrym miesiącu.** Karta znikająca uczy, że jej pojawienie
+się oznacza kłopot, a to buduje odruch **nieotwierania aplikacji wtedy, gdy jest najbardziej
+potrzebna**. W miesiącu bez deficytu karta niesie **jedną** pozycję — „ile możesz w tym miesiącu
+odłożyć" — i nie dorabia drugiego działania na siłę.
+
+**D-54 (ciąg dalszy) — karta należy do WSZYSTKICH stanów ekranu pierwszego, nie tylko do złego.** To jest
+warunek, dla którego kartę w ogóle zamawialiśmy, i dziś **nie jest spełniony na ramkach**.
+Zmierzone 2026-08-29, `grep -c "Co mam zrobić"` na wariantach ekranu pierwszego:
+
+| Ramka | Co przedstawia | Karta |
+|---|---|---|
+| `Main.dc.html` | stan zły (schodzisz poniżej zera) | **1** |
+| `Main-Ciemny.dc.html` | to samo, motyw ciemny | **1** |
+| `Main-Dobrze.dc.html` | stan dobry — w nośniku projektowym opisany jako **„stan NAJCZĘSTSZY"** | **0** |
+| `NieWiem.dc.html` | stan „prognoza nie wie" — **stan startowy**, czyli pierwszy, jaki Darek zobaczy | **0** |
+
+Ramka jest wiążącą specyfikacją zakresu (D-49), więc ramka stanu dobrego **bez karty znaczy
+„tu karty nie ma"** — czyli dokładnie kartę znikającą, przed którą to zlecenie miało chronić.
+Stan 2 opisany na `CoMamZrobic.dc.html` **nie zastępuje** ramki ekranu: to arkusz specyfikacji,
+poza bramką `--kontrola` (rozdział 17, pozycja 13). **Wymagane: karta wchodzi na
+`Main-Dobrze` i na `NieWiem`.** W stanie „nie wiem" karta nie znika i nie zgaduje — mówi, czego
+brakuje, żeby dało się cokolwiek policzyć (§3.7 konstytucji projektu).
+
+**Ile działań w v1 — pytanie zamknięte, żeby nikt go nie zgadywał.** Górna granica to trzy, ale
+z D-56 wynika, że w v1 działanie jest **dokładnie jedno**. Wykonawca **nie projektuje** układu
+dla dwóch ani trzech pozycji i nie dorabia treści do pustych miejsc.
+
+**D-55 — sprostowanie jawne, bo przesłanka pochodziła z nośnika wtórnego.**
+`../AI CFO/docs/makiety-v2/decyzje-projektowe.md` niesie w wierszu 619 zdanie, dosłownie:
+*„Zostaje na ekranie **decyzją Sophii z 2026-08-28**, ale traci pierwszeństwo: 20 px wobec 56 px."*
+**To zdanie jest dziś nieprawdziwe.** Nośnikiem pierwotnym decyzji jest
+`../AI CFO/docs/2026-08-28-przekazanie-do-implementacji.md` v1.9 (status: *jedyny nośnik decyzji*),
+gdzie **D-10 stoi przekreślona**, z adnotacją *„UCHYLONA przez D-16 (28.08, 16:50)"*.
+D-16 brzmi: *„Wolne środki ZNIKAJĄ z ekranu płynności. Darek, 16:50: »Zdejmij liczbę z dołu,
+prognoza wystarczy«"* — z rachunkiem, który Darek złożył sam: `9 920,79 + (−10 131,46) = −210,67`,
+**co do grosza werdykt prognozy stojący wyżej na tym samym ekranie**. Rachunek powtórzony na
+dzisiejszej ramce zgadza się: `3 025,33 − 660,00 − 2 576,00 = −210,67`.
+Liczba niesie więc treść już obecną, tylko w postaci nieczytelnej bez dodawania w pamięci —
+i dodatkowo ma **znaną, nierozstrzygniętą wadę czytelności** (§4.4 tamtego dokumentu:
+*„czyta się jak katastrofa, a znaczy »nie zaplanowałeś przychodu we wrześniu«"*, pytanie 3 nadal
+otwarte). Zmiana miejsca z dołu ekranu do wnętrza karty tej wady nie usuwa.
+
+**D-57 — pomiar, na którym stoi.** Budżet wiersza nagłówka przy ramce 1440 px i wcięciu 40 px
+wynosi **1360 px**. Wiersz niesie: znak słowny, przycisk księgowania, dziewięć pozycji paska
+i wskaźnik daty. Pomiar `makiety/miara.py` powtórzony 2026-08-29, z **doliczonym wskaźnikiem daty**
+(171,2 px), którego samo narzędzie nie liczy:
+
+| Znak słowny | Szerokość wiersza | Zapas do 1360 px | Werdykt |
+|---|---|---|---|
+| `FINANSE` (światło 0,12 em) | 1314,6 px | **45,4 px** | mieści się |
+| `Doradca` (0,12 em) | 1325,5 px | 34,5 px | mieści się, ale **koliduje** z pozycją paska „Doradca" — to samo słowo w tym samym wierszu znaczyłoby dwie rzeczy |
+| `Doradca Finansowy` (0,16 em) | 1449,4 px | **−89,4 px** | **nie mieści się** |
+| `Doradca Finansowy` (0,12 em) | 1439,2 px | −79,2 px | **nie mieści się** |
+
+Pełna nazwa mieści się **wyłącznie** po skróceniu wskaźnika daty do `6 X · 09:40` (zapas 13,9 px),
+czyli **kosztem roku** — w aplikacji, której cała treść to zobowiązania przypisane do lat.
+Ta zamiana jest odrzucona.
+**Jedna wartość wiążąca dla wykonawcy:** `interfejs/lib/ekrany.ts`, stała `ZNAK_SLOWNY`, wartość
+`"FINANSE"`, światło 0,12 em. Dziś stoi tam `"Doradca"` — **to jest rozjazd do naprawy w kodzie,
+nie w ramkach.** Pełna nazwa „Doradca Finansowy" zostaje w tytule okna
+(`interfejs/app/layout.tsx`), więc D-47 ma pokrycie w miejscu, w którym system operacyjny
+pokazuje nazwę aplikacji.
+
+**D-58 — dziś trzy nośniki znaku minus, a wyznaczony mówi co innego niż ekran.**
+Pomiar 2026-08-29: `rdzen/prezentacja.zloty(Decimal("-210.67"))` zwraca `'-210,67\xa0zł'`
+— **dywiz ASCII, bez U+2212**; `interfejs/lib/kwota.ts` składa własny prefiks `−` (U+2212);
+ramki po Z3 niosą U+2212. Rozstrzygnięcie idzie **za ramką** (D-49): na ekranie ma stać minus
+typograficzny. Wykonanie należy do Z4 — `prezentacja.py` zmienia znak, a widok przestaje
+formatować kwoty samodzielnie.
+
+**D-59 — czego dzisiejsze brzmienie nie spełnia.** Ramka `Ustawienia.dc.html` niesie zdanie:
+*„Baza leży u Neona (PostgreSQL), serwery w Unii Europejskiej — dokładny region potwierdzamy przy
+zakładaniu projektu."* Trzy zastrzeżenia. **Po pierwsze**, „potwierdzamy przy zakładaniu projektu"
+jest notatką wykonawcy do wykonawcy; użytkownik pytający „gdzie leżą moje pieniądze na papierze"
+dostaje w odpowiedzi cudzy plan pracy. **Po drugie**, położenie danych jest **stanem faktycznym
+działającego systemu**, więc musi być **odczytane**, nie wpisane w ekran; zdanie wpisane na stałe
+będzie prawdziwe najwyżej przez przypadek. Pomiar 2026-08-29: w `Doradca Finansowy/.env` jest
+**zero wystąpień słowa `neon`**, a baza stoi dziś w kontenerze na porcie 5434 — na dziś **oba
+człony zdania są nieprawdziwe**. **Po trzecie**, ten sam fakt stoi w dwóch miejscach ekranu
+(nagłówek sekcji Ustawienia: *„24 kategorie · dane w chmurze (Unia Europejska)"*) — dwa nośniki
+jednej reguły. Wymagania: jeden nośnik; treść z odczytu konfiguracji (dostawca, region, kraj,
+data odczytu); dopóki region nie jest znany, ekran mówi to **wprost i po ludzku**, razem z tym,
+co się z tym robi — dokładnie jak każdy inny stan „nie wiem" (§3.7 konstytucji projektu).
+Umieszczenie bazy w Unii Europejskiej **zostaje wymaganiem wiążącym** (D-38, D-44) — ale jest
+wymaganiem do spełnienia, nie zdaniem do pokazania, zanim będzie prawdziwe.
 
 ### 16.1 Pytania nadal otwarte — nie zgaduj ich
 
@@ -1071,6 +1184,25 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
 10. **Że próg ≥ 11 pt i odwzorowanie co do piksela dadzą się spełnić naraz** — **pomiar mówi, że
     nie** (804 deklaracje 13 px w ramkach, rozdział 10.4). Pozycja czeka na odpowiedź **P11**;
     do tego czasu **nie wolno cytować obu bramek jako spełnialnych jednocześnie**.
+11. **Region serwera bazy — nieustalony i niezmierzony.** Pomiar 2026-08-29: `grep -c neon
+    "Doradca Finansowy/.env"` zwraca **0**; projektu u dostawcy nie ma, baza stoi w kontenerze
+    na porcie 5434. Zdania „serwery w Unii Europejskiej" **nie wolno dziś cytować jako faktu**
+    ani pokazywać użytkownikowi (D-59). Luka zamyka się w chwili założenia projektu, odczytem
+    regionu z konfiguracji.
+12. **`makiety/miara.py` mierzy mniej, niż drukuje.** Narzędzie sumuje znak słowny, przycisk
+    księgowania i pozycje paska, ale **nie liczy wskaźnika daty**, który `buduj-makiety.py`
+    wstawia w ten sam wiersz nagłówka (`UZYTKOWE = ()`, wiersz 125). Zmierzone 2026-08-29:
+    narzędzie drukuje *„ZAPAS w jednej linii 200,6 px"*, a sam wskaźnik daty ma **171,2 px** —
+    realny zapas to **45,4 px**. Kto zaufa wydrukowi, wyciągnie wniosek odwrotny do prawdziwego
+    (narzędzie orzeka „Doradca Finansowy MIESCI SIE", a nazwa **nie mieści się**). Werdykt D-57
+    stoi na pomiarze z **doliczoną** datą, nie na wydruku narzędzia. **Narzędzie do naprawy** —
+    wraca do Mili.
+13. **Karta „Co mam zrobić" istnieje w dwóch plikach, a bramka pilnuje jednego.** Treść karty
+    stoi równolegle w `makiety/Main-zrodlo.dc.html` (ekran) i `makiety/CoMamZrobic.dc.html`
+    (specyfikacja dwóch stanów). Zmierzone 2026-08-29: `buduj-makiety.py --kontrola` sprawdza
+    **21 plików** i `CoMamZrobic.dc.html` **nie jest wśród nich** — rozjazd obu kopii nie zapali
+    się na niczym. Świadomy drugi nośnik, dopuszczalny wyłącznie z progiem: **przy pierwszej
+    zmianie treści karty** obie kopie schodzą do jednej albo dostają strażnika.
 
 ---
 
