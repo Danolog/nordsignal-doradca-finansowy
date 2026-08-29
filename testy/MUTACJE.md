@@ -335,3 +335,67 @@ Wszystkie trzy przepisano na `stawki.do_groszy`.
   test `test_sciezka_bazy.py` niesie własną kontrolę liczności
   (`test_straznik_ISTNIEJE_a_nie_tylko_powinien`) i kontrolę dwustronną
   (`test_straznik_PRZEPUSZCZA_sciezke_spoza_produkcji`), co jest słabsze niż mutacja.
+
+---
+
+## Przebieg 2026-08-29 — Z5, kontrakt po obu stronach granicy
+
+Kopia drzewa poza repozytorium (`scratchpad/mut5`), `__pycache__` czyszczony przed **każdym**
+przebiegiem. Kontrola bazowa kopii: **807 passed, 3 deselected** — identycznie jak w repozytorium.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M4** | Zmiana nazwy pola w `silnik/kontrakt.py`: `saldoPoDniu` → `saldoDnia` | `test_nazwy_pol_sie_ZGADZAJA[PozycjaKsiegi]` · `test_OPCJONALNOSC_pol_sie_zgadza[PozycjaKsiegi]` · `test_TE_SAME_pola_sa_kwotami[PozycjaKsiegi]` · `test_saldo_bite_RAZ_NA_DZIEN` · `test_saldo_raz_na_dzien_NIE_MODYFIKUJE_wejscia` · `test_ODPOWIEDZ_zlozona_z_kontraktu_przechodzi_granice_bez_ani_jednej_liczby` | **czerwony** |
+| **M5** | `api/kwoty.py`: `kwota()` zwraca `float(...)` zamiast `str(...)` | `test_kwota_wychodzi_NAPISEM_i_zaokragla_sie_RAZ` · `test_ODPOWIEDZ_zlozona_z_kontraktu_przechodzi_granice_bez_ani_jednej_liczby` | **czerwony** |
+| **M6** | `silnik/rdzen/magazyn.py`: `sciezka_bazy()` przestaje wołać `STRAZNICY_SCIEZKI` | `test_pod_pytestem_produkcyjna_sciezka_jest_BLEDEM` | **czerwony** |
+
+Kontrola po cofnięciu każdej mutacji z osobna: **807 passed, 3 deselected**.
+
+### M4 — komunikat mówi też, w którą stronę naprawiać
+
+```
+E  AssertionError: PozycjaKsiegi: tylko we wzorcu ['saldoPoDniu'];
+   tylko w Pythonie ['saldoDnia']. Wzorcem jest `kontrakt.ts` — poprawia się Python.
+```
+
+Kierunek zgodności stoi **w treści błędu**, nie tylko w nagłówku pliku. Strażnik, który mówi
+„niezgodność", zostawia wykonawcy wybór, którą stronę zmienić — a ten wybór jest już podjęty:
+oba ekrany są zbudowane wobec `kontrakt.ts` i przechodzą bramkę odwzorowania.
+
+### M5 — dowód, że obchód idzie w głąb, a nie po wierzchu
+
+```
+E  AssertionError: liczba zmiennoprzecinkowa w odpowiedzi:
+   ['$.saldoMinimalne', '$.ksiega[0].saldoPoDniu', '$.ksiega[1].kwota',
+    '$.ksiega[1].saldoPoDniu', '$.ksiega[2].kwota', '$.wykres[0].saldo']
+```
+
+**Pięć z sześciu znalezisk leży poniżej pierwszego poziomu**, w listach obiektów. Obchód sprawdzający
+tylko wierzch znalazłby jedno (`$.saldoMinimalne`) i zameldowałby, że reszta jest w porządku —
+a wszystkie kwoty tego projektu siedzą właśnie w `ksiega` i `wykres`.
+
+Przebieg końcowy odwiedza **21 liści** dla realistycznej odpowiedzi (cztery pola wierzchnie,
+trzy pozycje księgi po pięć pól, jeden punkt wykresu po dwa) i ta liczba jest **sprawdzana
+asercją**, nie tylko raportowana. Bez niej mutacja polegająca na tym, że obchód nigdzie nie
+dociera, przeszłaby na zielono: pusta lista ścieżek wygląda identycznie jak brak wady.
+
+### M6 — domknięcie długu zgłoszonego w Z4
+
+W raporcie z Z4 zgłosiłem: *„strażnik ścieżki bazy produkcyjnej jest niepotwierdzony mutacją,
+a powołuję się na niego jako na bramkę"*. **Dług domknięty — strażnik jest potwierdzony.**
+
+Mutacja celowo trafia w **kod produkcyjny** (`magazyn.sciezka_bazy` przestaje wołać listę
+strażników), nie w `conftest.py`. Mutacja w `conftest.py` dowiodłaby tylko tego, że test czyta
+konfigurację testów; ta dowodzi, że **mechanizm w silniku** naprawdę stoi między testem a bazą
+z realnymi finansami. Komunikat: `Failed: DID NOT RAISE BladMagazynu`.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano strony TypeScriptu.** `interfejs/lib/kontrakt.ts` jest wzorcem i cudzą własnością
+  (Z1/Z2); czytam go, nie piszę do niego. Skutek: **nie wykazałem mutacją**, że strażnik czerwieni
+  się na zmianie po stronie wzorca — wnioskuję to z symetrii porównania zbiorów, co jest słabsze
+  niż pomiar. Etykieta jawna: **ta połowa strażnika jest niepotwierdzona**.
+- **Rozjazd separatora tysięcy nie jest wadą do naprawy w tym zadaniu, tylko długiem przypiętym.**
+  `test_dwa_nosniki_formatowania_kwoty_sa_PRZYPIETE` nie sprawdza zgodności — pilnuje, żeby
+  **znana** różnica (Python U+00A0, TypeScript U+0020) nie zmieniła się bez decyzji. Ramki niosą
+  U+0020, więc odstaje strona Pythona.

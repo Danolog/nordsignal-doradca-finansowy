@@ -1,3 +1,5 @@
+# Z5: `api/kwoty.py` stoi na `fastapi.responses.JSONResponse` — klasa
+# odpowiedzi, ktora ODMAWIA wypuszczenia liczby zmiennoprzecinkowej.
 fastapi==0.141.1
 uvicorn[standard]==0.42.0
 psycopg[binary,pool]==3.2.11

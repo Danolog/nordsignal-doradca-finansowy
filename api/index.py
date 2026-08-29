@@ -13,35 +13,24 @@ zmiennoprzecinkowe, gubia grosze i zwracaja 200 — awaria, ktora melduje sukces
 
 from __future__ import annotations
 
-import json
-from decimal import Decimal
-from typing import Any
-
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import JSONResponse
 
+from api.kwoty import OdpowiedzJSON
 
-class OdpowiedzZKwotami(JSONResponse):
-    """Kwoty wychodza jako NAPIS, nigdy jako liczba zmiennoprzecinkowa.
+# KLASA ODPOWIEDZI MA JEDEN NOSNIK — `api/kwoty.py` (Z5 krok 5.3).
+#
+# Do Z5 stala tu wlasna klasa `OdpowiedzZKwotami`, czyli DRUGI nosnik tej samej
+# reguly, i rozniła sie od pierwszego w dwoch miejscach naraz:
+#   * zamieniala `Decimal` na napis PO CICHU (`format(x, "f")`) — zamiast
+#     zadac, zeby zaokraglenie do groszy zapadlo raz, w `kwoty.kwota()`;
+#   * NIE SPRAWDZALA WCALE liczb zmiennoprzecinkowych. `json.dumps` serializuje
+#     `float` sam, bez pytania `default`, wiec haczyk na nieznanym typie go nie
+#     widzial. Odpowiedz z `float` w srodku wychodzila stad z kodem 200.
+# Obie roznice byly ciche. Straznik: `testy/test_kontrakt_dwa_nosniki.py`,
+# sekcja „serializacja".
 
-    `json.dumps` domyslnie odmawia serializacji `Decimal`, a najczestsza
-    "naprawa" — `default=float` — jest dokladnie ta awaria, przed ktora ten
-    plik broni. Napis zachowuje grosze i zmusza odbiorce do jawnej zamiany.
-    """
-
-    def render(self, content: Any) -> bytes:
-        def zamien(x):
-            if isinstance(x, Decimal):
-                return format(x, "f")
-            raise TypeError(f"nieserializowalne: {type(x).__name__}")
-
-        return json.dumps(
-            content, default=zamien, ensure_ascii=False, allow_nan=False,
-        ).encode("utf-8")
-
-
-trasy = APIRouter(default_response_class=OdpowiedzZKwotami)
-aplikacja = FastAPI(title="Doradca Finansowy", default_response_class=OdpowiedzZKwotami)
+trasy = APIRouter(default_response_class=OdpowiedzJSON)
+aplikacja = FastAPI(title="Doradca Finansowy", default_response_class=OdpowiedzJSON)
 
 
 @trasy.get("/api/zdrowie")
