@@ -1784,3 +1784,47 @@ przebiegiem, zanim ktokolwiek dopisze go do listy.
   potwierdzona **odczytem źródła** (`interfejs/app/budzet/ekran.tsx:176–178`),
   nie przebiegiem przeglądarki.
 - **Nie ruszono interfejsu, `vercel.json` ani wdrożenia.**
+
+---
+
+## W12 — strażnik regionu widział jeden z dwóch projektów Vercela (2026-08-30, Eva)
+
+**Kopia drzewa poza repozytorium** (`rsync` bez `.venv`, `node_modules`, `.next`),
+bo mutujący agent nie wstrzykuje mutacji do drzewa, w którym pracują inni.
+**Kontrola przed:** `6 passed`.
+
+| # | Mutacja | Który test padł (po nazwie) | Wynik |
+|---|---|---|---|
+| M-W12-1 | `vercel.json` (korzeń, projekt silnika): `regions` `["fra1"]` → `["iad1"]` | `test_projekt_STOI_W_UNII[vercel.json]` | `1 failed, 5 passed` |
+| M-W12-2 | `interfejs/vercel.json` (projekt interfejsu): `regions` `["fra1"]` → `["iad1"]` — **to jest mutacja M-L12 Leo, która wcześniej dawała `1113 passed`** | `test_projekt_STOI_W_UNII[interfejs/vercel.json]` | `1 failed, 5 passed` |
+| M-W12-3 | **kontrola liczności:** dołożony trzeci `vercel.json` (`wiedza/vercel.json`) poza spisem `PROJEKTY_VERCELA` | `test_spis_projektow_OBEJMUJE_KAZDY_plik_konfiguracji` | `1 failed, 5 passed` |
+| M-W12-4 | **ślepota po staremu:** usunięty `interfejs/vercel.json` | `test_spis_projektow_OBEJMUJE_KAZDY_plik_konfiguracji` + 3 błędy przygotowania fikstury | `1 failed, 2 passed, 3 errors` |
+
+**Kontrola po cofnięciu wszystkich czterech:** `6 passed`; oba pliki z powrotem
+`['fra1']`, w drzewie znów dokładnie dwa `vercel.json`.
+
+**Dlaczego M-W12-2 jest tu najważniejsza.** Do W12 strażnik czytał wyłącznie
+`vercel.json` z korzenia. Projekt interfejsu renderuje ekrany po stronie serwera
+— pomiar wdrożenia z 2026-08-30 pokazuje **17 lambd** tego projektu, wszystkie
+`nodejs24.x`, wszystkie `fra1` — i przepuszcza przez siebie kwoty Darka.
+Przeniesienie **jego** regionu poza UE cofa połowę tego, co zrobił W6, nie
+czerwieniąc niczego. PRD §13 R7 domyka ryzyko „dane finansowe w chmurze"
+m.in. przez „dostawcy w UE".
+
+**M-W12-3 jest kontrolą liczności, nie ozdobą.** Poprzedni strażnik pytał
+„czy znalazłem `fra1`", a nie „ile plików konfiguracji istnieje". Sprawdzenie,
+do którego nic nie dociera, melduje sukces — dokładnie tak `interfejs/vercel.json`
+żył poza pomiarem od W6 do W12. Nowy strażnik porównuje **zbiór plików w drzewie**
+ze spisem `PROJEKTY_VERCELA`, więc trzeci projekt Vercela nie wejdzie poza pomiar
+po cichu.
+
+### Czego przebieg W12 NIE objął
+
+- **Nie mutowano niczego poza `testy/test_wejscie_platformy.py`.** Silnik, `api/`
+  i `interfejs/` nie zostały tknięte.
+- **Region jest sprawdzany w PLIKU, nie na wdrożeniu.** Strażnik czerwieni się na
+  konfiguracji w repozytorium; ustawienie regionu zmienione ręcznie w konsoli
+  Vercela byłoby poza jego zasięgiem. Zmierzone niezależnie interfejsem
+  programowym dostawcy (2026-08-30): oba wdrożenia produkcyjne mają
+  `regions = ['fra1']`, wszystkie 18 lambd `deployedTo = ['fra1']`.
+  **Progu automatycznego na to nie ma** — nazwane jako luka, nie przemilczane.
