@@ -1137,3 +1137,98 @@ na sterowniku.
 - **Nie mutowano atomowości `zapisz_koszt` i `oznacz_fakture_zaplacona`** — świadomie odłożone do
   W4, ze strażnikami opisującymi stan dzisiejszy i jawnym progiem
   (`testy/test_transakcje_przed_postgresql.py`, nagłówek).
+
+---
+
+## Przebieg 2026-08-29 (W3) — strażnicy **przed** migracją na PostgreSQL
+
+**Co pilnują.** Trzy wady, które po podmianie sterownika SQLite → psycopg **nie dałyby żadnego
+sygnału**, bo dzisiejsze asercje mierzą coś, co po migracji przestaje o nich mówić. Strażnicy
+powstali, **póki jeszcze widać stan poprawny**:
+
+| Plik | Wada | Ile obejmuje |
+|---|---|---|
+| `testy/test_kwoty_pozostaja_dziesietne.py` | kwota wraca jako `float64` zamiast `Decimal` | **16 kolumn w 9 tabelach** (asercja `== ILE_KOLUMN_KWOTOWYCH`, stała wołana z `test_schemat_dwa_dialekty.py` — jeden nośnik) |
+| `testy/test_komunikat_duplikatu_faktury.py` | zdanie „Faktura o tym numerze już jest" wisi na treści komunikatu sterownika | 2 gałęzie tłumaczenia + **10 klauzul `except sqlite3.…`** i **1 dopasowanie po treści** (pomiar) + 34 pliki `.py` przeszukane |
+| `testy/test_null_nie_udaje_liczby.py` | `NULL` → `NaN`, prawdziwy w warunku `if` | **3 składy kolumny** × 3 wiersze + **9 kształtów wejścia sterownika** (4 braki, 5 liczb) |
+
+**Pomiar, na którym stoi cały przebieg** (pandas 3.0.5, 2026-08-29). `pandas.read_sql` ma
+`coerce_float=True` w **wartości domyślnej**. Sterownik oddający `Decimal` — czyli dokładnie to,
+co poda psycopg na kolumnie `NUMERIC`:
+
+```
+surowy kursor: [('Decimal', Decimal('7034.72')), ('Decimal', Decimal('1234567890123456.8'))]
+read_sql domyslnie -> dtypes: {'kwota': dtype('float64')}
+coerce_float=False -> dtypes: {'kwota': dtype('O')}
+```
+
+Ten sam eksperyment stoi w suicie jako `test_sterownik_oddajacy_Decimal_ZAPALA_straznika` —
+nie jako cytat z raportu, tylko jako wykonywalny przypadek.
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mutW3`, `rsync` bez `.git`
+i `.venv`), `PYTHONDONTWRITEBYTECODE=1` i czyszczenie `__pycache__` przed każdym przebiegiem.
+Po każdej mutacji plik przywracany z kopii `scratchpad/mutW3-oryginal`.
+Kontrola przed mutacjami: **28 passed** (trzy nowe pliki), **981 passed, 3 deselected** (cała suita).
+
+| # | Mutacja (`silnik/rdzen/magazyn.py`) | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `_wczytaj` przestaje zamieniać kolumny kwotowe na `Decimal` (zdjęta cała pętla po `_KWOTOWE`) | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M2** | `_wczytaj` mapuje `float(x)` zamiast `Decimal(str(x))` | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M3** | `_KWOTOWE` gubi po cichu jedną kolumnę (`koszty_jdg.kwota_vat`, 16 → 15) | `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal` | **czerwony** (1 failed, 5 passed) |
+| **M4** | `_SCHEMAT`: `wpisy_budzetu.kwota TEXT` → `REAL` — sterownik zaczyna oddawać liczbę | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` | **czerwony** (1 failed, 5 passed; **na całej suicie 2 failed, 979 passed**) |
+| **M5** | `if "numer_faktury" in str(e)` → `if "faktura_numer" in str(e)` | `test_duplikat_numeru_MOWI_o_numerze_a_nie_o_bazie` | **czerwony** (1 failed, 5 passed) |
+| **M6** | `if "numer_faktury" in str(e)` → `if True` — gałąź łapie każde naruszenie więzu | `test_INNE_naruszenie_wiezu_daje_komunikat_OGOLNY` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` · `test_ZADEN_INNY_modul_nie_rozstrzyga_po_tresci_komunikatu` | **czerwony** (3 failed, 3 passed) |
+| **M7** | `except sqlite3.IntegrityError` → `except Exception` | `test_tlumaczenie_wyjatkow_OBEJMUJE_WYLACZNIE_sterownik_sqlite3` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` | **czerwony** (2 failed, 4 passed) |
+| **M8** | `wczytaj_zobowiazania`: normalizacja `NaN` → `None` wyłączona (`if False`) | `test_kontrakt_trzyma_sie_przy_KAZDYM_skladzie_kolumny[mieszany]` · `test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN` | **czerwony** (2 failed, 14 passed; na całej suicie 4 failed, 977 passed) |
+| **M9** | `oprocentowanie_z_wiersza` przestaje rozpoznawać `NaN` (zdjęty człon `isinstance(w, float) and w != w`) | `test_oprocentowanie_z_wiersza_ROZUMIE_kazdy_ksztalt[nan-None-pandas po coerce_float na NULL]` | **czerwony** (1 failed, 15 passed) |
+| **M10** | `_wczytaj` omija `pd.read_sql` (`cursor.fetchall()` + `pd.DataFrame`) — kształt zapowiedziany w W4 | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` · `test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN` | **czerwony** (2 failed, 20 passed) |
+
+Kontrola po cofnięciu wszystkich dziesięciu mutacji (`diff -r` wobec kopii sprzed mutacji: różni się
+wyłącznie `.pytest_cache`): **981 passed, 3 deselected, 0 skipped**.
+
+### Co pokazała M4 — najważniejsza pozycja tej tabeli
+
+Mutacja zmienia typ **jednej kolumny kwotowej** z `TEXT` na `REAL`, czyli robi to, co migracja zrobi
+z szesnastoma naraz: sterownik zaczyna oddawać liczbę zmiennoprzecinkową. **979 testów z 981
+pozostaje zielonych.** Zielony pozostaje też `test_KAZDA_z_szesnastu_kolumn_kwotowych_wraca_jako_Decimal`
+z tego samego pliku — bo `_wczytaj` opakowuje liczbę z powrotem w `Decimal` **po** odczycie i strata
+staje się niewidoczna dla każdej asercji patrzącej na wynik.
+
+Łapie to wyłącznie strażnik podglądający `pandas.read_sql` **w locie**, czyli patrzący na ramkę
+**taką, jaka wyszła ze sterownika**. To jest odpowiedź na pytanie „czy ten test zaczerwieni się po
+podmianie sterownika": zaczerwieni, i wiadomo to **z pomiaru na stanie wytworzonym dzisiaj**,
+nie z przypuszczenia.
+
+### Co pokazała M10
+
+Obydwa przyrządy — szpieg nad `pd.read_sql` i podstawiona ramka po-migracyjna — **wykrywają własne
+oślepienie**. Gdy `_wczytaj` przestaje wołać `pd.read_sql` (a tak właśnie zapowiada W4: pandas nie
+wspiera surowych połączeń psycopg), strażnik nie melduje sukcesu przy pustym pomiarze, tylko pada
+z komunikatem „szpieg nie zobaczył ani jednego odczytu". Kontrola liczności działa.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano zachowania na PostgreSQL** — baza w Neonie jest pusta do W4. Wszystkie stany
+  po-migracyjne są **wytworzone**: raz sterownikiem SQLite z konwerterem oddającym `Decimal`
+  (`test_sterownik_oddajacy_Decimal_ZAPALA_straznika`), raz podstawioną ramką `float64`
+  (`test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN`), raz zmianą typu kolumny w schemacie
+  (M4). Mechanizm jest ten sam — `coerce_float` w pandas — ale **zdanie „psycopg zachowa się tak
+  samo" pozostaje niezweryfikowane pomiarem na żywej bazie**.
+- **Nie zamknięto wady 2, tylko ją opisano.** Naprawa (tłumaczenie wyjątków psycopg) należy do W4.
+  Znalezisko na przyszłość: PostgreSQL nada więzowi `numer_faktury TEXT NOT NULL UNIQUE`
+  (`schemat.sql:86`, więz **bez nazwy własnej**) nazwę automatyczną
+  `przychody_jdg_numer_faktury_key`, więc napis `"numer_faktury"` **będzie w komunikacie nadal** —
+  dopasowanie po treści może przeżyć **przypadkiem**, opierając się na nazwie, której nikt nie
+  wybrał. Zawiedzie natomiast klauzula `except sqlite3.IntegrityError`, bo `psycopg.errors.
+  UniqueViolation` nie dziedziczy z `sqlite3.Error` — i razem z nią **zapasowe** „Zapis odrzucony
+  przez bazę". To pilnuje `test_tlumaczenie_wyjatkow_OBEJMUJE_WYLACZNIE_sterownik_sqlite3`,
+  **tripwire**: po naprawie w W4 zaczerwieni się raz, świadomie.
+- **Nie objęto kolumn pieniężnych spoza `_KWOTOWE`** — `forma_opodatkowania.stawka_ryczaltu`
+  i `zobowiazania.oprocentowanie` idą przez `Decimal` ręcznie, poza `_wczytaj`. Pierwszej pilnuje
+  `test_forma_opodatkowania.py`, drugiej `test_null_nie_udaje_liczby.py`; **żadna z nich nie wchodzi
+  do liczby 16**.
+- **Nie mutowano `_stawka_z_wiersza`** (13 pozycji indeksowanych liczbą, sparowanych z ręcznie
+  wypisaną kolejnością w `SELECT`) — to nazwane ryzyko W4, bez strażnika po tej stronie.
+- **Nie mutowano ścieżki HTTP.** Wszystkie trzy strażniki kończą się na granicy magazynu. Czy
+  `Decimal` przeżywa drogę przez `api/` i z powrotem, mówią inne pliki — ten przebieg tego nie
+  mierzył.
