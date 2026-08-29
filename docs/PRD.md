@@ -1,6 +1,22 @@
 # Doradca Finansowy — dokument wymagań produktu (PRD)
 
-**Wersja:** v1.4 · 2026-08-29 · autor: Ethan (CTO) · bump: Sophia (Product Owner) · **status: do sign-offu Darka**
+**Wersja:** v1.5 · 2026-08-29 · autor: Ethan (CTO) · bump: Sophia (Product Owner) · **status: do sign-offu Darka**
+
+**Changelog v1.4 → v1.5 — pięć decyzji odblokowujących cel nocy. Jedna z nich niczego nie
+rozstrzyga: potwierdza regułę, która stała już w czterech nośnikach, w tym w dwóch rozdziałach
+tego dokumentu.** Pytanie *„czy wpisany wydatek ma zmienić prognozę płynności"* zostało
+postawione jako otwarte i obronialne w obie strony. **Nie było otwarte.** Odpowiedź jest decyzją
+Darka **D-20** z 28.08 godz. 18:04, nieprzekreśloną w nośniku pierwotnym, a obawa o podwójne
+liczenie — którą przytoczono jako powód, by nie rozstrzygać — jest **dokładnie tą obawą, dla
+której Darek odrzucił odejmowanie i wybrał podział osi** dobę wcześniej. **D-60** to potwierdza.
+**D-61** zamyka jedyną lukę, której D-20 faktycznie nie zamykała: co zrobić z pozycją planu na
+dzień przyszły w kategorii, w której wydatek już padł — i pokazuje pomiarem, że nocny przykład
+trafił dokładnie w tę lukę, bo **plan na październik ma Energię Elektryczną 330,00 zł**.
+**D-62** dokłada zdanie, dzięki któremu stojąca liczba przestaje być nieodróżnialna od zepsutej
+aplikacji. **D-63** rozstrzyga bramkę odwzorowania na korzyść wzorcowego zestawu danych i broni
+ramki stanu deficytowego przed przerysowaniem. **D-64** i tabela przy nim rozdzielają cztery luki
+kontraktu na produktowe i techniczne. Rozdział 17 dostaje pozycje 14–15: dwie rzeczy, których
+**nie zmierzyłam**, a które łatwo byłoby zacytować jako ustalone.
 
 **Changelog v1.3 → v1.4 — sześć decyzji produktowych z recenzji zadania Z3, jedno sprostowanie
 cudzej przesłanki, trzy nowe pozycje niezweryfikowane. Zero zmian zakresu poza kartą „Co mam
@@ -1034,6 +1050,11 @@ Numeracja kontynuuje D-1…D-36 z przekazania poprzednika.
 | D-57 | **Znak słowny w nagłówku brzmi `FINANSE`** — dopuszczalne wykonanie D-47, nie odstępstwo od niego: D-47 nazywa aplikację, nie napis w pasku. Pełna nazwa stoi w tytule okna | 2026-08-29 |
 | D-58 | **Minus typograficzny (U+2212) jest wiążący dla każdej kwoty ujemnej** na ekranie; jedynym nośnikiem formatowania kwot zostaje `silnik/prezentacja.py`, a widok go **woła** | 2026-08-29 |
 | D-59 | **Sekcja „Gdzie leżą dane" pokazuje ODCZYT, nie obietnicę** — dostawca, region, kraj i data odczytu pochodzą z konfiguracji połączenia. Dopóki region nie jest znany, ekran mówi to wprost | 2026-08-29 |
+| D-60 | **Prognoza płynności CZYTA wpisy — reguła nie jest nowa, jest niewdrożona.** Potwierdzenie D-20 (Darek, 28.08 18:04) po pomiarze z nocy 29.08. Sposób też był rozstrzygnięty: **podział osi**, nie odejmowanie od wyniku | 2026-08-29 |
+| D-61 | **Wpis zrealizowany konsumuje pozycję planu tej samej kategorii w tym samym miesiącu, aż do zera; nadwyżka ponad plan obciąża oś w całości.** Luka, której D-20 nie zamykała — rozstrzygnięta dziś | 2026-08-29 |
+| D-62 | **Karta „Co ruszy ten wpis" niesie wiersz o prognozie — także wtedy, gdy prognoza się nie rusza.** Nieruchoma liczba bez zdania jest nieodróżnialna od zepsutej aplikacji | 2026-08-29 |
+| D-63 | **Bramka odwzorowania dostaje wzorcowy zestaw danych; `Main.dc.html` NIE jest przerysowywana pod plan Darka** | 2026-08-29 |
+| D-64 | **`POST /api/wpisy`: v1 blokuje przycisk na czas przelotu żądania.** Dwa kliknięcia nie mogą dać dwóch wpisów. Klucz idempotentności po stronie serwera — poza v1 | 2026-08-29 |
 
 **D-53 — koszt nazwany.** 15 px zamiast 13 px **przesuwa wysokości bloków tekstu**, więc ramka
 i ekran **nie zejdą się dokładnie w pionie**. Bramka odwzorowania (12.7, próg ≤ 2% różniących się
@@ -1138,6 +1159,125 @@ co się z tym robi — dokładnie jak każdy inny stan „nie wiem" (§3.7 konst
 Umieszczenie bazy w Unii Europejskiej **zostaje wymaganiem wiążącym** (D-38, D-44) — ale jest
 wymaganiem do spełnienia, nie zdaniem do pokazania, zanim będzie prawdziwe.
 
+**D-60 — reguła stała w czterech miejscach, w tym w dwóch moich. Nie decydowałam jej dziś.**
+Nośnik pierwotny: `../AI CFO/docs/2026-08-28-przekazanie-do-implementacji.md` v1.9 (status:
+*„jedyny nośnik decyzji"*), wiersz **D-20**, **nieprzekreślony**, data 28.08 godz. 18:04. Brzmi
+dosłownie: *„Oś prognozy dzieli się na dniu dzisiejszym: dni minione liczą się z RZECZYWISTYCH
+WPISÓW, dni przyszłe z PLANU. Dziś oś powstaje wyłącznie z planu i kotwicy
+(`prognoza_plynnosci.py:252`), a wpisy służą tylko rezerwie — więc kto wydał ponad plan, widzi
+sytuację lepszą, niż jest."* Ten sam wiersz zapisuje, że **Darek sam wskazał problem**
+(*„każdy wydatek ponad plan powinien wpływać na główną kwotę"*), zaproponował odejmowanie
+przekroczenia i **po przedstawieniu obu dróg wybrał podział osi**, bo *„proste odejmowanie działa
+tylko w jedną stronę i grozi podwójnym liczeniem po odświeżeniu kotwicy"*.
+
+**Pytanie „cały wydatek czy nadwyżka ponad plan" ma więc odpowiedź trzecią i już podjętą: ani
+jedno, ani drugie.** Nie odejmujemy niczego od gotowego wyniku — **budujemy oś z dwóch źródeł**.
+Dni do dnia dzisiejszego włącznie: **rzeczywiste wpisy zamiast planu**. Dni po nim: **plan**.
+Podwójne liczenie nie powstaje strukturalnie, bo dzień policzony z wpisów **nie jest** liczony
+z planu. Obawa, która wywołała to zapytanie, jest tą samą obawą, którą Darek rozstrzygnął dobę
+wcześniej — i rozstrzygnął ją **przeciw** odejmowaniu.
+
+Trzy pozostałe nośniki tej samej reguły, wszystkie żywe:
+`docs/PRD.md` §8.2 (*„Oś prognozy dzieli się na dniu dzisiejszym"*), `docs/PRD.md` §8.3 — gdzie
+stoi jako **jeden z czterech długów „do naprawy, nie do odziedziczenia"**, ze skutkiem opisanym
+wprost: *„przekroczenie planu nie widać w prognozie"* — oraz `docs/plan-wydawania.md`, Plasterek 1
+punkt 3: *„Naprawa długu: oś prognozy dzieli się na dniu dzisiejszym (D-20) — dni minione
+z wpisów, przyszłe z planu. **Bez tego wpisanie wydatku nie zmienia niczego na Płynności i cały
+plasterek jest teatrem.**"*
+
+**Specyfikacja i bramka też były napisane** — `../AI CFO/docs/2026-08-28-plan-implementacji-v1.0.md`
+krok **1.2**: zasięg **154 testy w ośmiu plikach** (pomiar Ethana), bramka *„przy wpisie 500 zł
+**ponad plan** w dniu minionym saldo **na dziś** jest o 500,00 zł niższe niż przed wpisem; przy
+wpisie w dniu przyszłym — bez zmiany. Kotwica nowsza od wpisu unieważnia je (zero podwójnego
+liczenia). Trzy nazwane testy, trzy mutacje z cytatem."* **To jest właściwa bramka i ona wraca
+w mocy.** Bramka nocna zgubiła z niej dwa słowa — **„ponad plan"** — i zamieniła *saldo na dziś*
+na *saldo minimalne*; stąd wynik, który wygląda jak spór o semantykę, a jest źle dobranym
+przyrządem (D-61).
+
+**D-61 — luka, której D-20 nie zamykała, i dlaczego trafiła akurat na Energię.**
+D-20 mówi, z czego liczyć **dni**, a milczy o tym, co zrobić z **pozycją planu na dzień przyszły
+w kategorii, w której wydatek już padł**. Zmierzone na bazie-wzorcu 2026-08-29:
+
+```
+sqlite3 cfo_database.db "select kategoria, kwota_planowana, dzien, co_ile_miesiecy
+  from plan_budzetu where rok=2026 and powtarzalna=1
+  and (10-miesiac)%co_ile_miesiecy=0 and 10>=miesiac"
+Kredyty              319.76    1   1
+Kredyty              1305.05  12   1
+Energia Elektryczna   330.00  20   2      <-- plan NA PAŹDZIERNIK ISTNIEJE
+Czesne                660.00  25   1
+SUMA PLANU X 2026: 2614.81
+```
+
+**Plan na październik ma pozycję „Energia Elektryczna": 330,00 zł, dzień 20.** Wpis z zadania pada
+**6 X**, czyli dziś. Bez reguły oś policzyłaby **274,06 zł (6 X) plus 330,00 zł (20 X) = 604,06 zł
+za prąd w jednym miesiącu** — czyli dokładnie to podwójne liczenie, przed którym D-20 miała
+chronić, tylko wchodzące innymi drzwiami: nie przez odejmowanie, lecz przez pozycję planu, która
+nie wie, że została zapłacona.
+
+**Reguła:** wpis zrealizowany w miesiącu M i kategorii K **pomniejsza pozostałe pozycje planu tej
+kategorii w miesiącu M**, aż do zera, w kolejności dat. Co zostanie ponad plan — obciąża oś
+**w całości i bez kompensaty**. To jest asymetria **D-9** przeniesiona z kafelka na oś: nadwyżka
+wydatku pogarsza obraz, nadwyżka przychodu go nie poprawia. Kontrola na wartości znanej, ta sama
+baza: **plan 2026 nie ma ani jednej pozycji `Podatki i ZUS` ani żadnej pozycji przychodowej**
+(`select typ||' | '||kategoria … group by` daje cztery wiersze: Czesne, Energia Elektryczna, Gaz,
+Kredyty). Kategoria bez pozycji planu nie ma czego konsumować, więc wpis wchodzi w całości — i to
+zgadza się z tym, co nocna kontrola faktycznie zobaczyła na „Podatki i ZUS".
+
+**Skutek dla zlecenia nocnego, nazwany wprost: 274,06 zł na Energię Elektryczną NIE JEST wydatkiem
+ponad plan.** Plan przewiduje w tej kategorii 330,00 zł. Po poprawnym wdrożeniu D-60 i D-61
+**suma** wydatków na prąd w październiku się nie zmieni — zmieni się ich **rozkład w czasie**:
+274,06 zł przesuwa się z 20 X na 6 X, więc **każde saldo dzienne między 6 a 20 października
+spada**. Nagłówkowe `saldoMinimalne` ruszy się tylko wtedy, gdy minimum krzywej leży w tym oknie.
+**Prognoza zmienia kształt zawsze; jedna liczba nagłówka — nie zawsze.** Dlatego bramką jest
+*saldo na dziś przy wydatku ponad plan* (krok 1.2), a nie *saldo minimalne przy dowolnym wpisie*.
+
+**D-62 — czego użytkownik ma się dowiedzieć, gdy liczba stoi.** Nieruchoma liczba bez zdania jest
+nieodróżnialna od zepsutej aplikacji, a to jest §3.5 i §3.7 konstytucji projektu naraz.
+**Wzorzec już istnieje w ramce i nie trzeba go wymyślać:** `makiety/Ksiegowanie.dc.html`, karta
+„Co ruszy ten wpis", niesie wiersz *„Wolne środki | bez zmian — liczą się z planu, nie z wpisów"*
+— nazwany brak ruchu zamiast milczenia. **Karta dostaje wiersz `Płynność` zbudowany tak samo,
+w trzech brzmieniach, zawsze z wielkością, nigdy z samym słowem:**
+
+| Sytuacja | Co stoi w karcie |
+|---|---|
+| wpis mieści się w planie kategorii | `Prognoza: bez zmian co do sumy — plan na październik przewiduje 330,00 zł w tej kategorii. Zmienia się data wypływu: 20 X → 6 X` |
+| wpis przekracza plan kategorii | `Prognoza: niżej o 44,06 zł — o tyle wydatek przekracza plan kategorii` |
+| kategoria nie ma pozycji planu | `Prognoza: niżej o 274,06 zł — ta kategoria nie ma pozycji w planie na październik` |
+
+Dzisiejsza karta pokazuje `Wydatki w październiku 0,00 → 274,06 zł`, `Energia Elektryczna
+0,00 → 274,06 zł` i `Plan wydatków wykonany 0,0% → 10,5%`. **Ten trzeci wiersz jest już poprawny
+i potwierdza model:** kontrola 2026-08-29 daje `274,06 / 2 614,81 = 10,4811%`, czyli mianownikiem
+jest plan października **razem z Energią 330,00 zł**. Karta już dziś mówi „to jest **wykonanie
+planu**", tylko Płynność o tym nie wie.
+
+**D-63 — bramka odwzorowania mierzy rysunek, nie miesiąc.** `Main` daje 14,45% przy progu 2%,
+a przyczyna nie jest układowa: ramka rysuje miesiąc **z deficytem** (6 pozycji, −210,67 zł),
+plan Darka daje **7 pozycji i +7 485,98 zł**. Ekran odwzorowywał ramkę **co do piksela (0,00%)**,
+dopóki liczby były z ramki; Księgowanie doprowadzone do stanu z ramki daje **1,31%**, czyli
+w progu. To dowodzi, że układ jest dobry, a rozjeżdżają się **dane**.
+**Rozstrzygnięcie: wzorcowy zestaw danych, ramka bez zmian.** Trzy powody. **(1)** Bramka
+z rozdziału 12.7 istnieje po to, by dowieść, że **ekran wygląda jak rysunek** — to twierdzenie
+o układzie i typografii. Bramka zależna od żywych danych mierzy dwie rzeczy naraz i nie umie ich
+rozdzielić, czyli **przestaje być dowodem czegokolwiek**. **(2)** Przerysowanie `Main` pod plan
+Darka **zniszczyłoby stan deficytowy** — a to jest stan, dla którego zaprojektowano cały pierwszy
+ekran: wiersz zamknięcia w czerwieni, zdanie werdyktu, karta „Co mam zrobić" w stanie 1.
+Oddalibyśmy rysunek złego stanu za zgodność z danymi **jednego miesiąca**, a dane zmieniają się
+co miesiąc — ramka wymagałaby przerysowania w listopadzie. To już nie jest specyfikacja.
+**(3)** Stan nadwyżkowy **ma własną ramkę** — `Main-Dobrze.dc.html`. Ekran na żywych danych
+z nadwyżką należy porównywać z nią, nie z `Main`.
+**Wiążące:** bramka odwzorowania renderuje ekran na **wzorcowym zestawie danych ramki**; żywe dane
+sprawdzają bramki 12.5 (zaufanie do liczby) i test pięciu sekund, **nigdy porównanie pikseli**.
+
+**D-64 i trzy pozostałe luki kontraktu — co jest produktowe, a co techniczne.**
+
+| Luka | Klasa | Werdykt |
+|---|---|---|
+| `liczbaPozycjiCoMnieCzeka` bez stanu „nie wiem" — przy odmowie prognozy wychodzi `0` | **produktowa** | **wchodzi do v1.** `0` czyta się jako *„policzyłem i nie ma"*, a znaczy *„nie policzyłem"* — §3.5 wprost. To ta sama klasa wady co forma opodatkowania zgadnięta wartością domyślną: brak wiedzy udający wiedzę |
+| `DaneKsiegowania` bez `ostatnieSprawdzenie` | **produktowa**, tania | **wchodzi do v1.** Ta sama informacja stoi na Płynności, więc dziś dwa ekrany mówią co innego o jednym fakcie — jeden nośnik (§3.2) |
+| `dopisek?` i `wyjasnienie?` opcjonalne, przychodzą jako `null` | **techniczna** | **wchodzi do v1** jako higiena kontraktu, nie jako funkcja. „Typ kłamie" znaczy, że następny wykonawca zbuduje na gwarancji, której nie ma. Do Ethana/Maxa |
+| `POST /api/wpisy` nieidempotentne — dwa kliknięcia, dwa wpisy | **produktowa** | **v1 blokuje przycisk** na czas przelotu żądania. Powód nie jest techniczny: podwójny wpis 274,06 zł fałszuje wykonanie planu, a po D-60 także samą prognozę — w aplikacji, której jedynym zadaniem jest powiedzieć, ile naprawdę zostało. Klucz idempotentności po stronie serwera to osobna praca i **poza v1** |
+
 ### 16.1 Pytania nadal otwarte — nie zgaduj ich
 
 | # | Pytanie | Co blokuje |
@@ -1203,6 +1343,17 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
     **21 plików** i `CoMamZrobic.dc.html` **nie jest wśród nich** — rozjazd obu kopii nie zapali
     się na niczym. Świadomy drugi nośnik, dopuszczalny wyłącznie z progiem: **przy pierwszej
     zmianie treści karty** obie kopie schodzą do jednej albo dostają strażnika.
+14. **Czy `saldoMinimalne` w ogóle drgnie na wpisie mieszczącym się w planie — niezmierzone.**
+    Po D-61 wpis przesuwa 274,06 zł z 20 X na 6 X, więc salda dzienne między tymi datami spadają;
+    czy minimum krzywej leży w tym oknie, **nie zostało policzone** — baza Postgres tego projektu
+    jest dziś pusta (`\dt` → *„Did not find any relations"*, odczyt 2026-08-29), a plik SQLite
+    pod `magazyn.sciezka_bazy()` nie istnieje. **Nie wolno cytować ani „ruszy się", ani „nie
+    ruszy"** jako faktu, dopóki ktoś nie policzy tego na wzorcu. Wiążąca jest bramka z kroku 1.2
+    (saldo **na dziś** przy wydatku **ponad plan**), która od tej niepewności nie zależy.
+15. **154 testy w ośmiu plikach jako zasięg zmiany D-60/D-61 — pomiar cudzy, nie powtórzony.**
+    Liczba pochodzi z `plan-implementacji-v1.0.md` krok 1.2 (Ethan, 2026-08-28) i jest tu
+    **cytowana, nie potwierdzona**. Przed wdrożeniem Ethan powtarza pomiar na przeniesionym
+    silniku — po Z4 układ plików jest inny niż w chwili tamtego liczenia.
 
 ---
 
