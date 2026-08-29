@@ -4,9 +4,44 @@
 // Gdyby skala, marginesy albo krok osi rozjechaly sie choc o dziesiata czesc
 // piksela, ten test pada, podajac ktore wspolrzedne — a bramka odwzorowania
 // powiedzialaby tylko „rozni sie 0,4%".
+//
+// SERIA JEST TU, A NIE W `lib/dane/` — I TO JEST SKUTEK PODPIECIA (Z7).
+// Do Z6 te same liczby stały w `lib/dane/plynnosc.ts` jako dane ekranu; od Z7
+// ekran bierze serie z `GET /api/plynnosc`, a `lib/dane/` nie niesie ani
+// jednej kwoty (straznik `testy/test_dane_bez_kwot.py`). Seria nizej NIE JEST
+// danymi aplikacji — jest ODCZYTEM Z RAMKI, czyli wzorcem, wobec ktorego
+// mierzymy geometrie. Jej miejscem jest wiec test, nie warstwa danych.
+//
+// GRANICA DOKLADNOSCI, NAZWANA. Piec sald jest odczytanych WPROST z rubryki
+// ramki i jest dokladne co do grosza: 9 601,03 · 8 295,98 · 8 145,98 ·
+// 3 025,33 · −210,67. Trzy dalsze punkty (30 IX, 1 X, 13 X) w rubryce NIE
+// STOJA — ramka niesie je wylacznie jako wspolrzedne rysunku z dokladnoscia
+// 0,1 px, wiec odtworzone sa przez odwrocenie skali, z bledem +/- 11 zl
+// (0,05 px na 44 px wysokosci przy rozpietosci 9 811,70 zl).
 import { expect, test } from "vitest";
-import { DANE } from "../lib/dane/plynnosc";
+import type { PunktWykresu } from "../lib/kontrakt";
 import { liniaZera, odcinekPodKreska, pierwszyPunktPodKreska, punkty } from "../lib/wykres";
+
+function serie(od: string, ile: number, saldo: string): PunktWykresu[] {
+  const [rok, miesiac, dzien] = od.split("-").map(Number);
+  return Array.from({ length: ile }, (_, i) => {
+    const d = new Date(Date.UTC(rok, miesiac - 1, dzien + i));
+    return { dzien: d.toISOString().slice(0, 10), saldo };
+  });
+}
+
+const SERIA_Z_RAMKI: readonly PunktWykresu[] = [
+  ...serie("2026-09-02", 10, "9601.03"),   // 2-11 IX
+  ...serie("2026-09-12", 3, "8295.98"),    // 12-14 IX
+  ...serie("2026-09-15", 6, "8145.98"),    // 15-20 IX
+  ...serie("2026-09-21", 4, "3025.33"),    // 21-24 IX
+  ...serie("2026-09-25", 5, "-210.67"),    // 25-29 IX — pod kreska
+  ...serie("2026-09-30", 1, "8196.26"),    // 30 IX   — odczyt z rysunku, +/- 11 zl
+  ...serie("2026-10-01", 11, "7861.84"),   // 1-11 X  — odczyt z rysunku, +/- 11 zl
+  ...serie("2026-10-12", 6, "6568.68"),    // 12-17 X — odczyt z rysunku, +/- 11 zl
+];
+
+const DANE = { wykres: SERIA_Z_RAMKI };
 
 const D_Z_RAMKI =
   "M0.0,10.0 L23.1,10.0 L46.2,10.0 L69.3,10.0 L92.4,10.0 L115.6,10.0 L138.7,10.0 " +

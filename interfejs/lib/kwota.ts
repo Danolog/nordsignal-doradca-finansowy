@@ -56,3 +56,18 @@ export function sformatujDzienSlownie(iso: string): string {
   const [, miesiac, dzien] = iso.split("-");
   return `${Number(dzien)} ${MIESIACE_DOPELNIACZ[Number(miesiac) - 1]}`;
 }
+
+// Odczyt w naglowku — „6 października 2026". Odpowiada na pytanie „z ktorego
+// dnia jest to, co widze", i od Z7 bierze ten dzien Z DANYCH: `DanePlynnosci.
+// odczyt` albo `DaneKsiegowania.dzisiaj`, czyli dokladnie ten dzien, dla
+// ktorego silnik policzyl liczby nizej.
+//
+// GODZINY TU NIE MA I TO JEST DECYZJA, NIE BRAK. Do Z7 naglowek niosl stala
+// „6 października 2026 · 09:40" — godzina nie miala zadnego nosnika i po
+// podpieciu byla by liczba z nieznanego zrodla obok liczb ze zrodla znanego
+// (CLAUDE.md §3.5, §3.7). Wraca w chwili, gdy kontrakt zacznie niesc znacznik
+// czasu odczytu, a nie sama date.
+export function sformatujOdczyt(iso: string): string {
+  const [rok] = iso.split("-");
+  return `${sformatujDzienSlownie(iso)} ${rok}`;
+}

@@ -17,8 +17,22 @@
 //   node narzedzia/porownaj-z-makieta.mjs Ksiegowanie Main          → musi dać >> 2%
 // Bez obu tych przebiegów narzędzie może mierzyć własną podłogę.
 //
+// STAN Z RAMKI (od Z7). Ramka `Ksiegowanie.dc.html` rysuje formularz W TRAKCIE
+// WYPEŁNIANIA: kwota wpisana, kategoria wybrana, szczegóły napisane. Po
+// podpięciu tras (Z7) ekran wchodzi na scenę PUSTY — bo tak wygląda wejście
+// na niego naprawdę — więc porównanie „ramka wobec ekranu po wejściu" mierzy
+// RÓŻNICĘ STANU, a nie różnicę układu, i przestaje odpowiadać na pytanie,
+// po co ta bramka istnieje.
+//
+// Dlatego trzeci argument `--stan=<nazwa>` DOPROWADZA EKRAN DO STANU, KTÓRY
+// RYSUJE RAMKA, zanim padnie zrzut. Wartości tego stanu (kwota, kategoria,
+// szczegóły) są własnością RAMKI, nie aplikacji — i dlatego mieszkają tutaj,
+// w narzędziu pomiarowym, a nie w `lib/dane/`, gdzie po Z7 nie ma ani jednej
+// kwoty (strażnik `testy/test_dane_bez_kwot.py`).
+//
 // Uruchomienie:
 //   node narzedzia/porownaj-z-makieta.mjs Ksiegowanie http://localhost:3000/ksiegowanie
+//   node narzedzia/porownaj-z-makieta.mjs Ksiegowanie http://... --stan=ksiegowanie-z-ramki
 //   node narzedzia/porownaj-z-makieta.mjs Ksiegowanie Ksiegowanie      (kontrola)
 // Drugi argument będący adresem http(s) to zbudowany ekran; każdy inny jest nazwą
 // ramki z katalogu `makiety/` (albo ścieżką do pliku .html).
@@ -55,7 +69,22 @@ function jestAdresem(tekst) {
   return /^https?:\/\//i.test(tekst);
 }
 
-async function zrzut(przegladarka, url, opis) {
+// Stany, do których wolno doprowadzić ekran przed zrzutem. Każdy opisuje
+// dokładnie to, co widać na swojej ramce — ani jednej rzeczy więcej.
+const STANY = {
+  // `makiety/Ksiegowanie.dc.html`: kwota 274,06 zł w polu, kategoria
+  // „Energia Elektryczna" wybrana, szczegóły „prąd, rozliczenie za wrzesień".
+  "ksiegowanie-z-ramki": async (strona) => {
+    await strona.fill('input[inputmode="decimal"]', "274,06 zł");
+    await strona.fill('input:not([inputmode])', "prąd, rozliczenie za wrzesień");
+    await strona.click('button[role="radio"]:has-text("Energia Elektryczna")');
+    // Karta „Co ruszy ten wpis" dolicza się z trasy; bez tego oczekiwania
+    // zrzut złapałby ją sprzed wpisania kwoty i pomiar mierzyłby wyścig.
+    await strona.waitForTimeout(900);
+  },
+};
+
+async function zrzut(przegladarka, url, opis, stan = null) {
   const strona = await przegladarka.newPage({
     viewport: { width: SZEROKOSC, height: 900 },
     deviceScaleFactor: 1,
@@ -66,6 +95,7 @@ async function zrzut(przegladarka, url, opis) {
   }
   // Wygładzanie kroju i obrazy tła potrzebują chwili po `networkidle`.
   await strona.waitForTimeout(400);
+  if (stan) await stan(strona);
   const miara = await strona.evaluate(() => {
     const d = document.documentElement;
     const b = document.body;
@@ -174,7 +204,13 @@ function procent(ulamek) {
 }
 
 async function glowna() {
-  const [nazwaRamki, cel] = process.argv.slice(2);
+  const argumenty = process.argv.slice(2);
+  const nazwaStanu = (argumenty.find((a) => a.startsWith("--stan=")) ?? "").slice("--stan=".length);
+  const [nazwaRamki, cel] = argumenty.filter((a) => !a.startsWith("--"));
+  if (nazwaStanu && !STANY[nazwaStanu]) {
+    console.error(`Nie znam stanu: ${nazwaStanu}. Znane: ${Object.keys(STANY).join(", ")}`);
+    process.exit(2);
+  }
   if (!nazwaRamki || !cel) {
     console.error("Użycie: node narzedzia/porownaj-z-makieta.mjs <NazwaRamki> <adres-ekranu | NazwaRamki>");
     process.exit(2);
@@ -211,7 +247,8 @@ async function glowna() {
   let kod = 0;
   try {
     const a = await zrzut(przegladarka, ramka.url, `ramka ${nazwaRamki}`);
-    const b = await zrzut(przegladarka, drugaStrona.url, drugaStrona.opis);
+    const b = await zrzut(przegladarka, drugaStrona.url, drugaStrona.opis,
+      nazwaStanu && !drugaStrona.plik ? STANY[nazwaStanu] : null);
 
     const plikA = path.join(KATALOG_ZRZUTOW, `${nazwaRamki}-ramka.png`);
     const plikB = path.join(KATALOG_ZRZUTOW, `${nazwaRamki}-${trybKontroli ? "kontrola" : "ekran"}.png`);
@@ -236,6 +273,7 @@ async function glowna() {
     console.log(`Ramka:  ${nazwaRamki}  ${wynik.wymiarA[0]}x${wynik.wymiarA[1]} px · ${a.miara.wezlow} węzłów · ${a.miara.tekstow} tekstów`);
     console.log(`Druga strona: ${drugaStrona.opis}  ${wynik.wymiarB[0]}x${wynik.wymiarB[1]} px · ${b.miara.wezlow} węzłów · ${b.miara.tekstow} tekstów`);
     if (trybKontroli) console.log("TRYB KONTROLI — obie strony to ten sam plik; oczekiwana różnica 0,00%.");
+    if (nazwaStanu) console.log(`Stan ekranu przed zrzutem: ${nazwaStanu}`);
     console.log(`Pole porównania: ${wynik.szerokosc}x${wynik.wysokosc} px`);
     console.log(`Porównanych pikseli: ${wynik.porownanych}`);
     console.log(`Różniących się:      ${wynik.roznych}  (tolerancja kanału ${TOLERANCJA_KANALU}, największa zmierzona różnica kanału ${wynik.najwiekszaRoznica})`);

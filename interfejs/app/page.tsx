@@ -15,14 +15,27 @@
 // ZERO KWOT W TYM PLIKU. Kazda liczba przychodzi z `lib/dane/plynnosc.ts`
 // i jest formatowana przez `lib/kwota.ts`; wspolrzedne rysunku liczy
 // `lib/wykres.ts`. Pilnuje tego straznik `testy/test_ekran_plynnosc.py`.
+//
+// PODPIECIE (Z7): `lib/dane/plynnosc.ts` przestal byc stala i stal sie
+// wywolaniem `GET /api/plynnosc`. Uklad nizej NIE ZMIENIL SIE — zmienil sie
+// wylacznie sposob, w jaki `DANE` powstaja: z argumentu, a nie z importu.
+// To byla teza podejscia „frontend najpierw" i tutaj jest sprawdzana.
 
 import { Powloka } from "./powloka";
+import { Awaria } from "./awaria";
 import { NAPISY_PLYNNOSCI } from "@/lib/napisy";
-import { sformatujDzien, sformatujDzienSlownie, sformatujKwote, znakKwoty } from "@/lib/kwota";
-import { DANE } from "@/lib/dane/plynnosc";
+import {
+  sformatujDzien,
+  sformatujDzienSlownie,
+  sformatujKwote,
+  sformatujOdczyt,
+  znakKwoty,
+} from "@/lib/kwota";
+import type { DanePlynnosci } from "@/lib/kontrakt";
+import { pobierzPlynnosc } from "@/lib/dane/plynnosc";
+import { BladWarstwySieciowej } from "@/lib/dane/warstwa-sieciowa";
 import { ulozKarte } from "@/lib/karta-dzialania";
 import { NAPISY_KARTY } from "@/lib/napisy";
-import { ODCZYT_NAGLOWKA } from "@/lib/dane/powloka";
 import {
   SZEROKOSC,
   WYSOKOSC,
@@ -45,7 +58,7 @@ function Strzalka() {
 // Prognoza rysowana KRESKA PRZERYWANA. Linia ciagla twierdzilaby wiedze;
 // to jest przewidywanie. Roznica niesie sie bez barwy, a jezyk zostaje
 // zarezerwowany: gdy narosnie historia, przeszlosc bedzie ciagla.
-function Wykres() {
+function Wykres({ DANE }: { DANE: DanePlynnosci }) {
   const pkt = punkty(DANE.wykres);
   const zero = liniaZera(DANE.wykres);
   const pod = odcinekPodKreska(pkt);
@@ -87,7 +100,7 @@ function Wykres() {
 // Karta NIE POWTARZA werdyktu: nazywa DZIALANIE, nie fakt. Fakt stoi wyzej
 // przy 56 px; najwiekszy stopien wewnatrz karty to 15 px, czyli 3,73x mniej —
 // pierwszenstwo wiersza zamkniecia zostaje nienaruszone.
-function KartaDzialania() {
+function KartaDzialania({ DANE }: { DANE: DanePlynnosci }) {
   const karta = ulozKarte(DANE);
   return (
     <div className={s.karta}>
@@ -104,7 +117,35 @@ function KartaDzialania() {
   );
 }
 
-export default function Plynnosc() {
+// PODPIECIE, KROK 7.1. Dane przychodza z trasy, a nie z importu stalej.
+//
+// `dzis` przekazywany z adresu jest UMYSLNY i ma nosnik po drugiej stronie:
+// `api/wspolne.py::dzien` mowi wprost, ze parametr istnieje DLA POMIARU
+// ODBIORCZEGO — bramka Z7 wymaga ustalonego dnia, zeby jej wynik nie zalezal
+// od godziny przebiegu. Bez parametru silnik bierze dzien dzisiejszy.
+export default async function Plynnosc({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const parametry = (await searchParams) ?? {};
+  const dzis = typeof parametry.dzis === "string" ? parametry.dzis : null;
+
+  let DANE: DanePlynnosci;
+  try {
+    DANE = await pobierzPlynnosc(dzis);
+  } catch (blad) {
+    // Awaria do stanu uzytecznego, nie do zera (CLAUDE.md §3.7). Ekran mowi,
+    // czego brakuje i co zrobic; nie pokazuje pustej rubryki ani zera.
+    if (blad instanceof BladWarstwySieciowej) {
+      return <Awaria aktywny="plynnosc" czegoBrakuje={blad.czegoBrakuje} coZrobic={blad.coZrobic} />;
+    }
+    throw blad;
+  }
+  return <Ekran DANE={DANE} />;
+}
+
+function Ekran({ DANE }: { DANE: DanePlynnosci }) {
   const ksiega = DANE.ksiega;
   const tenSamDzien = (a: number, b: number) =>
     a >= 0 && b < ksiega.length && ksiega[a]?.dzien === ksiega[b]?.dzien;
@@ -119,7 +160,7 @@ export default function Plynnosc() {
   return (
     <Powloka
       aktywny="plynnosc"
-      odczyt={ODCZYT_NAGLOWKA}
+      odczyt={sformatujOdczyt(DANE.odczyt)}
       straznik={DANE.ostatnieSprawdzenie}
       pion="srodek"
       odstepStopki={28}
@@ -132,26 +173,34 @@ export default function Plynnosc() {
             <span className={s.podpis}>{DANE.okresNapis}</span>
           </div>
 
-          <div className={s.kafelWykresu}>
-            <Wykres />
-            <div className={s.osDat}>
-              <span className={s.podpisOsi}>
-                {NAPISY_PLYNNOSCI.osDzis(sformatujDzien(DANE.wykres[0].dzien))}
-              </span>
-              <span className={s.rozpychacz} />
-              {DANE.dzienPodKreska && (
-                <>
-                  <span className={s.podpisOsiPodKreska}>
-                    {NAPISY_PLYNNOSCI.osPodKreska(sformatujDzien(DANE.dzienPodKreska))}
-                  </span>
-                  <span className={s.rozpychacz} />
-                </>
-              )}
-              <span className={s.podpisOsi}>
-                {sformatujDzien(DANE.koniecOknaCoMnieCzeka)}
-              </span>
+          {/* Pusta seria = prognozy NIE MA (brak kotwicy). Rysunek z zerowa
+              liczba punktow bylby prostokatem bez linii, a podpisy osi
+              opisywalyby dni, ktorych nikt nie policzyl — czyli etykieta
+              opisywalaby liczbe, ktorej nie ma (CLAUDE.md §3.5). Czego
+              brakuje, mowia wtedy zdanie werdyktu i karta „Co mam zrobic",
+              i to sa jedyne dwa miejsca, ktore maja o tym mowic (§3.7). */}
+          {DANE.wykres.length > 0 && (
+            <div className={s.kafelWykresu}>
+              <Wykres DANE={DANE} />
+              <div className={s.osDat}>
+                <span className={s.podpisOsi}>
+                  {NAPISY_PLYNNOSCI.osDzis(sformatujDzien(DANE.wykres[0].dzien))}
+                </span>
+                <span className={s.rozpychacz} />
+                {DANE.dzienPodKreska && (
+                  <>
+                    <span className={s.podpisOsiPodKreska}>
+                      {NAPISY_PLYNNOSCI.osPodKreska(sformatujDzien(DANE.dzienPodKreska))}
+                    </span>
+                    <span className={s.rozpychacz} />
+                  </>
+                )}
+                <span className={s.podpisOsi}>
+                  {sformatujDzien(DANE.koniecOknaCoMnieCzeka)}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className={s.wierszKolumn}>
             <span className={s.naglowekKolumny}>{NAPISY_PLYNNOSCI.kolumnaDzien}</span>
@@ -235,7 +284,7 @@ export default function Plynnosc() {
           <p className={s.horyzont}>{NAPISY_PLYNNOSCI.horyzont(DANE.horyzontDni)}</p>
         </div>
 
-        <KartaDzialania />
+        <KartaDzialania DANE={DANE} />
 
         <div className={s.wierszWezwania}>
           <span className={s.rozpychacz} />

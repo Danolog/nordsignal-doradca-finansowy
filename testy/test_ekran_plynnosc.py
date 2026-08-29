@@ -22,6 +22,10 @@ EKRANY = KATALOG / "interfejs" / "lib" / "ekrany.ts"
 POWLOKA_CSS = KATALOG / "interfejs" / "app" / "powloka.css"
 KARTA = KATALOG / "interfejs" / "lib" / "karta-dzialania.ts"
 RAMKI = KATALOG / "makiety"
+# Po podpieciu (Z7) czesc frazy z ramki — „Stan na dziś", dopisek kotwicy —
+# przeszla z warstwy danych DO SILNIKA, bo to on sklada ksiege plynnosci.
+# Straznik idzie za frazą do jej nowego nosnika, zamiast obnizyc wymaganie.
+SILNIK = KATALOG / "silnik" / "ekran_plynnosc.py"
 
 FRAZY_Z_RAMKI = (
     "Najniżej",              # etykieta wielkiej liczby
@@ -37,19 +41,29 @@ FRAZY_Z_RAMKI = (
 
 
 def _zrodla() -> list[pathlib.Path]:
+    """Zrodla, w ktorych czegos NIE WOLNO znalezc — sam interfejs."""
     return [EKRAN, NAPISY, DANE, WYKRES, STYL, KARTA]
 
 
-def _tekst_ekranu() -> str:
-    obecne = [p for p in _zrodla() if p.exists()]
+def _zrodla_frazy() -> list[pathlib.Path]:
+    """Zrodla, w ktorych fraza z ramki MOZE mieszkac — razem z silnikiem."""
+    return _zrodla() + [SILNIK]
+
+
+def _polacz(zrodla: list[pathlib.Path]) -> str:
+    obecne = [p for p in zrodla if p.exists()]
     # Kontrola liczności: sprawdzenie, do którego nic nie dociera, melduje
     # sukces. Bez tej asercji przemianowanie pliku dałoby zielone testy.
-    assert len(obecne) == len(_zrodla()), f"brak plików ekranu: {set(_zrodla()) - set(obecne)}"
+    assert len(obecne) == len(zrodla), f"brak plików ekranu: {set(zrodla) - set(obecne)}"
     return "\n".join(bez_komentarzy(p.read_text(encoding="utf-8")) for p in obecne)
 
 
+def _tekst_ekranu() -> str:
+    return _polacz(_zrodla())
+
+
 def test_kazda_fraza_z_ramki_JEST_na_ekranie():
-    brakujace = [f for f in FRAZY_Z_RAMKI if f not in _tekst_ekranu()]
+    brakujace = [f for f in FRAZY_Z_RAMKI if f not in _polacz(_zrodla_frazy())]
     assert brakujace == [], f"frazy z ramki, których nie ma na ekranie: {brakujace}"
 
 
@@ -119,44 +133,47 @@ def test_prognoza_JEST_kreska_przerywana():
     assert ekran.count("strokeDasharray") >= 2, "prognoza albo odcinek pod kreską są ciągłe"
 
 
-def test_saldo_bite_RAZ_NA_DZIEN():
-    """Silnik podaje saldo per pozycja, więc dwie pozycje z jednego dnia
-    dostają tę samą wartość — powtórzona wygląda jak błąd rachunku."""
-    dane = DANE.read_text(encoding="utf-8")
-    ksiega = dane[dane.index("const KSIEGA"): dane.index("function serie")]
-    # Wzorzec przechodzi przez znaki nowego wiersza, bo pierwszy wpis księgi
-    # jest rozbity na kilka linii. Zmierzone (przebieg Z2, mutacja P3):
-    # wzorzec liniowy widział PIĘĆ wierszy z sześciu i nie zauważył, że saldo
-    # przeniosło się na niewłaściwą pozycję dnia.
-    wiersze = re.findall(
-        r'dzien: "(\d{4}-\d{2}-\d{2})".*?saldoPoDniu: ("[^"]*"|null)', ksiega, flags=re.S
-    )
-    # Kontrola liczności: sprawdzenie, do którego dociera pusty zbiór, melduje
-    # sukces. Wierszy ma być tyle, ile jest pól `dzien:`.
-    assert len(wiersze) == ksiega.count("dzien:") == 6, (
-        f"pomiar zobaczył {len(wiersze)} wierszy z {ksiega.count('dzien:')}"
-    )
-    kolejnosc = [d for d, _ in wiersze]
-    for i, (dzien, saldo) in enumerate(wiersze):
-        ostatni_w_dniu = i + 1 >= len(kolejnosc) or kolejnosc[i + 1] != dzien
-        if not ostatni_w_dniu:
-            assert saldo == "null", (
-                f"saldo stoi przy pierwszej pozycji dnia {dzien}, a ma stać na końcu dnia — "
-                "powtórzone albo przedwczesne saldo wygląda jak błąd rachunku"
-            )
-    ile_na_dzien: dict[str, int] = {}
-    for dzien, saldo in wiersze:
-        ile_na_dzien[dzien] = ile_na_dzien.get(dzien, 0) + (0 if saldo == "null" else 1)
-    for dzien, ile in ile_na_dzien.items():
-        assert ile <= 1, f"saldo bite {ile} razy w dniu {dzien}"
+def test_ekran_NIE_POWTARZA_reguly_saldo_raz_na_dzien():
+    """Regula „saldo bite RAZ NA DZIEN" ma po podpieciu JEDEN nosnik i jest nim
+    `silnik/kontrakt.py::zbij_saldo_raz_na_dzien` (straznik:
+    `test_kontrakt_dwa_nosniki.py::test_ksiega_bije_saldo_RAZ_NA_DZIEN`,
+    mutacja M-Z6-4). Do Z6 druga kopia reguly stala w danych ekranu i tamten
+    egzemplarz mierzyl wlasnie ten plik.
+
+    Tutaj zostaje POLOWA po stronie ekranu, i tylko ona: ekran ma DOSTAC
+    `null` i narysowac puste miejsce, a NIE liczyc, ktora pozycja jest
+    pierwsza w swoim dniu. Gdyby liczyl, regula mialaby tyle nosnikow, ile
+    ekranow niesie ksiege (dzis dwa: Plynnosc i Co mnie czeka)."""
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert "w.saldoPoDniu === null" in ekran, (
+        "ekran nie rozpoznaje pustego salda — musi je dostac, nie policzyc")
+    # Zakaz liczenia reguly u siebie: zaden warunek na ekranie nie porownuje
+    # dnia BIEZACEJ pozycji z dniem NASTEPNEJ po to, zeby ukryc saldo.
+    # (Porownanie dni na potrzeby KRESKI miedzy dniami zostaje — to uklad,
+    # nie regula o liczbie; stad zawezenie do `saldoPoDniu` w tym samym
+    # wyrazeniu.)
+    for wiersz in ekran.splitlines():
+        if "saldoPoDniu" in wiersz and ("tenSamDzien" in wiersz or "kontynuacja" in wiersz):
+            raise AssertionError(
+                f"ekran liczy regule salda u siebie: {wiersz.strip()!r}")
 
 
 def test_kotwica_NIESIE_WIEK_odczytu():
     """Kotwica stoi wewnątrz prognozy, drobnym drukiem, z wiekiem odczytu.
-    Osobna karta obok była wadą nazwaną na Z67."""
-    dane = DANE.read_text(encoding="utf-8")
-    assert "dopisek:" in dane
-    assert "z odczytu" in dane and "września" in dane
+    Osobna karta obok była wadą nazwaną na Z67.
+
+    Po podpięciu (Z7) dopisek składa silnik — `_dopisek_kotwicy` — bo to on
+    zna datę odczytu. Strażnik mierzy więc DWIE połowy: że silnik go składa
+    i że ekran go rysuje. Sprawdzenie samej połowy przechodziłoby przy
+    dopisku, którego nikt nie pokazuje, i przy ekranie rysującym pustkę."""
+    silnik = bez_komentarzy(SILNIK.read_text(encoding="utf-8"))
+    assert "dopisek=" in silnik, "silnik nie składa dopisku kotwicy"
+    assert "z odczytu" in silnik, "dopisek nie mówi, skąd wzięło się saldo"
+    assert "MIESIACE_DOPELNIACZ" in silnik, "dopisek nie niesie dnia odczytu"
+
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert "w.dopisek" in ekran, "ekran nie rysuje dopisku kotwicy"
+    assert "s.dopisek" in ekran, "dopisek nie dostaje własnego, drobnego stopnia"
 
 
 def test_podwojna_linia_jest_ATRAMENTEM_nie_liniatura():
@@ -288,8 +305,8 @@ def test_karta_STOI_NA_EKRANIE_miedzy_werdyktem_a_wezwaniem():
     """D-54: karta jest komponentem podrzędnym wobec wiersza zamknięcia
     i stoi między werdyktem a przyciskiem „Co mnie czeka"."""
     ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
-    assert "<KartaDzialania />" in ekran, "karty nie ma na ekranie"
-    assert ekran.index("s.werdykt") < ekran.index("<KartaDzialania />") < ekran.index("s.wierszWezwania"), (
+    assert "<KartaDzialania " in ekran, "karty nie ma na ekranie"
+    assert ekran.index("s.werdykt") < ekran.index("<KartaDzialania ") < ekran.index("s.wierszWezwania"), (
         "karta stoi poza miejscem wyznaczonym przez D-54"
     )
 

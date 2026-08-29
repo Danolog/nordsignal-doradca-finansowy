@@ -484,3 +484,65 @@ zauważył.
 - **Nie ma strażnika behawioralnego** — żaden z tych testów nie mówi, że liczba **na ekranie**
   równa się liczbie z silnika. Ta luka zostaje otwarta do zadania Z7, którego bramka brzmi
   „prognoza po wpisie jest inna niż przed".
+
+---
+
+## Przebieg 2026-08-29 — Z7 (podpięcie): strażnicy warstwy danych i strażnik ekran-wobec-silnika
+
+**Kopia drzewa poza repozytorium:** `scratchpad/mut-z7` (`rsync` bez `.git`, `.venv`, `.next`,
+`__pycache__`), własne `node_modules` skopiowane, nie dowiązane — Turbopack odmawia pracy
+z dowiązaniem wychodzącym poza korzeń projektu. `__pycache__` czyszczone **przed każdym**
+przebiegiem. Serwer kopii na porcie **3100**, żeby nie mieszać się z przebiegiem odbiorczym
+na 3000.
+
+Kontrola przed mutacjami: **859 passed, 3 deselected** (Python, w kopii) ·
+strażnik ekran-wobec-silnika **kod wyjścia 0, 15 porównanych liczb**.
+
+| # | Mutacja | Który test / sprawdzenie padło | Wynik |
+|---|---|---|---|
+| **M-Z7-1** | `lib/dane/plynnosc.ts`: wraca stała `const SALDO_STARTOWE: Kwota = "9601.03"` | `test_warstwa_danych_NIE_MA_ANI_JEDNEJ_wpisanej_kwoty` | **czerwony** |
+| **M-Z7-1b** | wszystkie pliki `lib/dane/*.ts` znikają (kontrola liczności) | `test_skan_NAPRAWDE_cokolwiek_zobaczyl` · `test_warstwa_danych_WOLA_TRASY_zamiast_niesc_stale` | **czerwony** |
+| **M-Z7-1c** | `warstwa-sieciowa.ts`: `cache: "no-store"` → `cache: "force-cache"` | — **przed poprawką: ŻADEN (4 passed)** | **ZIELONY — atrapa** |
+| **M-Z7-1c′** | ta sama mutacja po zdjęciu komentarzy w strażniku | `test_warstwa_danych_WOLA_TRASY_zamiast_niesc_stale` | **czerwony** |
+| **M-Z7-1d** | `plynnosc.ts` woła `/api/prognoza` zamiast `/api/plynnosc` | `test_warstwa_danych_WOLA_TRASY_zamiast_niesc_stale` | **czerwony** |
+| **M-Z7-2** | `app/page.tsx`: saldo rysowane znakiem `"ujemna"` zamiast `"neutralna"` | strażnik ekran-wobec-silnika, 7× `KSIEGA[i].saldo`, **kod wyjścia 1** | **czerwony** |
+| **M-Z7-3** | `app/page.tsx`: `ksiega.slice(0, 3)` — ekran rysuje trzy pierwsze pozycje | strażnik ekran-wobec-silnika, `LICZNOSC_WIERSZY: silnik 7, ekran 3` | **czerwony** |
+| **M-Z7-4** | `ekran_ksiegowanie._alfabetycznie` → `(nazwa, nazwa)` (porządek po surowych znakach) | `test_pasmo_ma_PIETNASCIE_kategorii_w_kolejnosci_Z_REGULY_SILNIKA` | **czerwony** |
+| **M-Z7-5** | `app/page.tsx`: ekran przestaje rysować `w.dopisek` przy wierszu otwarcia | `test_kotwica_NIESIE_WIEK_odczytu` | **czerwony** |
+| **M-Z7-6** | `app/page.tsx`: kolumna salda liczy regułę „raz na dzień" u siebie (`przedDalszym`) | `test_ekran_NIE_POWTARZA_reguly_saldo_raz_na_dzien` | **czerwony** |
+| **M-Z7-7** | `app/page.tsx`: wiersz zamknięcia bierze `DANE.wykres[0].saldo` zamiast `saldoMinimalne` | strażnik ekran-wobec-silnika, `WIERSZ_ZAMKNIECIA: silnik „7 485,98 zł", ekran „9 601,03 zł"` | **czerwony** |
+
+Kontrola po cofnięciu wszystkich mutacji: **859 passed, 3 deselected** · strażnik
+ekran-wobec-silnika **kod wyjścia 0** · `diff -r` kopii z repozytorium: bez różnic poza
+dziennikiem sesji.
+
+### Co znalazła M-Z7-1c — i dlaczego to najważniejsza pozycja tej tabeli
+
+Strażnik miał pilnować, że warstwa sieciowa **nie buforuje** odpowiedzi. Bufor `fetch`
+w komponencie serwerowym Next.js oddałby drugie zapytanie z pamięci, więc bramka całej nocy —
+„prognoza po wpisie jest inna niż przed" — mierzyłaby wtedy pamięć przeglądarki, nie silnik.
+To jest awaria, która **melduje sukces**: ekran wygląda poprawnie i pokazuje stan sprzed wpisu.
+
+Mutacja przeszła **na zielono**, bo strażnik czytał plik **razem z komentarzami**, a nagłówek
+tego samego pliku cytuje `cache: "no-store"` w zdaniu tłumaczącym, po co bufor jest wyłączony.
+Sprawdzenie „ta fraza JEST w pliku" trafiało w komentarz o frazie, nie we frazę.
+
+To **trzecie** trafienie tego samego wzorca w tym projekcie (M3 z Z1 — `autoFocus` w komentarzu;
+`pomocnicze.bez_komentarzy` powstało właśnie po nim) i drugie, w którym autor strażnika sam
+napisał komentarz, który go unieważnił. Wykryła to mutacja, nie czytanie kodu.
+
+### Czego ten przebieg NIE objął — i co przez to zostaje niepilnowane
+
+- **Strażnik ekran-wobec-silnika dzieli z ekranem nośnik formatowania** (`lib/kwota.ts`).
+  Wada **wewnątrz** `sformatujKwote` — na przykład zgubiony grosz — zmieni obie strony
+  porównania naraz i strażnik jej **nie zobaczy**. To jest granica świadoma, nie przeoczenie:
+  alternatywą byłaby druga kopia reguły formatowania w narzędziu, czyli dokładnie ten drugi
+  nośnik, przed którym broni §3.2. Tę połowę pilnuje `interfejs/testy/kwota.test.ts`, który
+  porównuje wynik ze znakami **wyciętymi z ramki**, a nie z kodu.
+- **Strażnik czyta wyłącznie ekran Płynności.** Liczby ekranu Księgowania („Co ruszy ten wpis",
+  „Ostatnie wpisy") **nie są** porównywane z odpowiedzią trasy — etykieta jawna: ta część jest
+  **niepotwierdzona**. Kandydat na kolejny przebieg: te same cztery wiersze karty wobec
+  `POST /api/wpisy/podglad`.
+- **Nie mutowano `silnik/` poza `_alfabetycznie`** — silnik jest w tym zadaniu cudzą własnością
+  (Z4/Z5/Z6); czytam go, nie piszę do niego. Jedyna mutacja tam była **odwracalna i wykonana
+  w kopii**, żeby pokazać, że przerysowany strażnik pasma naprawdę mierzy regułę, a nie stałą.

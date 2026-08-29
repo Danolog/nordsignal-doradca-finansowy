@@ -20,6 +20,8 @@
 //   PROG:     przy pierwszej zmianie ktoregokolwiek z tych dwoch zdan —
 //             wtedy oba wyprowadzamy z `silnik/prezentacja.py` (Z4/Z5).
 
+import { DOPELNIACZ_TYPU, type TypWpisu } from "./kontrakt";
+
 export const NAPISY = {
   // --- etykiety ekranu, w kolejnosci ramki ---
   tytul: "Księgowanie",
@@ -34,6 +36,18 @@ export const NAPISY = {
     "Trzy takie same zakupy pod rząd to trzy kwoty i trzy razy ",
   coZostajePoZapisieAkcent: "Zapisz",
   coZostajePoZapisieOgon: ".",
+
+  // Podpis pasma kategorii. Mowi WYLACZNIE to, co da sie policzyc z tego,
+  // co pasmo pokazuje: ile kafelkow stoi i jakiego sa typu.
+  //
+  // DO Z7 STALO TU DRUGIE ZDANIE — „· na razie od pozycji planu" — i po
+  // podpieciu bylby to DRUGI NOSNIK reguly kolejnosci. Pierwszym i jedynym
+  // jest `ekran_ksiegowanie.uzasadnienie_kolejnosci`, ktore przychodzi
+  // z silnika jako `uzasadnienieKolejnosci` i stoi pod pasmem. Tamto zdanie
+  // zmienia brzmienie po pierwszym wpisie; to nie zmienialoby sie nigdy
+  // i klamalo by od drugiego dnia (CLAUDE.md §3.5).
+  podpisPasma: (ile: number, typ: TypWpisu) =>
+    `${ile} ${ile === 1 ? "kategoria" : "kategorii"} ${DOPELNIACZ_TYPU[typ]}`,
 
   tytulPodgladu: "Co ruszy ten wpis",
   podpisPodgladu: (kwota: string) => `po zapisaniu ${kwota}`,
@@ -69,6 +83,13 @@ export const NAPISY = {
     typNieznany:
       "Nieznany typ wpisu. Przełącznik ma trzy pozycje, więc ten stan nie " +
       "powinien powstać — zgłoś to, zanim wpiszesz cokolwiek dalej.",
+    // OSMY STAN, spoza §41.5: awaria warstwy sieciowej o nieznanym rodzaju.
+    // Silnik ma dla swoich odmow wlasne zdania i te oddajemy w calosci
+    // (`BladWarstwySieciowej`); to brzmienie stoi WYLACZNIE dla wyjatku,
+    // ktorego nie umiemy nazwac — i mowi wprost, czyja to wada.
+    awariaNieznana:
+      "Coś padło po naszej stronie i nie umiem powiedzieć co. Wpis NIE został " +
+      "zapisany — zgłoś to, zanim spróbujesz ponownie.",
   },
 } as const;
 
@@ -117,6 +138,19 @@ export const NAPISY_POWLOKI = {
   // gorsze niż brak zdania (CLAUDE.md §3.7).
   straznikNieDzialal:
     "Ostatnie sprawdzenie: brak danych — strażnik nie jest jeszcze podpięty.",
+} as const;
+
+/* ---------- EKRAN AWARII (§3.7) ---------- */
+
+// Brzmienia stale ekranu awarii. Zdanie o tym, CZEGO BRAKUJE, i zdanie o tym,
+// CO ZROBIC, przychodza z `BladWarstwySieciowej` — bo w przypadku odmowy
+// silnika sa to JEGO slowa, oddane w calosci. Tutaj stoi wylacznie rama.
+export const NAPISY_AWARII = {
+  tytul: "Nie mam skąd wziąć liczb",
+  // Naglowek pyta „z ktorego dnia jest to, co widze". Przy awarii odpowiedz
+  // brzmi „nie wiem" i ma tak brzmiec — data wpisana na sztywno byla by
+  // dokladnie ta liczba z nieznanego zrodla, przed ktora broni ten ekran.
+  odczytNieznany: "odczyt nieznany",
 } as const;
 
 /* ---------- EKRAN PLYNNOSCI ---------- */

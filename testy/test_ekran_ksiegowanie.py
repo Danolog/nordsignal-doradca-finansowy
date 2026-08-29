@@ -31,13 +31,20 @@ SIEDEM_BRZMIEN = (
     "Nieznany typ wpisu.",               # (g) — niemożliwy z konstrukcji
 )
 
-EKRAN = KATALOG / "interfejs" / "app" / "ksiegowanie" / "page.tsx"
+# PO PODPIECIU (Z7) UKLAD MIESZKA W `formularz.tsx`, a `page.tsx` jest samym
+# wejsciem: pobiera dane z trasy i oddaje je formularzowi. Straznik czyta OBA,
+# bo inaczej mierzylby polowe ekranu i meldowal sukces.
+EKRAN = KATALOG / "interfejs" / "app" / "ksiegowanie" / "formularz.tsx"
+WEJSCIE = KATALOG / "interfejs" / "app" / "ksiegowanie" / "page.tsx"
 NAPISY = KATALOG / "interfejs" / "lib" / "napisy.ts"
 DANE = KATALOG / "interfejs" / "lib" / "dane" / "ksiegowanie.ts"
+# Po podpieciu czesc frazy z ramki („Wolne środki", „bez zmian") przyszla
+# z warstwy danych DO SILNIKA — bo to on sklada karte „Co ruszy ten wpis".
+# Straznik idzie za frazą do jej nowego nosnika, zamiast obnizyc wymaganie.
+SILNIK = KATALOG / "silnik" / "ekran_ksiegowanie.py"
 
 
-def _tekst_ekranu() -> str:
-    zrodla = [EKRAN, NAPISY, DANE]
+def _pliki(zrodla: list) -> str:
     obecne = [p for p in zrodla if p.exists()]
     # Kontrola liczności: sprawdzenie, do którego nic nie dociera, melduje
     # sukces. Bez tej asercji przemianowanie pliku dałoby zielone testy.
@@ -45,8 +52,18 @@ def _tekst_ekranu() -> str:
     return "\n".join(_bez_komentarzy(p.read_text(encoding="utf-8")) for p in obecne)
 
 
+def _tekst_ekranu() -> str:
+    """Zrodla, w ktorych czegos NIE WOLNO znalezc — sam interfejs."""
+    return _pliki([EKRAN, WEJSCIE, NAPISY, DANE])
+
+
+def _tekst_z_silnikiem() -> str:
+    """Zrodla, w ktorych fraza z ramki MOZE mieszkac — razem z silnikiem."""
+    return _pliki([EKRAN, WEJSCIE, NAPISY, DANE, SILNIK])
+
+
 def test_kazda_fraza_z_ramki_JEST_na_ekranie():
-    brakujace = [f for f in FRAZY_Z_RAMKI if f not in _tekst_ekranu()]
+    brakujace = [f for f in FRAZY_Z_RAMKI if f not in _tekst_z_silnikiem()]
     assert brakujace == [], f"frazy z ramki, których nie ma na ekranie: {brakujace}"
 
 
@@ -93,14 +110,82 @@ def test_kategoria_Firmowe_NIE_JEST_na_tym_ekranie():
     assert "Firmowe" not in dane
 
 
-def test_pasmo_ma_PIETNASCIE_kategorii_w_kolejnosci_z_ramki():
-    """Kontrola liczności: pomiar, do którego dociera pusta lista, melduje
-    sukces. Trzy pierwsze to pozycje planu na październik, dalej alfabetycznie."""
-    dane = DANE.read_text(encoding="utf-8")
-    nazwy = re.findall(r'kategoria\("([^"]+)"\)', dane)
-    assert len(nazwy) == 15, f"kategorii jest {len(nazwy)}, ma być 15: {nazwy}"
-    assert nazwy[:3] == ["Czesne", "Energia Elektryczna", "Kredyty"], nazwy[:3]
-    assert nazwy[3:] == sorted(nazwy[3:]), f"ogon nie jest alfabetyczny: {nazwy[3:]}"
+#: Kafelki pasma WYCIETE Z RAMKI, nie przepisane z pamięci. Ramka jest
+#: wiążącą specyfikacją zakresu (CLAUDE.md §3.6), więc to ona mówi, ile
+#: kategorii stoi w paśmie i w jakiej kolejności.
+RAMKA = KATALOG / "makiety" / "Ksiegowanie.dc.html"
+
+
+def _kafelki_z_ramki() -> list:
+    tekst = RAMKA.read_text(encoding="utf-8")
+    poczatek = tekst.index("Czesne")
+    # Domknięcie znacznika po ostatnim kafelku MUSI wejść do wycinka —
+    # wzorzec szuka tekstu MIĘDZY znacznikami, więc urwany na literze
+    # „Zdrowie" gubi ostatnią pozycję i pomiar melduje 14 zamiast 15.
+    koniec = tekst.index("Zdrowie") + len("Zdrowie") + 40
+    fragment = tekst[poczatek - 400:koniec]
+    nazwy = [w.strip() for w in re.findall(r">([^<>]{2,40})<", fragment)]
+    return [n for n in nazwy if n]
+
+
+#: JEDYNY ZNANY ROZJAZD ramki z regułą silnika, nazwany zamiast przemilczany.
+#: Ramka stawia „PUWIS" zaraz po „Monika i Ada" — czyli tak, jakby sortowała
+#: po surowych znakach, gdzie wielkie „U" (85) stoi przed małym „o" (111).
+#: Silnik porównuje po polsku: bez ogonków i bez wielkości liter, więc
+#: „podatki" < „praca" < „puwis" i PUWIS ląduje o dwa miejsca dalej.
+#: Reguła silnika (`ekran_ksiegowanie._alfabetycznie`) jest tu POPRAWNA,
+#: rysunek jest pomyłką ręki. ZGŁOSZONE — nie poprawiam ani ramki, ani silnika.
+#: PRÓG: gdy Mila poprawi ramkę, obie liczby niżej się zrównają, a strażnik
+#: zaczerwieni się sam i każe zdjąć ten wyjątek.
+ROZJAZD_KAFELEK = "PUWIS"
+ROZJAZD_MIEJSCE_W_RAMCE = 7
+ROZJAZD_MIEJSCE_W_SILNIKU = 9
+
+
+def test_pasmo_ma_PIETNASCIE_kategorii_w_kolejnosci_Z_REGULY_SILNIKA():
+    """Po podpięciu (Z7) kolejność kafelków NIE STOI w źródle interfejsu —
+    liczy ją `ekran_ksiegowanie.kolejnosc_kategorii` i przysyła gotową.
+    Strażnik mierzy więc regułę wobec ramki, a nie stałą wobec stałej.
+
+    Kontrola liczności stoi PRZED porównaniem: pomiar, do którego dociera
+    pusta lista, melduje sukces."""
+    import pandas as pd
+
+    from silnik import ekran_ksiegowanie
+
+    z_ramki = _kafelki_z_ramki()
+    assert len(z_ramki) == 15, f"z ramki wyszło {len(z_ramki)} kafelków: {z_ramki}"
+
+    # Wejście silnika w stanie z ramki: ani jednego wpisu, trzy pozycje planu
+    # na październik 2026. Plan podajemy ramką danych, bo tego żąda reguła.
+    plan = pd.DataFrame([
+        {"rok": 2026, "miesiac": 10, "typ": "Wydatki", "kategoria": k,
+         "opis": "", "kwota": "100.00", "powtarzalna": 0}
+        for k in ("Czesne", "Energia Elektryczna", "Kredyty")
+    ])
+    wyliczona = list(ekran_ksiegowanie.kolejnosc_kategorii(
+        z_ramki, wpisy=pd.DataFrame(), plan=plan, typ="Wydatki",
+        rok=2026, miesiac=10))
+
+    assert len(wyliczona) == 15, f"silnik oddał {len(wyliczona)} kafelków"
+    assert set(wyliczona) == set(z_ramki), "silnik zgubił albo dołożył kategorię"
+    assert wyliczona[:3] == ["Czesne", "Energia Elektryczna", "Kredyty"], wyliczona[:3]
+
+    # Rozjazd to PRZESUNIĘCIE DOKŁADNIE JEDNEGO kafelka i tyle wolno mu być.
+    # Sprawdzamy go wprost — obie pozycje z nazwy — a potem porównujemy resztę
+    # ciągu bez niego. Pominięcie porównania „bo się różni" byłoby strażnikiem,
+    # który przestaje strzec dokładnie tam, gdzie zaczyna być potrzebny.
+    assert z_ramki.index(ROZJAZD_KAFELEK) == ROZJAZD_MIEJSCE_W_RAMCE, (
+        f"ramka stawia {ROZJAZD_KAFELEK} na miejscu "
+        f"{z_ramki.index(ROZJAZD_KAFELEK)}, a nie {ROZJAZD_MIEJSCE_W_RAMCE}")
+    assert wyliczona.index(ROZJAZD_KAFELEK) == ROZJAZD_MIEJSCE_W_SILNIKU, (
+        f"silnik stawia {ROZJAZD_KAFELEK} na miejscu "
+        f"{wyliczona.index(ROZJAZD_KAFELEK)}, a nie {ROZJAZD_MIEJSCE_W_SILNIKU}")
+
+    bez_rozjazdu = lambda lista: [n for n in lista if n != ROZJAZD_KAFELEK]
+    assert bez_rozjazdu(wyliczona) == bez_rozjazdu(z_ramki), (
+        f"kolejność silnika różni się od ramki poza znanym rozjazdem:\n"
+        f"  silnik: {wyliczona}\n  ramka:  {z_ramki}")
 
 
 def test_kursor_STOI_w_polu_kwoty_po_wejsciu():

@@ -1,0 +1,38 @@
+/* EKRAN AWARII. Barwy WYLACZNIE ze zmiennych `paleta.css` — zero wartosci
+   szesnastkowych. Stopnie pisma z tej samej drabiny co reszta aplikacji
+   (28 / 20 / 15 px), zeby stan awarii nie wygladal jak inna aplikacja.
+
+   NIE MA TU CZERWIENI. Czerwien w tej aplikacji ma jedno znaczenie i jest
+   nim SALDO PONIZEJ ZERA (`--saldo-ujemne`). Uzyta na braku polaczenia
+   bylaby drugim znaczeniem tej samej barwy — a wtedy pierwsze przestaje
+   cokolwiek znaczyc. */
+
+.ekran {
+  width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 32px 0 24px;
+}
+
+.etykieta {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--atrament-cichy);
+}
+
+/* 20 px — waga zdania werdyktu z ekranu Plynnosci. To jest zla wiadomosc
+   tej samej klasy: mowi, ze liczb nie ma. */
+.zdanie {
+  margin: 0;
+  font-size: 20px;
+  max-width: 720px;
+}
+
+.instrukcja {
+  margin: 0;
+  font-size: 15px;
+  color: var(--atrament-cichy);
+  max-width: 720px;
+}

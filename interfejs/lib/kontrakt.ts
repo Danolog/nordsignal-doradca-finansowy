@@ -71,6 +71,22 @@ export const NAPIS_TYPU: Readonly<Record<TypWpisu, string>> = {
   Oszczędności: "Oszczędność",
 } as const;
 
+// Dopelniacz liczby mnogiej — „15 kategorii WYDATKOW", podpis pasma kategorii.
+// Stoi TU, obok mianownika, a nie w `lib/napisy.ts`: to jest ta sama tabela
+// nazw trzech typow, tylko w drugim przypadku. Rozdzielone na dwa pliki byly
+// by dwoma nosnikami jednej listy — i przy czwartym typie jeden z nich
+// zostalby uzupelniony, a drugi nie.
+//
+// Straznik zakresu ekranu Plynnosci szuka slowa „Przychody" w zrodlach TEGO
+// ekranu (`lib/napisy.ts`, `app/page.tsx`, ...) i ma prawo go tam nie znalezc:
+// przychody odpowiadaja na inne pytanie i maja inny ekran. `kontrakt.ts` jest
+// wspolny dla wszystkich ekranow, wiec nazwy typow mieszkaja wlasnie tu.
+export const DOPELNIACZ_TYPU: Readonly<Record<TypWpisu, string>> = {
+  Przychody: "przychodów",
+  Wydatki: "wydatków",
+  Oszczędności: "oszczędności",
+} as const;
+
 /* ---------- EKRAN PLYNNOSCI (Z2) ---------- */
 
 // Wiersz ksiegi. `kwota` moze niesc wiodacy minus — to jest kierunek pozycji,

@@ -384,3 +384,34 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* Obszar mowiacy pod wierszem zapisu — stoi ZAWSZE, wypelnia sie tylko przy
+   awarii warstwy sieciowej. Pusty nie zajmuje wysokosci (`min-height: 0`),
+   wiec nie przesuwa niczego w dol na ekranie bez bledu i nie rusza bramki
+   odwzorowania. */
+/* Wiersz zapisu RAZEM z obszarem mowiacym — jedno dziecko `.ekran`, bo ten
+   ma odstep 24 px miedzy dziecmi i pusty obszar mowiacy jako osobne dziecko
+   dokladal ten odstep zawsze. `gap: 0` wewnatrz: odstep nad komunikatem
+   niesie sam komunikat, wiec przy jego braku nie ma czego odsuwac. */
+.blokZapisu {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.podZapisem {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.podZapisem .podpisUwagi { padding-top: 8px; }
+
+/* Przycisk w locie. Zapis nie jest idempotentny po stronie silnika — dwa
+   klikniecia daja dwa wpisy — wiec stan „nie klikaj drugi raz" musi byc
+   WIDOCZNY, nie tylko obslużony w kodzie. */
+.przyciskZapisz:disabled,
+.wycofaj:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
