@@ -1,0 +1,122 @@
+{
+  "wersja": "1.0",
+  "data": "2026-08-28",
+  "opis": "JEDEN NOSNIK PALETY OBOWIAZUJACEJ. Wersja ostateczna projektu: papier o ton jasniejszy (Z10) + atrament granatowy (Z9) + poprawione wypelnienie kontrolki (Z13). Skrypt `buduj-makiety.py` wczytuje ten plik; dokument `decyzje-projektowe.md` sekcja 26 NIE przepisuje tych wartosci recznie — blok tabeli jest z tego pliku generowany i pilnowany kontrola `--kontrola`. Prog konsolidacji z v0.6 (sekcja 25.3) zostal osiagniety przy pierwszej zmianie barwy palety i to jest jego splata.",
+  "regula_doboru": "Kazda rola atramentu trzyma swoje L* co do setnej wobec odpowiednika sepiowego; rusza sie wylacznie odcien (nosnik: dokument sekcja 22.1). Papier idzie o JEDEN ton w gore, czyli +2,90 L* przy stalej chromie i stalym odcieniu (nosnik: sekcja 23.2). Wypelnienie kontrolki idzie za papierem tak, zeby odzyskac rozdzielenie, ktore mial na papierze ciemniejszym (nosnik: sekcja 26.3).",
+  "jasny": [
+    {
+      "rola": "papier",
+      "zrodlo": "#F5EEE0",
+      "final": "#FBECD5",
+      "powod": "papier o ton jasniejszy: +2,90 L* wobec #F3E4CD, chroma i odcien bez zmian (23.2)"
+    },
+    {
+      "rola": "pole kontrolki",
+      "zrodlo": "#FBF6EA",
+      "final": "#FFF5E1",
+      "powod": "kafelek idzie za papierem o ten sam ton, zeby odzyskac rozdzielenie z Main-Papier-Granat: dL* +2,81 wobec +2,90, dE 3,77 wobec 3,68, po odbarwieniu 2,79 wobec 2,80 (26.3)"
+    },
+    {
+      "rola": "liniatura wierszy",
+      "zrodlo": "#E7DCC4",
+      "final": "#E2D1B3",
+      "powod": "nadruk arkusza, zostaje cieply; stosunek do papieru 1,29:1 — dowiedziona dekoracja (5.5, 23.6)"
+    },
+    {
+      "rola": "atrament",
+      "zrodlo": "#2E2A22",
+      "final": "#02143C",
+      "powod": "granat, L* 7,58 bez zmian wobec sepii, C* 5,69 -> 30,0 przy sufitcie 33,03 (22.2)"
+    },
+    {
+      "rola": "atrament cichy",
+      "zrodlo": "#6B6252",
+      "final": "#4A5267",
+      "powod": "ten sam tusz pisany slabiej: mieszanina z papierem przy kryciu 0,7033, cel L* 34,91 (22.3)"
+    },
+    {
+      "rola": "saldo ujemne",
+      "zrodlo": "#8C2F2A",
+      "final": "#791B1B",
+      "powod": "konwencja ksiegowa, poza osia granatu — nie jest przedmiotem tej zmiany (22.4)"
+    },
+    {
+      "rola": "obrys kontrolki",
+      "zrodlo": "#8F8268",
+      "final": "#696C7A",
+      "powod": "ten sam tusz, krycie 0,5745, cel L* 46,06 (22.3)"
+    },
+    {
+      "rola": "saldo dodatnie",
+      "zrodlo": "#3E5C31",
+      "final": "#234017",
+      "powod": "zielen papierowa: stara #3E5C31 daje 5,66:1 w najciemniejszym punkcie faktury wobec wymaganych 6,54 (22.6, przeliczone na papierze jasnym w 26.6)"
+    }
+  ],
+  "ciemny": [
+    {
+      "rola": "tlo",
+      "zrodlo_jasne": "#F5EEE0",
+      "zrodlo_sepia_ciemna": "#1E1B15",
+      "final": "#1E1B15",
+      "powod": "tlo motywu ciemnego bez zmian wobec wersji sepiowej — os jasnosci papieru nie ma odpowiednika w motywie ciemnym (22.7)"
+    },
+    {
+      "rola": "pole kontrolki",
+      "zrodlo_jasne": "#FBF6EA",
+      "zrodlo_sepia_ciemna": "#262218",
+      "final": "#262218",
+      "powod": "bez zmian wobec wersji sepiowej: rozdzielenie od tla wynosi tu dE 4,45, czyli powyzej progu 2,3 — wada z Z13 dotyczyla wylacznie motywu jasnego (26.5)"
+    },
+    {
+      "rola": "liniatura wierszy",
+      "zrodlo_jasne": "#E7DCC4",
+      "zrodlo_sepia_ciemna": "#3C362B",
+      "final": "#3C362B",
+      "powod": "bez zmian wobec wersji sepiowej — nadruk arkusza"
+    },
+    {
+      "rola": "atrament",
+      "zrodlo_jasne": "#2E2A22",
+      "zrodlo_sepia_ciemna": "#EFE6D4",
+      "final": "#E5E5FC",
+      "powod": "granat w motywie ciemnym; L* 91,6 trzymane, C* 11,9 przy sufitcie gamutu 14,80 (22.7)"
+    },
+    {
+      "rola": "atrament cichy",
+      "zrodlo_jasne": "#6B6252",
+      "zrodlo_sepia_ciemna": "#A99E88",
+      "final": "#9F9DAA",
+      "powod": "ten sam tusz slabiej, cel L* jak w sepii (22.7)"
+    },
+    {
+      "rola": "obrys kontrolki",
+      "zrodlo_jasne": "#8F8268",
+      "zrodlo_sepia_ciemna": "#7A7160",
+      "final": "#737177",
+      "powod": "ten sam tusz najslabiej, cel L* jak w sepii (22.7)"
+    },
+    {
+      "rola": "saldo ujemne",
+      "zrodlo_jasne": "#8C2F2A",
+      "zrodlo_sepia_ciemna": "#E0887C",
+      "final": "#E0887C",
+      "powod": "bez zmian wobec wersji sepiowej — parytet wagi werdyktow w motywie ciemnym, 6,53:1 (12.2)"
+    },
+    {
+      "rola": "saldo dodatnie",
+      "zrodlo_jasne": "#3E5C31",
+      "zrodlo_sepia_ciemna": "#88A976",
+      "final": "#88A976",
+      "powod": "bez zmian wobec wersji sepiowej — para z powyzsza, 6,53:1 obie strony (12.2)"
+    }
+  ],
+  "faktura": {
+    "wlokno_ciemne": "#5A5142",
+    "wlokno_jasne": "#FFF8EA",
+    "powod": "wlokno to STRUKTURA ARKUSZA, nie atrament — zostaje cieple we wszystkich wariantach (22.4). Pilnuje tego straznik dwustronny w `buduj-makiety.py`, z mutacja w dokumencie sekcja 24.3 i 26.8."
+  },
+  "kafel_wykresu": "#B9A17A1F",
+  "kafel_wykresu_ciemny": "#0000003C",
+  "kafel_wykresu_powod": "Kafel pod wykresem jako warstwa POLPRZEZROCZYSTA (16.4c). W motywie ciemnym dobrany tak, zeby dawac TEN SAM krok postrzegany co w jasnym i w TYM SAMYM kierunku (przygasza arkusz): jasny dE 3,34 przy dL* -3,12; ciemny dE 3,41 przy dL* -3,08. Kierunek rozstrzygniety pomiarem — wariant rozjasniajacy zblizal sie do pola kontrolki na dE 1,45, przygaszajacy odsuwa sie na 7,78 (26.7)."
+}

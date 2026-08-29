@@ -10,6 +10,15 @@ out/
 *.tsbuildinfo
 interfejs/zrzuty/
 
+# pliki dopisywane przez `next dev`, nie przez nas
+# `interfejs/node_modules/next/dist/server/lib/generate-agent-files.js` zapisuje
+# AGENTS.md (blok reguł Next.js) i CLAUDE.md o treści `@AGENTS.md`. Oba są
+# odtwarzane przy każdym uruchomieniu, a `CLAUDE.md` jest w tym projekcie
+# powierzchnią rządzenia z właścicielem-człowiekiem — narzędzie nie zakłada jej
+# po cichu. Zostają na dysku, poza repozytorium.
+interfejs/AGENTS.md
+interfejs/CLAUDE.md
+
 # sekrety — NIGDY do repozytorium
 .env
 .env.local

@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #6B6252; } a:hover { color: #2E2A22; }
+  </style>
+</helmet>
+
+<div style="background: #F5EEE0; color: #2E2A22; min-height: 900px; display: flex; flex-direction: column;">
+
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 40px;">
+      <span style="font-size: 15px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;">AI CFO</span>
+      <span style="flex: 1;"></span>
+      <button type="button" style="min-height: 44px; padding: 0 16px; font: inherit; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; cursor: pointer;">Motyw ciemny</button>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;">Stara aplikacja</a>
+    </div>
+    <div style="height: 1px; background: #6B6252;"></div>
+    <div style="height: 3px;"></div>
+    <div style="height: 1px; background: #6B6252;"></div>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; align-items: center; padding: 32px 40px 24px;">
+    <div style="width: 1040px; display: flex; flex-direction: column; gap: 34px;">
+
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 10px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Godziny</span>
+          <span style="font-size: 13px; color: #6B6252;">0 wpisów · stawka 70,00&nbsp;zł za godzinę</span>
+          <span style="flex: 1;"></span>
+          <span style="display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px;">
+            <span>1 IX 2026</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#6B6252" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px;">
+            <span>30 IX 2026</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#6B6252" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </span>
+        </div>
+        <div style="height: 1px; background: #6B6252;"></div>
+        <div style="height: 3px;"></div>
+        <div style="height: 1px; background: #6B6252;"></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0; font-size: 20px; line-height: 1.45;">Rejestr godzin jest pusty — nie ma z czego wystawić faktury ani powiedzieć, na co poszedł miesiąc.</p>
+        <p style="margin: 0; font-size: 15px; color: #6B6252;">Rozliczasz się skalą podatkową, więc <span style="color: #2E2A22;">czynności nie trzeba rozdzielać</span> — jedna stawka obejmuje całość dochodu. Godziny są tu do dwóch rzeczy: wystawienia faktury i Twojej własnej orientacji, na co poszedł czas.</p>
+        <div style="display: flex; align-items: center; gap: 16px; padding-top: 4px;">
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none; gap: 8px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="#6B6252" stroke-width="1.6" stroke-linecap="round"></path></svg><span>Dodaj godziny</span></a>
+          <span style="font-size: 13px; color: #6B6252;">data · liczba godzin · rodzaj czynności · opis dla siebie</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; align-items: start;">
+
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: baseline; gap: 16px; padding-bottom: 6px; border-bottom: 1px solid #6B6252;">
+            <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Wpisy w okresie</span>
+          </div>
+          <p style="margin: 10px 0 0; font-size: 15px; color: #6B6252;">Brak wpisów w tym okresie. Po pierwszym wpisie stanie tu tabela: data, liczba godzin i opis — po jednym wierszu na wpis, z sumą godzin w nagłówku.</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: baseline; gap: 16px; padding-bottom: 6px; border-bottom: 1px solid #6B6252;">
+            <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Ile z tego wychodzi</span>
+          </div>
+          <p style="margin: 10px 0 0; font-size: 15px; color: #6B6252;">Jedna pozycja: suma godzin razy 70,00&nbsp;zł to kwota netto faktury. Przy skali podatkowej nie ma powodu jej dzielić — dochód z całości opodatkowany jest tą samą stawką.</p>
+        </div>
+
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 16px;">
+        <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Sprawdzenie</span>
+        <span style="font-size: 15px; color: #6B6252;">faktura przykładowa na 11&nbsp;200,00&nbsp;zł netto przy stawce 70,00&nbsp;zł to równe 160 godzin — tyle powinno być w rejestrze za ten okres.</span>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center; padding: 0 40px 28px;">
+    <div style="width: 1040px; display: flex; align-items: center; gap: 24px;">
+      <span style="display: inline-flex; align-items: center; padding: 8px 14px; font-size: 13px; color: #6B6252; border: 1px solid #6B6252; border-radius: 2px; box-shadow: 0 0 0 3px #F5EEE0, 0 0 0 4px #6B6252;">Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.</span>
+      <span style="flex: 1;"></span>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Księgowanie — dopisz wydatek albo przychód</a>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

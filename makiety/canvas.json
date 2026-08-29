@@ -1,0 +1,268 @@
+{
+  "artboards": [
+    {
+      "file": "CoMnieCzeka.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1080,
+      "page": "page-2"
+    },
+    {
+      "file": "Main-Dobrze.dc.html",
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-2"
+    },
+    {
+      "file": "NieWiem.dc.html",
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-2"
+    },
+    {
+      "file": "Main-Ciemny.dc.html",
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-2"
+    },
+    {
+      "file": "TrzyStany.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-3"
+    },
+    {
+      "file": "TrzyStany-Ciemny.dc.html",
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-3"
+    },
+    {
+      "file": "Main-B.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Main-Papier.dc.html",
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Main-Papier-Granat.dc.html",
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Main-Papier-Jasny.dc.html",
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Zdanie.dc.html",
+      "x": 0,
+      "y": 1020,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Os.dc.html",
+      "x": 1520,
+      "y": 1020,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Waga.dc.html",
+      "x": 3040,
+      "y": 1020,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Main-Reka.dc.html",
+      "x": 4560,
+      "y": 1020,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Main-Reka-Papier.dc.html",
+      "x": 0,
+      "y": 2040,
+      "w": 1440,
+      "h": 900,
+      "page": "page-4"
+    },
+    {
+      "file": "Ksiegowanie.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 972,
+      "page": "page-5"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Miesiac.dc.html",
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Budzet.dc.html",
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1483,
+      "page": "page-5"
+    },
+    {
+      "file": "Raporty.dc.html",
+      "x": 0,
+      "y": 1603,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Firma.dc.html",
+      "x": 1520,
+      "y": 1603,
+      "w": 1440,
+      "h": 1701,
+      "page": "page-5"
+    },
+    {
+      "file": "Majatek.dc.html",
+      "x": 3040,
+      "y": 1603,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Godziny.dc.html",
+      "x": 4560,
+      "y": 1603,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Doradca.dc.html",
+      "x": 0,
+      "y": 3424,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    },
+    {
+      "file": "Ustawienia.dc.html",
+      "x": 1520,
+      "y": 3424,
+      "w": 1440,
+      "h": 1639,
+      "page": "page-5"
+    },
+    {
+      "file": "Miesiac-Ciemny.dc.html",
+      "x": 3040,
+      "y": 3424,
+      "w": 1440,
+      "h": 900,
+      "page": "page-5"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "rozwiniecie",
+      "x": 0,
+      "y": -420,
+      "w": 1400,
+      "page": "page-2",
+      "text": "ROZWINIECIE — cztery ekrany w jezyku ostatecznym. Wszystkie zbudowane tym samym przebiegiem co ramka na stronie „Ksiega\".\nCO MNIE CZEKA — ekran drugi, odpowiedz na moment M4 (terminy 20. i 25.). Jedno klikniecie od ekranu pierwszego.\nMAIN-DOBRZE — stan NAJCZESTSZY (nie schodzisz ponizej zera). To on niesie zielen: #234017 dobrana na papier, bo stara #3E5C31 daje 5,66:1 w najciemniejszym punkcie faktury wobec wymaganych 6,54. Uwaga jawna: TEN EKRAN NIE MA WYKRESU dolozonego w Z1, bo jego szereg dzienny musialby wyjsc z silnika, a liczb nie wymyslam. To jedyna znana niespojnosc ukladu w tym zestawie — sekcja 26.9.\nNIEWIEM — stan startowy aplikacji. Wykresu nie ma i nie powinno byc: nie ma prognozy, wiec nie ma czego rysowac.\nMAIN-CIEMNY — ta sama ramka co „Ksiega\", nie osobny plik. Do 2026-08-28 motyw ciemny mial wlasne zrodlo i ZOSTAL W TYLE ZA UKLADEM: nie mial wykresu z Z1, mial rytm wierszy 14 px zamiast 11 i inny odstep zamkniecia. Zaden pomiar barwy tego nie widzial, bo pomiar barwy nie patrzy na uklad. Oba motywy maja teraz JEDNO zrodlo i roznia sie wylacznie paleta, kaflem wykresu i napisem przelacznika."
+    },
+    {
+      "id": "stany",
+      "x": 0,
+      "y": -380,
+      "w": 1400,
+      "page": "page-3",
+      "text": "STANY LICZBY — trzy stany jednej liczby plus wzornik reguly barwy, oba motywy.\nWZORNIK CYTUJE ZMIERZONE STOSUNKI I DLATEGO JEST TRESCIA ZALEZNA OD PALETY. Po zmianie papieru stare liczby mowilyby na wlasnym wzorniku nieprawde, wiec zostaly przeliczone i podmienione w skrypcie budujacym: czerwien 7,67:1, zielen 8,39:1, atrament cichy 5,66:1 — wszystkie W NAJCIEMNIEJSZYM PUNKCIE FAKTURY, czyli w przypadku najgorszym, a nie na plaskim tle.\nMOTYW CIEMNY nie ma faktury, wiec tam stosunek jest wprost „na tle\": 6,53 / 6,53 / 6,44.\nKONFLIKT DWOCH REGUL, NIEROZSTRZYGNIETY I NAZWANY: parytet wagi werdyktow (czerwien i zielen o tym samym kontrascie) wyklucza sie z rozroznialnoscia po odbarwieniu — zielen o dokladnie tej samej wadze co czerwien ma po odbarwieniu dE 0,00. W motywie ciemnym stoi parytet (6,53 = 6,53), w jasnym rozroznialnosc (dE 2,68). To jest pytanie 14 i nadal czeka na decyzje."
+    },
+    {
+      "id": "odrzucone",
+      "x": 0,
+      "y": -320,
+      "w": 1400,
+      "page": "page-4",
+      "text": "KIERUNKI ODRZUCONE — slad wyboru, nie projekt. Te ramki celowo NIE ida za `paleta.json`: ich barwy sa zamrozone w skrypcie budujacym, bo gdyby szly za paleta, kanwa przestalaby pokazywac, miedzy czym wybor byl dokonywany.\nRZAD GORNY — cztery ramki z 2026-08-28 przed poludniem, kazda odpadla z innego powodu:\nMAIN-B — rozdzielenie wykresu od tabeli LINIA zamiast kafla. Tansza w utrzymaniu (zero nowych zmiennych), ale w pomiarze przeduwagowym nie robila nic (krok rozdzielenia 0,35 wobec 2,81 dla kafla). Odpadla na tym jednym pomiarze.\nMAIN-PAPIER — pierwszy papier sepiowy. Przyjety jako kierunek („podoba mi sie main papier\"), odpadl jako wariant koncowy: sepia czyta sie jak ksiega, granat jak zeszyt pisany reka — i to drugie Darek wybral.\nMAIN-PAPIER-GRANAT — atrament granatowy na papierze ciemniejszym. Wygral OS ATRAMENTU, przegral os papieru. To z tej ramki pochodzi wzorzec rozdzielenia kafelkow, ktory wraca w wersji ostatecznej.\nMAIN-PAPIER-JASNY — papier o ton jasniejszy przy atramencie sepiowym. Wygral OS PAPIERU, przegral os atramentu. To ta ramka niosla wade, ktora Darek zobaczyl golym okiem: kafelki schodzily do dE 2,18 przy progu 2,3 i przestawaly sie odcinac.\nRZAD SRODKOWY I DOLNY — kierunki odrzucone wczesniej: ZDANIE (odpowiedz jako zdanie; to z niej pochodzi wykres), OS (odpowiedz jako ksztalt — test mruzenia oczu 1 z 3, hierarchia 1,33x przy progu 1,5x), WAGA (odpowiedz jako polozenie wobec progu — przy niedoborze 210,67 zl pasek ma 1,75% szerokosci toru), MAIN-REKA i MAIN-REKA-PAPIER (pismo reczne — odrzucone przez Darka 2026-08-28: trudnosc odczytu)."
+    },
+    {
+      "id": "ekrany-komplet",
+      "x": 0,
+      "y": -420,
+      "w": 1400,
+      "page": "page-5",
+      "text": "DZIEWIEC EKRANOW APLIKACJI. Do 2026-08-28 rano zaprojektowany byl JEDEN; wieczorem doszedl DZIEWIATY — KSIEGOWANIE, jedyny ekran, na ktorym cos sie ROBI, a nie oglada. Powstal ostatni, bo zlecenie wymienialo siedem ekranow i tego wsrod nich nie bylo. Trzy klikniecia od otwarcia aplikacji do zapisanego wydatku: Ksiegowanie w naglowku, kafelek kategorii, Zapisz. Kwote sie wpisuje — kursor stoi w polu od razu.\nMAPA (M1): kazda zdolnosc ma DOKLADNIE JEDEN ekran. Spory graniczne rozstrzyga pytanie „na jakie pytanie odpowiada ten ekran\", zapisane w kodzie (`ekrany.py`, pole `pytanie`), a nie podobienstwo nazw. ZUS: rozbicie i terminy na Firmie, zaplata jako wydatek na Miesiacu. Koszty firmowe i faktury: na Firmie, bo niosa VAT i numer dokumentu. Wpisy: dopisanie i wycofanie SZESCIU OSTATNICH w Ksiegowaniu, poprawa i cala historia na Budzecie. Cele: na Budzecie. Pelny wywod z kosztami — dokument sekcje 27 i 41.\nPASEK (M2) PO Z-17 I Z-18: znika odsylacz do starej aplikacji (z naglowka I ze stopki) oraz przelacznik motywu, ktory schodzi do Ustawien. Zostaje osiem miejsc plus KSIEGOWANIE jako kontrolka przy znaku slownym — teraz z wlasnym stanem „tu jestem\", bo jest juz takze miejscem. Zmierzone: 1028,7 px przy progu 1360 px, zapas 331,3 px. Dziewiata pozycja w rzedzie ZMIESCILABY SIE (1008,4 px, zapas 351,6) — o rozdziale decyduje wiec znaczenie, nie miejsce: pasek prowadzi do miejsca, ta jedna kontrolka wykonuje czynnosc robiona okolo 30 razy w miesiacu.\nCO PRZEZ Z-17 PRZESTAJE DZIALAC, wprost: dopoki nowy interfejs nie przejmie czterech operacji (dopisanie i wycofanie wpisu, ustawienie i zakonczenie pozycji planu), zaden ekran nie prowadzi do jedynego miejsca, w ktorym da sie dzis zarzadzac PLANEM. Ksiegowanie przejmuje dwie z czterech.\nLICZBY SA PRAWDZIWE. Kazda kwota pochodzi z bazy-wzorca TYLKO DO ODCZYTU, policzona silnikiem aplikacji, nie wymyslona. Miesiac pokazuje pazdziernik 2025 (jedyny miesiac z kompletem wpisow i planu), a Ksiegowanie 4 XII 2025 — bo „ostatnie wpisy\" znaczy ostatnie, a nie ladniejsze.\nWYSOKOSC KAZDEJ RAMKI JEST ZMIERZONA, nie zalozona: ramka wyzsza od 900 px znaczy ekran, ktory nie miesci sie w oknie. Zamiast uciac go po cichu, kanwa to pokazuje."
+    }
+  ],
+  "pages": [
+    {
+      "id": "page-2",
+      "name": "Rozwiniecie"
+    },
+    {
+      "id": "page-3",
+      "name": "Stany liczby"
+    },
+    {
+      "id": "page-4",
+      "name": "Odrzucone kierunki"
+    },
+    {
+      "id": "page-5",
+      "name": "Ekrany"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-5"
+  }
+}

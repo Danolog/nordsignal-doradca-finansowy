@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #6B6252; } a:hover { color: #2E2A22; }
+  </style>
+</helmet>
+
+<div style="background: #F5EEE0; color: #2E2A22; min-height: 800px; display: flex; justify-content: center; padding: 48px 40px;">
+  <div style="width: 1360px; display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 40px; row-gap: 48px;">
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Wiem</span>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Najniżej — 25 września</span>
+        <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #8C2F2A;">-210,67&nbsp;zł</span>
+      </div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="height: 3px;"></div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5;">25&nbsp;września schodzisz poniżej zera — tego dnia wychodzi VAT i czesne.</p>
+      <p style="margin: 0; font-size: 13px; color: #6B6252;">Stan konta z 1 września, wczoraj.</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Nie wiem</span>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Najniżej</span>
+        <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #6B6252;">—</span>
+      </div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="height: 3px;"></div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5;">Nie policzę prognozy: nie wiem, ile masz na koncie. Saldo z budżetu to suma wpisów, a nie pieniądze — prognoza zbudowana na nim startowałaby z punktu, który nie istnieje. Wpisz stan konta i datę odczytu.</p>
+      <div>
+        <button type="button" style="min-height: 44px; padding: 0 20px; font: inherit; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; cursor: pointer;">Podaj stan konta</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Wiem, ale nieaktualne</span>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Najniżej — 25 września</span>
+          <span style="display: inline-flex; align-items: center; padding: 3px 8px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #6B6252; border: 1px solid #6B6252; border-radius: 2px;">nieaktualne</span>
+        </div>
+        <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #6B6252;">-210,67&nbsp;zł</span>
+      </div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="height: 3px;"></div>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5;">Stan konta jest z 2026-09-01 i od jego daty minęły terminy: 2 — prognoza biegnie od liczby, która mogła się już zmienić. Odśwież stan konta.</p>
+      <div>
+        <button type="button" style="min-height: 44px; padding: 0 20px; font: inherit; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; cursor: pointer;">Odśwież stan konta</button>
+      </div>
+    </div>
+
+    <div style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 16px;">
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Reguła barwy liczby werdyktu</span>
+      <div style="height: 1px; background: #6B6252;"></div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 40px;">
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Poniżej zera</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #8C2F2A;">-210,67&nbsp;zł</span>
+          <span style="font-size: 13px; color: #6B6252;">czerwień #8C2F2A · 7,12:1 na papierze</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Powyżej zera</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #3E5C31;">+2&nbsp;468,39&nbsp;zł</span>
+          <span style="font-size: 13px; color: #6B6252;">zieleń #3E5C31 · 6,54:1 na papierze</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Nieaktualne — oba znaki</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #6B6252;">-210,67&nbsp;zł</span>
+          <span style="font-size: 13px; color: #6B6252;">atrament cichy #6B6252 · 5,21:1 na papierze</span>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5;">Znak przy kwocie niesie to samo co barwa i przeżywa odbarwienie. Liczba nieaktualna traci barwę oceny — ocenia się tylko to, co aktualne.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

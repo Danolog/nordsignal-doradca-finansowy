@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #6B6252; } a:hover { color: #2E2A22; }
+  </style>
+</helmet>
+
+<div style="background: #F5EEE0; color: #2E2A22; min-height: 900px; display: flex; flex-direction: column;">
+
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 40px;">
+      <span style="font-size: 15px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;">AI CFO</span>
+      <span style="flex: 1;"></span>
+      <button type="button" style="min-height: 44px; padding: 0 16px; font: inherit; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; cursor: pointer;">Motyw ciemny</button>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;">Stara aplikacja</a>
+    </div>
+    <div style="height: 1px; background: #6B6252;"></div>
+    <div style="height: 3px;"></div>
+    <div style="height: 1px; background: #6B6252;"></div>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; align-items: center; padding: 32px 40px 24px;">
+    <div style="width: 1040px; display: flex; flex-direction: column; gap: 40px;">
+
+      <div style="display: flex; flex-direction: column;">
+
+        <div style="display: flex; align-items: baseline; gap: 16px; padding-bottom: 10px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Księga płynności</span>
+          <span style="font-size: 13px; color: #6B6252;">wrzesień 2026 · 45 dni naprzód</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 18px;">
+          <svg width="1040" height="64" viewBox="0 0 1040 64" role="img" aria-label="Prognoza linii ostrożnej od dziś, 2 września, do 17 października; kreską przerywaną, bo to przewidywanie; od 25 do 29 września biegnie pod kreską zera">
+            <line x1="0" y1="53.1" x2="1040" y2="53.1" stroke="#6B6252" stroke-width="1"></line>
+            <path d="M0.0,10.0 L23.1,10.0 L46.2,10.0 L69.3,10.0 L92.4,10.0 L115.6,10.0 L138.7,10.0 L161.8,10.0 L184.9,10.0 L208.0,10.0 L231.1,15.9 L254.2,15.9 L277.3,15.9 L300.4,16.5 L323.6,16.5 L346.7,16.5 L369.8,16.5 L392.9,16.5 L416.0,16.5 L439.1,39.5 L462.2,39.5 L485.3,39.5 L508.4,39.5 L531.6,54.0 L554.7,54.0 L577.8,54.0 L600.9,54.0 L624.0,54.0 L647.1,16.3 L670.2,17.8 L693.3,17.8 L716.4,17.8 L739.6,17.8 L762.7,17.8 L785.8,17.8 L808.9,17.8 L832.0,17.8 L855.1,17.8 L878.2,17.8 L901.3,17.8 L924.4,23.6 L947.6,23.6 L970.7,23.6 L993.8,23.6 L1016.9,23.6 L1040.0,23.6" fill="none" stroke="#2E2A22" stroke-width="1.6" stroke-dasharray="6 4"></path>
+            <path d="M531.6,54.0 L554.7,54.0 L577.8,54.0 L600.9,54.0 L624.0,54.0" fill="none" stroke="#8C2F2A" stroke-width="3" stroke-dasharray="6 4"></path>
+            <circle cx="531.6" cy="54.0" r="4.5" fill="#8C2F2A"></circle>
+          </svg>
+          <div style="display: flex; align-items: baseline;">
+            <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">2 IX — dziś</span>
+            <span style="flex: 1;"></span>
+            <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #8C2F2A;">25 IX — pod kreską</span>
+            <span style="flex: 1;"></span>
+            <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">17 X</span>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding-bottom: 8px; border-bottom: 1px solid #6B6252;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Dzień</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Pozycja</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252; text-align: right;">Kwota</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252; text-align: right;">Saldo po tym dniu</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px; color: #6B6252;">2 IX</span>
+          <span style="font-size: 15px;">Stan na dziś <span style="font-size: 13px; color: #6B6252;">— z odczytu 9&nbsp;920,79&nbsp;zł z 1 września</span></span>
+          <span style="font-size: 15px; color: #6B6252; text-align: right;">—</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">9&nbsp;601,03&nbsp;zł</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px; color: #6B6252;">12 IX</span>
+          <span style="font-size: 15px;">Kredyt Revolut</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; color: #6B6252; text-align: right;">-1&nbsp;305,05&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">8&nbsp;295,98&nbsp;zł</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px; color: #6B6252;">15 IX</span>
+          <span style="font-size: 15px;">PGNiG</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; color: #6B6252; text-align: right;">-150,00&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">8&nbsp;145,98&nbsp;zł</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px; color: #6B6252;">21 IX</span>
+          <span style="font-size: 15px;">ZUS</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; color: #6B6252; text-align: right;">-5&nbsp;120,65&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">3&nbsp;025,33&nbsp;zł</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 11px 0 4px;">
+          <span style="font-size: 15px; color: #6B6252;">25 IX</span>
+          <span style="font-size: 15px;">Czesne WSB Merito</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; color: #6B6252; text-align: right;">-660,00&nbsp;zł</span>
+          <span></span>
+        </div>
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 4px 0 11px; border-bottom: 1px solid #E7DCC4;">
+          <span></span>
+          <span style="font-size: 15px;">VAT</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; color: #6B6252; text-align: right;">-2&nbsp;576,00&nbsp;zł</span>
+          <span></span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 96px 1fr 200px 260px; column-gap: 24px; align-items: baseline; padding: 16px 0 10px;">
+          <span></span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Najniżej — 25 września</span>
+          <span></span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 56px; line-height: 1.05; color: #8C2F2A; text-align: right;">-210,67&nbsp;zł</span>
+        </div>
+        <div style="height: 1px; background: #6B6252;"></div>
+        <div style="height: 3px;"></div>
+        <div style="height: 1px; background: #6B6252;"></div>
+
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0; font-size: 20px; line-height: 1.45;">25&nbsp;września schodzisz poniżej zera — tego dnia wychodzi VAT i czesne.</p>
+        <p style="margin: 0; font-size: 15px; color: #6B6252;">Masz 23 dni.</p>
+      </div>
+
+      <div style="display: flex; align-items: flex-end; gap: 32px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 13px; color: #6B6252;">Ile mogę jeszcze rozdysponować we wrześniu</span>
+          <div style="display: flex; align-items: baseline; gap: 16px;">
+            <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 20px; color: #8C2F2A;">-10&nbsp;131,46&nbsp;zł</span>
+            <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Miesiąc</a>
+          </div>
+        </div>
+        <span style="flex: 1;"></span>
+        <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0 20px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;">
+          <span>Co mnie czeka — 7 pozycji do 17 października</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8h9M8.5 4l4 4-4 4" stroke="#6B6252" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center; padding: 0 40px 28px;">
+    <div style="width: 1040px; display: flex; align-items: center; gap: 24px;">
+      <span style="display: inline-flex; align-items: center; padding: 8px 14px; font-size: 13px; color: #6B6252; border: 1px solid #6B6252; border-radius: 2px; box-shadow: 0 0 0 3px #F5EEE0, 0 0 0 4px #6B6252;">Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.</span>
+      <span style="flex: 1;"></span>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Księgowanie — dopisz wydatek albo przychód</a>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

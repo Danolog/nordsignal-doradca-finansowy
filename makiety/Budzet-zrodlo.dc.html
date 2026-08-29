@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #6B6252; } a:hover { color: #2E2A22; }
+  </style>
+</helmet>
+
+<div style="background: #F5EEE0; color: #2E2A22; min-height: 900px; display: flex; flex-direction: column;">
+
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 40px;">
+      <span style="font-size: 15px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;">AI CFO</span>
+      <span style="flex: 1;"></span>
+      <button type="button" style="min-height: 44px; padding: 0 16px; font: inherit; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; cursor: pointer;">Motyw ciemny</button>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;">Stara aplikacja</a>
+    </div>
+    <div style="height: 1px; background: #6B6252;"></div>
+    <div style="height: 3px;"></div>
+    <div style="height: 1px; background: #6B6252;"></div>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; align-items: center; padding: 32px 40px 24px;">
+    <div style="width: 1040px; display: flex; flex-direction: column; gap: 34px;">
+
+      <div style="display: flex; flex-direction: column;">
+
+        <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 10px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Budżet</span>
+          <span style="font-size: 13px; color: #6B6252;">4 pozycje planu · 0 wpisów</span>
+          <span style="flex: 1;"></span>
+          <span style="display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px;">
+            <span>październik 2026</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#6B6252" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px;">
+            <span>Wybrany miesiąc</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="#6B6252" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 24px; padding-bottom: 8px; border-bottom: 1px solid #6B6252;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Wydatki osobiste z planu</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Rezerwa na podatki</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Plan miesiąca razem</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 24px; align-items: baseline; padding: 12px 0 4px;">
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 24px;">2&nbsp;614,81&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 24px;">7&nbsp;696,65&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 24px;">10&nbsp;311,46&nbsp;zł</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 24px; align-items: baseline; padding-bottom: 12px;">
+          <span style="font-size: 13px; color: #6B6252;">przepływ tego miesiąca</span>
+          <span style="font-size: 13px; color: #6B6252;">saldo narastające, nie wydatek miesiąca</span>
+          <span style="font-size: 13px; color: #6B6252;">to jest kwota z ekranu Miesiąc</span>
+        </div>
+        <div style="height: 1px; background: #6B6252;"></div>
+        <div style="height: 3px;"></div>
+        <div style="height: 1px; background: #6B6252;"></div>
+
+        <p style="margin: 12px 0 0; font-size: 15px; color: #6B6252;">Rezerwa nie jest wydatkiem tego miesiąca. To saldo tego, co jeszcze należysz urzędowi — ta sama liczba wraca w listopadzie i w grudniu, dopóki jej nie zapłacisz.</p>
+        <div style="height: 1px; background: #E7DCC4; margin-top: 18px;"></div>
+        <div style="display: flex; align-items: baseline; gap: 16px; padding-top: 16px;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Bilans planu</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 24px; color: #8C2F2A;">-2&nbsp;614,81&nbsp;zł</span>
+          <span style="font-size: 15px; color: #6B6252;">tyle zostanie, gdy zrealizujesz plan co do złotówki</span>
+        </div>
+        <p style="margin: 6px 0 0; font-size: 15px; color: #6B6252;">Plan przychodów 0,00&nbsp;zł minus plan wydatków 2&nbsp;614,81&nbsp;zł; oszczędności na ten miesiąc nie zaplanowałeś. Przychód z faktury 1/2026 nie jest planem — wpłynie, gdy oznaczysz ją jako zapłaconą na karcie Firma. Ujemny bilans znaczy, że plan się nie spina — miesiąc bez ani jednej zaplanowanej pozycji przychodu wygląda tak samo. Rezerwa nie wchodzi w tę liczbę; stoi wyżej, osobno.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <p style="margin: 0; font-size: 20px; line-height: 1.45;">Z planu 2&nbsp;614,81&nbsp;zł nie wydałeś jeszcze nic — miesiąc jest w szóstym dniu.</p>
+        <p style="margin: 0; font-size: 15px; color: #6B6252;">Trzy pozycje czekają na swoje dni: Kredyty 1&nbsp;624,81&nbsp;zł (1 i 12 X), Energia Elektryczna 330,00&nbsp;zł (20 X), Czesne 660,00&nbsp;zł (25 X). Kategoria <span style="color: #2E2A22;">Firmowe</span> nie wpisuje się ręcznie — powstaje z każdego kosztu na karcie <span style="color: #2E2A22;">Firma</span>, na kwotę brutto; w tym miesiącu nie ma ani jednego.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Plan kontra wykonanie</span>
+          <span style="font-size: 13px; color: #6B6252;">największe odchylenie u góry</span>
+          <span style="flex: 1;"></span>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="#6B6252" stroke-width="1.6" stroke-linecap="round"></path></svg><span>Dodaj pozycję planu</span></a>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;">Skopiuj z września</a>
+        </div>
+        <div style="display: grid; grid-template-columns: 210px 130px 1fr 130px 190px; column-gap: 24px; padding-bottom: 6px; border-bottom: 1px solid #6B6252;">
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Kategoria</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252; text-align: right;">Plan</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Postęp</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252; text-align: right;">Wykonanie</span>
+          <span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252; text-align: right;">Odchylenie</span>
+        </div>
+        <div style="padding: 14px 0 6px;"><span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Wydatki</span></div>
+        <div style="display: grid; grid-template-columns: 210px 130px 1fr 130px 190px; column-gap: 24px; align-items: center; padding: 6px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px;">Kredyty</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">1&nbsp;624,81&nbsp;zł</span>
+          <span style="position: relative; display: block; height: 14px;"><span style="position: absolute; left: 0; top: 1px; height: 12px; width: 100.0%; background: #E7DCC4; border: 1px solid #8F8268; box-sizing: border-box;"></span><span style="position: absolute; left: 0; top: 3px; height: 8px; width: 0.0%; background: #6B6252;"></span></span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">0,00&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right; color: #6B6252;">−1&nbsp;624,81&nbsp;zł</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 210px 130px 1fr 130px 190px; column-gap: 24px; align-items: center; padding: 6px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px;">Czesne</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">660,00&nbsp;zł</span>
+          <span style="position: relative; display: block; height: 14px;"><span style="position: absolute; left: 0; top: 1px; height: 12px; width: 100.0%; background: #E7DCC4; border: 1px solid #8F8268; box-sizing: border-box;"></span><span style="position: absolute; left: 0; top: 3px; height: 8px; width: 0.0%; background: #6B6252;"></span></span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">0,00&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right; color: #6B6252;">−660,00&nbsp;zł</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 210px 130px 1fr 130px 190px; column-gap: 24px; align-items: center; padding: 6px 0; border-bottom: 1px solid #E7DCC4;">
+          <span style="font-size: 15px;">Energia Elektryczna</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">330,00&nbsp;zł</span>
+          <span style="position: relative; display: block; height: 14px;"><span style="position: absolute; left: 0; top: 1px; height: 12px; width: 100.0%; background: #E7DCC4; border: 1px solid #8F8268; box-sizing: border-box;"></span><span style="position: absolute; left: 0; top: 3px; height: 8px; width: 0.0%; background: #6B6252;"></span></span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">0,00&nbsp;zł</span>
+          <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right; color: #6B6252;">−330,00&nbsp;zł</span>
+        </div>
+        <div style="padding: 14px 0 6px;"><span style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6252;">Przychody i oszczędności</span></div>
+        <p style="margin: 0 0 10px; font-size: 15px; color: #6B6252;">Na październik nie zaplanowałeś ani przychodu, ani oszczędności — dlatego bilans planu jest ujemny o całą kwotę wydatków. Faktura 1/2026 stoi na karcie <span style="color: #2E2A22;">Firma</span> i wejdzie tu dopiero jako wpływ.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Cele oszczędnościowe</span>
+          <span style="font-size: 13px; color: #6B6252;">postęp liczy się z wpisów w kategorii celu, nie z ręcznie wpisanej liczby</span>
+          <span style="flex: 1;"></span>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 15px; color: #2E2A22; background: #FBF6EA; border: 1px solid #8F8268; border-radius: 3px; text-decoration: none;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="#6B6252" stroke-width="1.6" stroke-linecap="round"></path></svg><span>Dodaj cel</span></a>
+        </div>
+        <div style="display: grid; grid-template-columns: 210px 130px 1fr 130px 190px; column-gap: 24px; align-items: center; padding: 6px 0; border-top: 1px solid #6B6252;">
+          <span style="font-size: 15px;">Poduszka finansowa</span>
+                    <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">30&nbsp;000,00&nbsp;zł</span>
+          <span style="position: relative; display: block; height: 14px;"><span style="position: absolute; left: 0; top: 1px; height: 12px; width: 100.0%; background: #E7DCC4; border: 1px solid #8F8268; box-sizing: border-box;"></span><span style="position: absolute; left: 0; top: 3px; height: 8px; width: 0.0%; background: #6B6252;"></span></span>
+<span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right;">0,00&nbsp;zł</span>
+          <span style="font-size: 13px; color: #6B6252; text-align: right;">2&nbsp;000,00&nbsp;zł / mc przez 15 mc</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 16px; padding-bottom: 6px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6252;">Historia</span>
+          <span style="font-size: 13px; color: #6B6252;">zaznacz wiersz, żeby poprawić pomyłkę</span>
+          <span style="flex: 1;"></span>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Popraw zaznaczony</a>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Usuń zaznaczone</a>
+        </div>
+        <div style="display: grid; grid-template-columns: 110px 130px 1fr 160px 160px; column-gap: 24px; padding-bottom: 6px; border-bottom: 1px solid #6B6252;">
+          <p style="margin: 6px 0 0; font-size: 20px; line-height: 1.45;">W październiku nie ma jeszcze czego poprawiać.</p>
+          <p style="margin: 8px 0 0; font-size: 15px; color: #6B6252;">Historia pokazuje wpisy z wybranego okresu; ten miesiąc ma ich zero. 204 wpisy sprzed wznowienia działalności (1 IX 2026) zostają w bazie, ale nie wchodzą do żadnego okresu tej aplikacji — także na <span style="color: #2E2A22;">Raportach</span>.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center; padding: 0 40px 28px;">
+    <div style="width: 1040px; display: flex; align-items: center; gap: 24px;">
+      <span style="display: inline-flex; align-items: center; padding: 8px 14px; font-size: 13px; color: #6B6252; border: 1px solid #6B6252; border-radius: 2px; box-shadow: 0 0 0 3px #F5EEE0, 0 0 0 4px #6B6252;">Ostatnie sprawdzenie: dziś 06:00 — nic pilnego nie znalazł.</span>
+      <span style="flex: 1;"></span>
+      <a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 15px; color: #6B6252; text-decoration: none;">Księgowanie — dopisz wydatek albo przychód</a>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
