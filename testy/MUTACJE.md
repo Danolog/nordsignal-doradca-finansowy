@@ -728,7 +728,7 @@ E  + ziernika; pozycja schodzi z osi w całości
 - **Nie mutowano `_wejscia_planu`** — funkcji wydzielonej w tym zadaniu z `zbuduj`. Wydzielenie jest
   neutralne (suita przed i po: 880 passed), ale **żaden test nie pilnuje, że oba wołania dostają tę
   samą listę**; gdyby ktoś rozdzielił je z powrotem, nic by się nie zaczerwieniło. Etykieta jawna:
-  **niepotwierdzone**. Próg: przy pierwszej zmianie reguły dnia płatności (`_dzien_pozycji`).
+  **niepotwierdzone**. Próg: przy pierwszej zmianie reguły dnia płatności (`dzien_pozycji`).
 - **Nie ma strażnika na zdanie w przeglądarce.** Testy czytają odpowiedź trasy, nie wyrenderowany
   ekran. Że wiersz z `po: null` rysuje się jako etykieta + wyjaśnienie, wiadomo z Z1 — nie
   z pomiaru wykonanego dziś.
@@ -1510,3 +1510,82 @@ którego używa nagłówek ekranu). Wykryte zrzutem ekranu, nie testem — jak w
   `test_wezwanie_ODSWIEZ_Z_RAMKI_NIE_MA_dzis_na_ekranie`.
 - **Nie sprawdzono kontrolki czytnikiem ekranu ani przy wyłączonym JavaScript.**
 - **Nie ma ramki dla rozwiniętej kontrolki** — układ pól powstał bez makiety (odstępstwo od §3.6).
+
+---
+
+## Przebieg 2026-08-29 — W9b, sześć tras ekranu Budżet
+
+**Gdzie.** Kopia drzewa poza repozytorium
+(`scratchpad/mutacje-W9b`), `PYTHONDONTWRITEBYTECODE=1`, `__pycache__` czyszczone przed
+każdym przebiegiem. Po ostatnim cofnięciu `diff -rq` kopii z repozytorium: **bez różnic**.
+
+Kontrola przed mutacjami (`test_trasy_budzet` + `test_nosniki` + `test_trasy_bez_rachunku`
++ `test_kontrakt_dwa_nosniki` + `test_magazyn_budzet`): **212 passed**.
+
+| # | Mutacja | Który test padł (po nazwie) | Klasa | Wynik |
+|---|---|---|---|---|
+| **M-W9b-1** | do spisu `api/trasy.py` dopisana `Trasa("DELETE", "/api/plan/{id}", "budzet", …)` | `test_nosniki.py::test_kosz_planu_KONCZY_regule_a_nie_kasuje` | treść | **czerwony** |
+| **M-W9b-2** | `ekran_budzet.zakoncz_pozycje` woła `magazyn.usun_plan` zamiast `zakoncz_plan` | `test_trasy_budzet.py::test_ekran_budzetu_NIE_WOLA_usun_plan` · `::test_P1_ZAKONCZYC_pozycje_planu_HISTORIA_ZOSTAJE` | treść | **czerwony** |
+| **M-W9b-3** | `pozycje_wykonania` obcina posortowaną listę do jednego wiersza (`[:1]`) | `test_trasy_budzet.py::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` · `::test_najwieksze_odchylenie_STOI_U_GORY` · `::test_wiersz_z_DWOMA_pozycjami_planu_NIE_MA_jednego_numeru` · `::test_procent_bez_planu_to_MYSLNIK_a_nie_zero` · `::test_pasek_postepu_NIE_WYCHODZI_poza_sto` | **liczność** | **czerwony** |
+| **M-W9b-4** | `pozycje_planu` oddaje kwotę przez `str(float(...))` zamiast `napis_kwoty` | `test_trasy_budzet.py::test_kwota_z_ZEREM_NA_KONCU_nie_gubi_go_po_drodze` · `::test_P1_ZMIENIC_pozycje_planu_przez_PUT` · `::test_kopiuj_plan_PRZENOSI_pozycje_do_miesiaca_bez_planu` | treść | **czerwony** |
+| **M-W9b-5** | z `api/trasy_budzet.py` usunięta cała trasa `POST /api/plan` | `test_trasy_bez_rachunku.py::test_straznik_widzi_DOKLADNIE_dwanascie_tras` · `test_trasy_budzet.py::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` · `::test_P1_USTAWIC_pozycje_planu_przez_POST` · `::test_zakonczenie_NIE_JEST_metoda_DELETE` · `::test_kwota_z_ZEREM_NA_KONCU_nie_gubi_go_po_drodze` | **liczność** | **czerwony** |
+| **M-W9b-6** | odmowa rachunku rezerwy zwraca `Decimal("0.00")` zamiast `None` | `test_trasy_budzet.py::test_rezerwa_BEZ_FORMY_nie_jest_zerem_tylko_zdaniem` | treść | **czerwony** |
+| **M-W9b-7** | `magazyn.kopiuj_plan` wraca do stanu sprzed naprawy (wiersze miesiąca zamiast pozycji obowiązujących) | `test_trasy_budzet.py::test_kopiuj_plan_NIE_DOKLADA_pozycji_ktore_juz_obowiazuja` · `::test_kopiuj_plan_PRZENOSI_pozycje_do_miesiaca_bez_planu` | treść | **czerwony** |
+| **M-W9b-8** | z `interfejs/lib/kontrakt.ts` usunięte pole `DaneBudzetu.liczbaPozycjiPlanu` | `test_kontrakt_dwa_nosniki.py::test_nazwy_pol_sie_ZGADZAJA[DaneBudzetu]` · `::test_RAPORT_ile_pol_porownano_po_kazdej_stronie` | **liczność** | **czerwony** |
+
+| **M-W9b-9** | z `ekran_budzet.ustaw_pozycje` zdjęte sprawdzenie kategorii **przed** zapisem | `test_trasy_budzet.py::test_pozycja_planu_BEZ_KATEGORII_nie_dociera_do_bazy` · `::test_pozycja_planu_W_ZLYM_TYPIE_jest_odmowa` | treść | **czerwony** |
+| **M-W9b-10** | `magazyn.ustal_regule_planu` zawsze traktuje pozycję jak nową (`obowiazujaca = None`) — utrata idempotencji | `test_trasy_budzet.py::test_ZAPIS_POWTORZONY_daje_jeden_skutek_a_nie_dwa` · `::test_P1_ZMIENIC_pozycje_planu_przez_PUT` · `::test_kazda_z_szesciu_tras_ODPOWIADA_i_nie_niesie_liczby` | treść | **czerwony** |
+
+Kontrola po cofnięciu wszystkich ośmiu: **212 passed**. Po dołożeniu dwóch strażników
+wejścia i idempotencji (M-9, M-10) kontrola powtórzona: **215 passed**, a `diff -rq` kopii
+z repozytorium — **bez różnic**.
+
+### Dwie klasy mutacji, bo jedna nie wystarcza
+
+Ostrzeżenie z tej samej sesji (W7): mutacja kasująca trasę dowodzi tylko, że strażnik **znajduje
+zepsutą rzecz** — nie że **wie, ile rzeczy zobaczył**. Dlatego trzy z ośmiu mutacji są
+**licznościowe** (M-3 okraja listę wierszy, M-5 zabiera całą trasę, M-8 zabiera pole kontraktu),
+a pięć jest **treściowych**. Gdyby istniały tylko treściowe, obchód odpowiedzi po pustym drzewie
+i asercja „nie ma tu liczby zmiennoprzecinkowej" byłyby zielone przy odpowiedzi, która nie niesie
+nic.
+
+### Wada pieniężna znaleziona po drodze — `magazyn.kopiuj_plan` (M-W9b-7)
+
+**Nie jest to wada wprowadzona w W9b.** Powstała w Z42, gdy pozycja planu stała się **regułą**
+obowiązującą od swojego miesiąca do odwołania, a `kopiuj_plan` dalej czytał **wiersze** miesiąca
+źródłowego. W9b jest pierwszym zadaniem, które wystawia tę funkcję na HTTP (`POST /api/plan/kopiuj`),
+więc wada przestała być teoretyczna.
+
+Pomiar przez trasę, 2026-08-29, przed naprawą — plan października złożony z trzech reguł
+(Kredyty „Alior" 1 305,05 zł, Kredyty „Revolut" 319,76 zł, Czesne 660,00 zł):
+
+```
+LISTOPAD PRZED: [('Czesne','',660.00,d.25), ('Kredyty','Alior',1305.05,d.1), ('Kredyty','Revolut',319.76,d.12)]  plan 2284.81
+WYNIK:          skopiowane 2, pominiete 1
+LISTOPAD PO:    [('Czesne','',660.00,BRAK DNIA), ('Kredyty','',1305.05,BRAK DNIA),
+                 ('Kredyty','Alior',1305.05,d.1), ('Kredyty','Revolut',319.76,d.12)]  plan 3589.86
+```
+
+Plan listopada urósł o **1 305,05 zł**, których nikt nie zaplanował, pojawiła się druga pozycja
+„Kredyty" z pustą nazwą, a „Czesne" straciło dzień płatności — i wszystko to zwróciło meldunek
+sukcesu. Trzy przyczyny naraz: (a) źródło czytane po wierszach, nie przez `budzet.plan_na_miesiac`;
+(b) sprawdzenie „czy już jest" pomijało `opis`, więc kategoria z dwiema pozycjami zwijała się do
+jednej; (c) kopia gubiła `opis`, `dzien`, `powtarzalna` i `co_ile_miesiecy`.
+
+Naprawione: źródło i cel czyta ten sam nośnik co ekran, tożsamość to pełna trójka
+(typ, kategoria, opis), granice okresu nie są kopiowane. Cztery istniejące strażniki
+`test_magazyn_budzet.py` przeszły bez zmian; dołożono dwa nowe, oba z mutacją (M-W9b-7).
+
+### Czego przebieg W9b NIE objął
+
+- **Nie zbudowano ekranu.** Trasy i kontrakt — tak; interfejs Budżetu to zadanie Jacka.
+  Bramka odwzorowania (`PRD` §12.7) dla `Budzet.dc.html` **nie była uruchamiana**.
+- **Nie ma strażnika behawioralnego czytającego liczbę z wyrenderowanej strony** — luka ta sama,
+  co opisana w `conftest.py` przy niezaniesionym `test_ekran_playwright.py`.
+- **Nie sprawdzono zachowania na wdrożeniu w chmurze** — wszystkie liczby z przebiegu lokalnego
+  przez `TestClient`. Wdrożenie prowadzi Eva.
+- **Nie ruszono `magazyn.usun_plan` ani `magazyn.usun_cel`** — obie funkcje żyją w silniku
+  i pozostają świadomie odcięte od warstwy sieciowej (Z-9).
+- **Kontrolka „Wybrany miesiąc"** z ramki jest poza zakresem (rozstrzygnięcie Mili, §7 spisu
+  `docs/2026-08-29-spis-ekran-budzet.md`) — trasa `GET /api/budzet` przyjmuje **jeden** parametr
+  miesiąca.

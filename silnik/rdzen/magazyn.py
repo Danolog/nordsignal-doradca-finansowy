@@ -1196,7 +1196,7 @@ def _wymagaj_pkwiu(pkwiu: str) -> str:
     return str(pkwiu).strip()
 
 
-def _wymagaj_typu(typ: str) -> str:
+def wymagaj_typu(typ: str) -> str:
     """Trzy dozwolone typy wpisu — jedyne miejsce, gdzie ta reguła jest sprawdzana."""
     if typ not in budzet.TYPY:
         raise BladMagazynu(
@@ -1206,11 +1206,19 @@ def _wymagaj_typu(typ: str) -> str:
     return typ
 
 
-def _wymagaj_kategorii(polaczenie, typ: str, kategoria: str) -> str:
+def wymagaj_kategorii(polaczenie, typ: str, kategoria: str) -> str:
     """Kategoria musi istnieć w słowniku, w TYM SAMYM typie, i być aktywna.
 
     Para (typ, nazwa), nie sama nazwa: `Inne` jest jednocześnie kategorią
     przychodu i wydatku, a to dwie różne pozycje budżetu.
+
+    PUBLICZNA OD W9b. Trasa `POST /api/plan` musi sprawdzić kategorię
+    **przed** zapisem, a `ustal_regule_planu` tego nie robi — jest wołane
+    także przez import arkusza, który zasiewa słownik i plan w jednym
+    przebiegu. Warstwa ekranu woła więc ten sam, jedyny nośnik reguły
+    zamiast pytać bazę po swojemu. Bez tego `kategoria=None` z żądania HTTP
+    trafiało do bazy jako pozycja planu o nazwie „None": kwota w planie,
+    której żaden wpis nigdy nie wykona, i której nie widać jako błędu.
     """
     kategoria = str(kategoria).strip()
     wiersz = polaczenie.execute(
@@ -1466,8 +1474,8 @@ def _przygotuj_wpis(polaczenie, *, data: date, typ: str, kategoria: str,
     funkcje i przy pierwszym zapomnieniu dawalby ciche zatwierdzenie w srodku
     cudzej transakcji.
     """
-    typ = _wymagaj_typu(typ)
-    kategoria = _wymagaj_kategorii(polaczenie, typ, kategoria)
+    typ = wymagaj_typu(typ)
+    kategoria = wymagaj_kategorii(polaczenie, typ, kategoria)
     if Decimal(str(kwota)) < 0:
         raise BladMagazynu(
             f"Kwota wpisu nie może być ujemna ({kwota}). Kierunek wynika "
@@ -1505,7 +1513,7 @@ def wczytaj_wpisy(polaczenie, *, od: date | None = None, do: date | None = None,
         parametry.append(do)
     if typ is not None:
         warunki.append("typ = %s")
-        parametry.append(_wymagaj_typu(typ))
+        parametry.append(wymagaj_typu(typ))
     gdzie = ("WHERE " + " AND ".join(warunki)) if warunki else ""
     return _wczytaj(polaczenie, "wpisy_budzetu",
                     f"{gdzie} ORDER BY data, id", tuple(parametry))
@@ -1539,8 +1547,8 @@ def zmien_wpis(polaczenie, *, wpis_id: int, data: date, typ: str,
     poprawiony omijajacy slownik kategorii byloby furtka wokol reguly,
     ktorej `zapisz_wpis` pilnuje od poczatku.
     """
-    typ = _wymagaj_typu(typ)
-    kategoria = _wymagaj_kategorii(polaczenie, typ, kategoria)
+    typ = wymagaj_typu(typ)
+    kategoria = wymagaj_kategorii(polaczenie, typ, kategoria)
     if Decimal(str(kwota)) < 0:
         raise BladMagazynu(
             f"Kwota wpisu nie może być ujemna ({kwota}). Kierunek wynika "
@@ -1573,7 +1581,7 @@ def zapisz_plan(polaczenie, *, rok: int, miesiac: int, typ: str, kategoria: str,
     bo to niezmiennik składowania (jeden plan na pozycję), a nie reguła
     produktowa — i czyni ponowny import planu bezpiecznym.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     kategoria = str(kategoria).strip()
     opis = str(opis or "").strip()
     dzien = _wymagaj_dnia(dzien)
@@ -1609,7 +1617,7 @@ def usun_plan(polaczenie, *, rok: int, miesiac: int, typ: str,
     jednym klknieciu. Brak wiersza jest bledem, nie cicha zgoda — inaczej
     pomylka w miesiacu wyglada jak sukces.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     kursor = polaczenie.execute(
         "DELETE FROM plan_budzetu WHERE rok = %s AND miesiac = %s "
         "AND typ = %s AND kategoria = %s AND opis = %s",
@@ -1709,7 +1717,7 @@ def ustal_regule_planu(polaczenie, *, rok: int, miesiac: int, typ: str,
       od M. Nadpisanie kwoty w starym wierszu zmienialoby takze miesiace
       zamkniete, ktorych Darek juz nie oglada.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     kategoria = str(kategoria).strip()
     opis = str(opis or "").strip()
     dzien = _wymagaj_dnia(dzien)
@@ -1779,7 +1787,7 @@ def zakoncz_plan(polaczenie, *, rok: int, miesiac: int, typ: str,
     Brak obowiazujacej reguly jest bledem, nie cicha zgoda — inaczej pomylka
     w miesiacu wyglada jak sukces, dokladnie jak w `usun_plan`.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     kategoria = str(kategoria).strip()
     opis = str(opis or "").strip()
     obowiazujaca = _obowiazujaca_regula(polaczenie, rok=rok, miesiac=miesiac,
@@ -1848,25 +1856,53 @@ def kopiuj_plan(polaczenie, *, z_roku: int, z_miesiaca: int,
     Dwie liczby zamiast jednej, bo "skopiowano 12" nie odroznia pelnego
     przeniesienia od takiego, ktore ominelo polowe pozycji. Sprawdzenie,
     do ktorego nic nie dociera, melduje sukces.
+
+    NAPRAWIONE W W9b — ZMIERZONA WADA PIENIEZNA, nie porzadki.
+    Do W9b ta funkcja czytala WIERSZE miesiaca zrodlowego (`WHERE rok = …
+    AND miesiac = …`), a nie POZYCJE OBOWIAZUJACE w tym miesiacu. Roznica
+    powstala w Z42, gdy pozycja planu stala sie REGULA obowiazujaca od
+    swojego miesiaca do odwolania: od tej pory miesiac bez ani jednego
+    wlasnego wiersza ma pelny plan, a wiersze zrodla nie sa tym, co
+    uzytkownik widzi. Do tego sprawdzenie „czy juz jest" pomijalo `opis`,
+    a kopia gubila `opis`, `dzien`, `powtarzalna` i `co_ile_miesiecy`.
+
+    Zmierzony skutek (2026-08-29, przez `POST /api/plan/kopiuj`): listopad
+    z planem 2 284,81 zl zlozonym z regul pazdziernikowych po kopii mial
+    **3 589,86 zl** — przybyla druga pozycja „Kredyty" z pusta nazwa,
+    a „Czesne" stracilo dzien platnosci (25 -> brak). Plan urosl o 1 305,05 zl,
+    ktorych nikt nie zaplanowal, i zwrocil „skopiowane 2, pominiete 1",
+    czyli meldunek sukcesu.
+
+    Po naprawie zrodlo i cel czyta ten sam nosnik co ekran —
+    `budzet.plan_na_miesiac` — a tozsamosc pozycji jest pelna trojka
+    (typ, kategoria, opis), tak jak wszedzie indziej w tym module.
+    Granice okresu (`do_roku`, `do_miesiaca`) NIE sa kopiowane: regula
+    zamknieta kiedys w przeszlosci nie ma prawa przyjsc do nowego miesiaca
+    juz zamknieta.
     """
-    zrodlo = polaczenie.execute(
-        "SELECT typ, kategoria, kwota_planowana FROM plan_budzetu "
-        "WHERE rok = %s AND miesiac = %s",
-        (int(z_roku), int(z_miesiaca))).fetchall()
+    caly = wczytaj_plan(polaczenie)
+    zrodlo = budzet.plan_na_miesiac(caly, int(z_roku), int(z_miesiaca))
+    cel = budzet.plan_na_miesiac(caly, int(do_roku), int(do_miesiaca))
+    juz_sa = {(w["typ"], w["kategoria"], str(w.get("opis", "") or ""))
+              for _, w in cel.iterrows()} if not cel.empty else set()
     skopiowane = pominiete = 0
-    for typ, kategoria, kwota in zrodlo:
-        istnieje = polaczenie.execute(
-            "SELECT 1 FROM plan_budzetu WHERE rok = %s AND miesiac = %s "
-            "AND typ = %s AND kategoria = %s",
-            (int(do_roku), int(do_miesiaca), typ, kategoria)).fetchone()
-        if istnieje:
-            pominiete += 1
-            continue
-        polaczenie.execute(
-            "INSERT INTO plan_budzetu (rok, miesiac, typ, kategoria, "
-            "kwota_planowana) VALUES (%s,%s,%s,%s,%s)",
-            (int(do_roku), int(do_miesiaca), typ, kategoria, kwota))
-        skopiowane += 1
+    if not zrodlo.empty:
+        for _, w in zrodlo.iterrows():
+            klucz = (w["typ"], w["kategoria"], str(w.get("opis", "") or ""))
+            if klucz in juz_sa:
+                pominiete += 1
+                continue
+            dzien = w.get("dzien")
+            polaczenie.execute(
+                "INSERT INTO plan_budzetu (rok, miesiac, typ, kategoria, "
+                "kwota_planowana, opis, dzien, powtarzalna, co_ile_miesiecy) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (int(do_roku), int(do_miesiaca), klucz[0], klucz[1],
+                 str(w["kwota_planowana"]), klucz[2],
+                 None if dzien is None or pd.isna(dzien) else int(dzien),
+                 bool(w.get("powtarzalna", False)),
+                 int(w.get("co_ile_miesiecy", 1) or 1)))
+            skopiowane += 1
     polaczenie.commit()
     return skopiowane, pominiete
 
@@ -1886,6 +1922,31 @@ def wczytaj_plan(polaczenie, rok: int | None = None,
                     tuple(parametry))
 
 
+def wczytaj_pozycje_planu(polaczenie, *, plan_id: int) -> dict:
+    """JEDEN wiersz planu, po numerze. Zwraca slownik kolumn.
+
+    DLACZEGO TO ISTNIEJE (W9b). Warstwa sieciowa dostaje z ekranu NUMER
+    pozycji — bo to on jest tym, co uzytkownik klika — a `ustal_regule_planu`
+    i `zakoncz_plan` rozpoznaja pozycje przez czworke
+    (typ, kategoria, opis, miesiac). Ktos musi zamienic jedno na drugie
+    i musi to byc miejsce, ktore rozmawia z baza. Wolajacy, ktory
+    przefiltrowalby sobie ramke `wczytaj_plan`, bylby DRUGIM nosnikiem
+    odpowiedzi „ktora to pozycja".
+
+    BRAK WIERSZA JEST BLEDEM, nie pusta odpowiedzia — dokladnie jak
+    w `usun_wpis` i `zakoncz_plan`. Numer, ktorego nie ma, to zwykle pozycja
+    zakonczona w innym oknie przegladarki; cicha zgoda kazalaby uzytkownikowi
+    wierzyc, ze zmienil cos, czego juz nie ma.
+    """
+    ramka = _wczytaj(polaczenie, "plan_budzetu", "WHERE id = %s",
+                     (int(plan_id),))
+    if ramka.empty:
+        raise BladMagazynu(
+            f"Nie ma pozycji planu o numerze {plan_id}. Odśwież ekran — "
+            f"mogła zostać zakończona gdzie indziej.")
+    return {kolumna: ramka.iloc[0][kolumna] for kolumna in ramka.columns}
+
+
 # --- słownik kategorii ----------------------------------------------------
 
 def wczytaj_kategorie(polaczenie, typ: str | None = None,
@@ -1893,7 +1954,7 @@ def wczytaj_kategorie(polaczenie, typ: str | None = None,
     warunki, parametry = [], []
     if typ is not None:
         warunki.append("typ = %s")
-        parametry.append(_wymagaj_typu(typ))
+        parametry.append(wymagaj_typu(typ))
     if tylko_aktywne:
         warunki.append("aktywna")
     gdzie = ("WHERE " + " AND ".join(warunki)) if warunki else ""
@@ -1902,7 +1963,7 @@ def wczytaj_kategorie(polaczenie, typ: str | None = None,
 
 
 def dodaj_kategorie(polaczenie, *, typ: str, nazwa: str) -> int:
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     nazwa = str(nazwa).strip()
     if not nazwa:
         raise BladMagazynu("Nazwa kategorii nie może być pusta.")
@@ -1928,7 +1989,7 @@ def zmien_nazwe_kategorii(polaczenie, *, typ: str, stara: str, nowa: str) -> int
     której już nie ma — wypadłyby ze wszystkich zestawień przy zielonej suicie.
     Zwraca liczbę przepisanych wpisów.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     stara, nowa = str(stara).strip(), str(nowa).strip()
     if not nowa:
         raise BladMagazynu("Nowa nazwa kategorii nie może być pusta.")
@@ -1964,7 +2025,7 @@ def ustaw_aktywnosc_kategorii(polaczenie, *, typ: str, nazwa: str,
                               aktywna: bool) -> None:
     """Dezaktywacja zamiast kasowania: kategoria znika z list wyboru, a wpisy
     i plan zostają nietknięte. Historia ma zostać prawdziwa."""
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     kursor = polaczenie.execute(
         "UPDATE kategorie SET aktywna = %s WHERE typ = %s AND nazwa = %s",
         (bool(aktywna), typ, str(nazwa).strip()))
@@ -1977,7 +2038,7 @@ def ustaw_aktywnosc_kategorii(polaczenie, *, typ: str, nazwa: str,
 def policz_wpisy_kategorii(polaczenie, *, typ: str, nazwa: str) -> int:
     return polaczenie.execute(
         "SELECT COUNT(*) FROM wpisy_budzetu WHERE typ = %s AND kategoria = %s",
-        (_wymagaj_typu(typ), str(nazwa).strip())).fetchone()[0]
+        (wymagaj_typu(typ), str(nazwa).strip())).fetchone()[0]
 
 
 def usun_kategorie_trwale(polaczenie, *, typ: str, nazwa: str) -> None:
@@ -1985,7 +2046,7 @@ def usun_kategorie_trwale(polaczenie, *, typ: str, nazwa: str) -> None:
 
     Kategoria z historią nie znika nigdy; od tego jest dezaktywacja.
     """
-    typ = _wymagaj_typu(typ)
+    typ = wymagaj_typu(typ)
     nazwa = str(nazwa).strip()
     ile = policz_wpisy_kategorii(polaczenie, typ=typ, nazwa=nazwa)
     if ile:
@@ -2010,7 +2071,7 @@ def zapisz_cel(polaczenie, *, nazwa: str, kategoria: str,
     Cel wskazujący kategorię wydatku liczyłby postęp z pieniędzy **wydanych** —
     pasek pokazywałby, że zbierasz na wakacje, im więcej wydajesz na zakupy.
     """
-    kategoria = _wymagaj_kategorii(polaczenie, budzet.TYP_OSZCZEDNOSCI, kategoria)
+    kategoria = wymagaj_kategorii(polaczenie, budzet.TYP_OSZCZEDNOSCI, kategoria)
     nazwa = str(nazwa).strip()
     if not nazwa:
         raise BladMagazynu("Nazwa celu jest wymagana.")

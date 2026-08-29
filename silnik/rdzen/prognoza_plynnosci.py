@@ -210,8 +210,14 @@ def _ostatni_dzien(rok: int, miesiac: int) -> date:
     return terminy.dzien_w_miesiacu(rok, miesiac, terminy.DZIEN_MAX)
 
 
-def _dzien_pozycji(rok: int, miesiac: int, wiersz) -> tuple[date, bool]:
+def dzien_pozycji(rok: int, miesiac: int, wiersz) -> tuple[date, bool]:
     """Kiedy pozycja planu schodzi z konta. Zwraca date i „czy domniemana".
+
+    PUBLICZNA OD W9b. Ekran Budzet musi odpowiedziec na pytanie „ktore
+    pozycje jeszcze czekaja na swoje dni" — a to jest DOKLADNIE ta regula,
+    razem z zalozeniem najgorszego przy pozycji bez dnia platnosci. Wlasny
+    rachunek po stronie ekranu bylby drugim nosnikiem i rozjechalby sie
+    cicho: Plynnosc stawialaby pozycje na 1., a Budzet mowilby „czeka".
 
     Bez dnia platnosci zakladamy NAJGORZEJ, konsekwentnie wg kierunku:
     wydatek i oszczednosc na 1. (pieniadz wychodzi jak najwczesniej),
@@ -426,7 +432,7 @@ def _wejscia_planu(plan, rok: int,
     karta „Co ruszy ten wpis" musi wiedziec, ktora pozycja planu zostanie
     skonsumowana i ile z niej zostanie. Kopia tej petli w drugim miejscu
     rozjechalaby sie przy pierwszej zmianie reguly dnia platnosci
-    (`_dzien_pozycji`) — i rozjechalaby sie CICHO, bo obie wersje nadal
+    (`dzien_pozycji`) — i rozjechalaby sie CICHO, bo obie wersje nadal
     zwracalyby poprawnie wygladajace pozycje.
 
     Zwraca `(wejscia, suma planowanych przychodow, czy miesiac jest bez planu)`.
@@ -447,7 +453,7 @@ def _wejscia_planu(plan, rok: int,
                 continue
             kwota = stawki.do_groszy(Decimal(str(w["kwota_planowana"])))
             ze_znakiem = kwota * budzet.znak(w["typ"])
-            dzien_p, domniemany = _dzien_pozycji(rok, miesiac, w)
+            dzien_p, domniemany = dzien_pozycji(rok, miesiac, w)
             if w["typ"] == budzet.TYP_PRZYCHODY:
                 suma_przychodow += kwota
             wejscia.append(_Wejscie(

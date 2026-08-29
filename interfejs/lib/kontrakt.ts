@@ -147,3 +147,101 @@ export interface DanePlynnosci {
   koniecOknaCoMnieCzeka: Data;
   ostatnieSprawdzenie: string | null; // null = straznik nigdy nie dzialal
 }
+
+/* ---------- EKRAN BUDZET (W9b) ---------- */
+
+// GRANICA MIEDZY SILNIKIEM A WIDOKIEM, NAZWANA RAZ DLA CALEGO EKRANU:
+// silnik oddaje LICZBY i NAZWY MIESIECY, widok sklada z nich PROZE (napisy.ts).
+// Wyjatek po obu stronach: zdanie niosace liczbe ALBO odmowe silnika sklada
+// silnik — `KafelekBudzetu.wyjasnienie`, `CelNaEkranie.tempoNapis`.
+// Zapis rzymski dnia („20 X") sklada `lib/kwota.ts` i dostaje dzien POLEM
+// (`PozycjaPlanu.dzien`), wiec zaden napis z silnika go nie zawiera.
+
+// `kwota: null` = NIE POLICZYLEM; wtedy `wyjasnienie` mowi, czego brakuje.
+// Rezerwa na podatki bez wskazanej formy opodatkowania jest tym przypadkiem:
+// zero czytaloby sie jako „nic nie jestes winien urzedowi".
+// `klucz` istnieje po to, zeby komponent NIE SIEGAL PO INDEKS tablicy.
+export interface KafelekBudzetu {
+  klucz: string;                 // "wydatkiZPlanu" | "rezerwa" | "razem"
+  tytul: string;
+  kwota: Kwota | null;
+  dopisek: string;
+  wyjasnienie: string | null;
+}
+
+// Wiersz tabeli „Plan kontra wykonanie" — jeden na pare (typ, kategoria),
+// NIE jeden na pozycje planu. Wpis budzetu nie wskazuje, ktora pozycje planu
+// realizuje, wiec „wykonane" da sie policzyc wylacznie per kategoria.
+export interface PozycjaWykonania {
+  typ: TypWpisu;
+  kategoria: string;
+  plan: Kwota;
+  wykonane: Kwota;
+  odchylenie: Kwota;             // wykonane - plan; ujemne = jeszcze nie wydane
+  procent: string | null;        // null = planu nie ma; NIGDY "0,0%" w tym stanie
+  procentPaska: number | null;   // punkty procentowe przyciete do 0–100
+  przekroczone: boolean;
+  // null = zero pozycji planu za tym wierszem ALBO wiecej niz jedna. Te dwa
+  // przypadki rozroznia `liczbaPozycjiPlanu`; sam null by ich nie rozroznil.
+  // Link „zmien pozycje planu" wolno postawic wylacznie, gdy to nie jest null.
+  idPozycjiPlanu: number | null;
+  liczbaPozycjiPlanu: number;
+}
+
+// Regula planu obowiazujaca w wybranym miesiacu — to, co edytuje panel.
+// `id` jedzie do `PUT /api/plan/{id}` i `POST /api/plan/{id}/zakoncz`.
+export interface PozycjaPlanu {
+  id: number;
+  typ: TypWpisu;
+  kategoria: string;
+  opis: string;
+  kwota: Kwota;
+  dzien: number | null;          // dzien miesiaca; zapis rzymski sklada kwota.ts
+  coIleMiesiecy: number;         // 1 = co miesiac, 2 = co drugi
+  czeka: boolean;                // dzien jeszcze nie minal w tym miesiacu
+}
+
+// Postep liczony Z WPISOW, nigdy z liczby wpisanej recznie: pasek napedzany
+// reczna liczba pokazuje to, co uzytkownik wpisal, a nie to, co ma.
+export interface CelNaEkranie {
+  id: number;
+  nazwa: string;
+  kategoria: string;
+  kwotaDocelowa: Kwota;
+  uzbierane: Kwota;
+  brakuje: Kwota;
+  procent: string;
+  procentPaska: number;
+  termin: Data;
+  tempoNapis: string | null;     // "2 000,00 zl / mc przez 15 mc"; null = nie ma czego dogadniac
+  osiagniety: boolean;
+  poTerminie: boolean;
+}
+
+// Caly ekran w jednej odpowiedzi — kazdy zapis rusza NARAZ kafelki, bilans,
+// tabele i licznik naglowka, wiec odpowiedz „zapisano" kazalaby przegladarce
+// zlozyc te liczby po swojemu albo odpytac drugi raz.
+export interface DaneBudzetu {
+  dzisiaj: Data;
+  miesiac: string;                  // "2026-10"
+  miesiacNapis: string;             // "październik 2026" — selektor
+  nazwaMiesiaca: string;            // "październiku" — miejscownik dla napisy.ts
+  // LICZY TAKZE CELE — tak, jak liczy je naglowek ramki („4 pozycje planu"
+  // = trzy wydatki + jeden cel). Sama dlugosc `pozycjePlanu` dalaby trzy.
+  liczbaPozycjiPlanu: number;
+  liczbaWpisow: number;
+  kafelki: readonly KafelekBudzetu[];
+  planPrzychodow: Kwota;
+  planWydatkow: Kwota;
+  planOszczednosci: Kwota;
+  // Rezerwa podatkowa NIE WCHODZI w te liczbe — stoi w kafelku, osobno.
+  bilansPlanu: Kwota;
+  wykonaneWydatki: Kwota;
+  pozycjeWykonania: readonly PozycjaWykonania[];
+  pozycjePlanu: readonly PozycjaPlanu[];
+  cele: readonly CelNaEkranie[];
+  historia: readonly OstatniWpis[]; // wpisy TEGO miesiaca, od najnowszego
+  miesiacKopiujZ: string;           // "2026-09"
+  napisKopiujZ: string;             // "Skopiuj z września"
+  ostatnieSprawdzenie: string | null;
+}

@@ -29,10 +29,15 @@ import pytest
 KORZEN = pathlib.Path(__file__).resolve().parent.parent
 PLIKI_TRAS = sorted((KORZEN / "api").glob("trasy_*.py"))
 
-#: Ile tras ma stac po zadaniu Z6. Liczba jest ASERCJA, nie komentarzem:
-#: straznik, ktory nie znalazl ani jednej trasy, przechodzi kazde
-#: sprawdzenie „w trasach nie ma rachunku".
-ILE_TRAS = 6
+#: Ile tras ma stac. Liczba jest ASERCJA, nie komentarzem: straznik, ktory
+#: nie znalazl ani jednej trasy, przechodzi kazde sprawdzenie „w trasach nie
+#: ma rachunku".
+#:
+#: Z6: 6 (Ksiegowanie 4 + Plynnosc 2) -> W9b: 12 (+ Budzet 6).
+#: PODNIESIENIE TEJ LICZBY JEST DECYZJA, NIE PORZADKAMI. Spadek znaczy, ze
+#: trasa zniknela albo ze wykrywacz przestal ja widziec — i jedno, i drugie
+#: ma sie zaczerwienic, zanim ktokolwiek zajrzy na ekran.
+ILE_TRAS = 12
 
 ZAKAZANE = {
     ast.If: "rozgałęzienie `if`",
@@ -70,11 +75,11 @@ def _trasy() -> list[tuple[str, ast.FunctionDef]]:
     return znalezione
 
 
-def test_straznik_widzi_DOKLADNIE_szesc_tras():
+def test_straznik_widzi_DOKLADNIE_dwanascie_tras():
     """Kontrola licznosci. Bez niej parametryzacja mogla by byc pusta —
     a przebieg bez ani jednego przypadku melduje sukces."""
     assert [p.name for p in PLIKI_TRAS] == [
-        "trasy_ksiegowanie.py", "trasy_plynnosc.py"]
+        "trasy_budzet.py", "trasy_ksiegowanie.py", "trasy_plynnosc.py"]
     nazwy = [n for n, _ in _trasy()]
     assert len(nazwy) == ILE_TRAS, f"straznik widzi {len(nazwy)} tras: {nazwy}"
 

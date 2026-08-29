@@ -37,7 +37,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api import trasy_ksiegowanie, trasy_plynnosc
+from api import trasy_budzet, trasy_ksiegowanie, trasy_plynnosc
 from api.kwoty import OdpowiedzJSON
 from silnik.rdzen import magazyn
 
@@ -107,7 +107,8 @@ aplikacja = FastAPI(title="Doradca Finansowy",
 #: do Z6 („10 tras" wobec 24 zmierzonych u poprzednika).
 ZBUDOWANE = tuple(
     trasa.path
-    for router in (trasy_ksiegowanie.trasy, trasy_plynnosc.trasy)
+    for router in (trasy_ksiegowanie.trasy, trasy_plynnosc.trasy,
+                   trasy_budzet.trasy)
     for trasa in router.routes) + ("/api/zdrowie",)
 
 
@@ -119,7 +120,7 @@ def zdrowie() -> dict:
     global _ZADAN_ZDROWIA
     _ZADAN_ZDROWIA += 1
     return {
-        "stan": "dwa ekrany",
+        "stan": "trzy ekrany",
         "tras_w_spisie": len(spis.WSZYSTKIE),
         "zbudowanych": len(ZBUDOWANE),
         # Pomiar zycia procesu — patrz komentarz przy licznikach wyzej.
@@ -156,6 +157,7 @@ for _typ_bledu in (magazyn.BladMagazynu, ValueError, ArithmeticError):
 aplikacja.include_router(trasy)
 aplikacja.include_router(trasy_ksiegowanie.trasy)
 aplikacja.include_router(trasy_plynnosc.trasy)
+aplikacja.include_router(trasy_budzet.trasy)
 
 #: NAZWA WYMAGANA PRZEZ PLATFORME, NIE WYBOR STYLU (W6, 2026-08-29).
 #: Budowniczy Pythona Vercela szuka w `api/index.py` obiektu ASGI o nazwie
