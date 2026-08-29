@@ -732,3 +732,50 @@ E  + ziernika; pozycja schodzi z osi w całości
 - **Nie ma strażnika na zdanie w przeglądarce.** Testy czytają odpowiedź trasy, nie wyrenderowany
   ekran. Że wiersz z `po: null` rysuje się jako etykieta + wyjaśnienie, wiadomo z Z1 — nie
   z pomiaru wykonanego dziś.
+
+---
+
+## Przebieg 2026-08-29 — Z7c domknięcie: piąty wiersz karty widziany w przeglądarce (D-62)
+
+**Co potwierdzano.** Max wdrożył D-62 po stronie silnika (SHA `db2b60a`), a jego testy czytają
+**odpowiedź trasy**, nie wyrenderowany ekran. Różnica nie jest formalnością: ta noc wyprodukowała
+sześć strażników-atrap i dwa narzędzia drukujące odwrotność prawdy. Potwierdzenie poszło więc
+**wzrokiem w przeglądarce** plus pomiarem prostokątów, nie odczytem JSON-a.
+
+**Zmierzone (Playwright, 1440×900, dzień 2026-10-06, baza `scratchpad/z7c.db`):** piąty wiersz stoi
+na ekranie we **wszystkich pięciu** stanach brzmienia, mieści się w kolumnie karty
+(`pozaKolumne: 0 px`, `naklada: false`, `scrollWidth` dokumentu 1440 = szerokość okna),
+etykieta 63 px + wyjaśnienie 427 px w kolumnie 500 px.
+
+**Kontrola liczności, która wyłapała własny błąd sondy.** Pierwszy przebieg mierzył wyjście poza
+kolumnę względem elementu wybranego przez `querySelector('[class*="__kolumna"]')` — trafił
+w `kolumnaKwoty` formularza (260 px) i zameldował „wiersz wychodzi poza kolumnę o 240 px"
+dla **wszystkich pięciu wierszy, także tych sprzed D-62**. Sonda w złej warstwie melduje
+awarię tak samo pewnie, jak sonda w dobrej melduje sukces. Poprawny pomiar bierze
+`wiersz.closest('[class*="__kolumna"]')`.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-Z7c-7** | ramka `Ksiegowanie.dc.html` dostaje **piąty** wiersz siatki karty (symulacja przerysowania przez Milę) | `liczba wierszy karty w ramce zgadza się z wzorcem` | **czerwony** (1 failed / 38) |
+| **M-Z7c-8** | wzorzec zliczający wiersze przestaje cokolwiek trafiać (`display: grid;` → `display:grid;`) | `liczba wierszy karty w ramce zgadza się z wzorcem` | **czerwony** (1 failed / 38) |
+
+Kontrola po cofnięciu obu: **38 passed**. Mutacje wykonane w kopii poza repozytorium
+(`scratchpad/mut-z7c`), na kopii ramek — **repozytorium `makiety/` nietknięte**.
+
+M-Z7c-8 jest kontrolą dwustronną tego samego strażnika: pierwsza mutacja dowodzi, że test
+czerwieni się na **zmianie ramki**, druga — że czerwieni się także wtedy, gdy **pomiar przestaje
+cokolwiek widzieć**. Bez drugiej test przechodziłby po cichu w chwili, w której zmieni się
+zapis stylu w ramce.
+
+### Czego ten przebieg NIE objął — i to jest najważniejsza pozycja
+
+**Bramka odwzorowania jest wobec piątego wiersza ŚLEPA.** `Ksiegowanie` daje **0,12% przed D-62
+i 0,12% po D-62** — bo wzorcowy zestaw danych niesie kartę taką, jaką rysuje ramka, czyli
+czterowierszową. To nie jest wada wzorca: wzorzec ma być rysunkiem. To jest **rozjazd ramki
+z produktem**, który kosztuje (zmierzone w przeglądarce na żywym silniku) **+52 px** wysokości
+strony w brzmieniach dwuwierszowych i **+70 px** w brzmieniu „w planie" — 1 024 i 1 042 px
+wobec 972 px ramki. Różnica jest **układowa, nie tekstowa**: dochodzi cały wiersz.
+
+Dług opisany przy `KSIEGOWANIE` w `interfejs/narzedzia/dane-wzorcowe.mjs`, z progiem:
+**przy pierwszym przerysowaniu `Ksiegowanie.dc.html` wzorzec dostaje piąty wiersz**, a strażnik
+M-Z7c-7 pilnuje, żeby ten moment nie przeszedł niezauważony.

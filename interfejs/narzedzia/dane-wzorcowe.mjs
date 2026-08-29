@@ -140,6 +140,24 @@ const MAIN_DOBRZE = {
 
 const kategoria = (nazwa) => ({ nazwa, aktywna: true, systemowa: false });
 
+// DŁUG JAWNY PO D-62 (2026-08-29, SHA `db2b60a`): TEN WZORZEC NIESIE CZTERY
+// WIERSZE KARTY, A PRODUKCJA RYSUJE PIĘĆ.
+// Piąty wiersz — `Płynność` — dołożył Max po stronie silnika. Wzorzec go NIE
+// dostaje i to jest decyzja, nie przeoczenie: wzorzec ma być tym, co rysuje
+// ramka, a `makiety/Ksiegowanie.dc.html` rysuje cztery wiersze. Wpisany tutaj
+// piąty czyniłby bramkę odwzorowania zieloną wobec rysunku, którego nie ma.
+//
+// CENA, NAZWANA: bramka odwzorowania jest wobec piątego wiersza **ŚLEPA** —
+// zmierzone 2026-08-29, `Ksiegowanie` daje 0,12% i przed, i po D-62, bo na
+// wzorcu ekran rysuje cztery wiersze. Rozjazd ramki z produktem kosztuje
+// (zmierzone w przeglądarce na żywym silniku) **+52 px wysokości strony**
+// w brzmieniach dwuwierszowych i **+70 px** w brzmieniu „w planie",
+// czyli 1 024 i 1 042 px wobec 972 px ramki.
+//
+// STRAŻNIK I PRÓG: `testy/wzorzec.test.mjs`, test „liczba wierszy karty
+// w ramce zgadza się z wzorcem" liczy wiersze siatki w ramce między nagłówkami
+// „Co ruszy ten wpis" i „Czego tu nie ma". Czerwieni się w chwili, w której
+// Mila dorysuje piąty wiersz — i wtedy, i tylko wtedy, wzorzec go dostaje.
 const KSIEGOWANIE = {
   dzisiaj: "2026-10-06",
   typDomyslny: "Wydatki",

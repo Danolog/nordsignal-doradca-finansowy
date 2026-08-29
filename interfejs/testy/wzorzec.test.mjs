@@ -115,3 +115,31 @@ test("wzorzec karty Księgowania niesie liczby z ramki", () => {
     if (w.wyjasnienie !== null) expect(html).toContain(w.wyjasnienie);
   }
 });
+
+// LICZBA WIERSZY KARTY — strażnik długu opisanego w `dane-wzorcowe.mjs`.
+//
+// Po D-62 produkcja rysuje w karcie „Co ruszy ten wpis" PIĘĆ wierszy, a ramka
+// nadal cztery. Wzorzec trzyma się ramki, więc bramka odwzorowania jest wobec
+// piątego wiersza ślepa — 0,12% i przed D-62, i po nim. To jest świadomy dług,
+// a świadomy dług wolno zostawić WYŁĄCZNIE ze strażnikiem i progiem (§3.2).
+//
+// W CO TEN STRAŻNIK TRAFIA: w liczbę wierszy SIATKI w ramce, między nagłówkiem
+// „Co ruszy ten wpis" a „Czego tu nie ma" — nie w tekst brzmienia. Brzmienie
+// należy do silnika i przepisane tutaj byłoby jego drugim nośnikiem; liczba
+// wierszy należy do rysunku i tu jest na miejscu.
+//
+// PRÓG: w chwili, w której Mila dorysuje piąty wiersz, ten test się czerwieni
+// i wzorzec dostaje piąty wiersz razem z jego brzmieniem z ramki.
+test("liczba wierszy karty w ramce zgadza się z wzorcem", () => {
+  const html = readFileSync(join(RAMKI, "Ksiegowanie.dc.html"), "utf8");
+  const od = html.indexOf("Co ruszy ten wpis");
+  const doJ = html.indexOf("Czego tu nie ma");
+  expect(od).toBeGreaterThan(-1);
+  expect(doJ).toBeGreaterThan(od);
+  const wycinek = html.slice(od, doJ);
+  const wierszeRamki = [...wycinek.matchAll(/<div style="display: grid;/g)].length;
+  // Kontrola liczności: wycinek, w którym nie ma ANI JEDNEGO wiersza, znaczy,
+  // że zmieniła się budowa ramki i pomiar patrzy w puste miejsce.
+  expect(wierszeRamki).toBeGreaterThan(0);
+  expect(wierszeRamki).toBe(ZESTAWY.ksiegowanie.ksiegowanie.podglad.wiersze.length);
+});
