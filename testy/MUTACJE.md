@@ -910,3 +910,78 @@ napis, którego program używa, jest.**
   z progiem, opisany w nagłówku `silnik/pieniadz.py`.
 - **Nie mutowano `podatki.zaplaty_podatkowe`.** Filtr okresu nie istnieje, więc nie ma czego
   mutować; dług z progiem, opisany w `silnik/pieniadz.py` i w `docs/PRD.md` §17 poz. 18.
+
+---
+
+## Przebieg 2026-08-29 — schemat 12: rejestr stawek w bazie + trzy kolumny z PRD §6.3 (Ethan)
+
+**Co przybyło.** Tabela `rejestr_stawek` w bazie SQLite (napis SQL mieszka w `wiedza/rejestr.py`
+jako `SCHEMAT_SQLITE`), zasilenie 19 pozycjami z `wiedza/stawki_poczatkowe.py` — **wszystkie
+w statusie `proponowana`, żadna zatwierdzona** — oraz trzy kolumny z PRD §6.3:
+`wpisy_budzetu.zrodlo`, `kategorie.niezbedna`, `przychody_jdg.data_obowiazku_vat`.
+Nowi strażnicy: `testy/test_rejestr_sqlite.py` (13), `testy/test_trzy_kolumny.py` (10).
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mut-ethan-0829`, kopia przez
+`rsync` z wyłączeniem `node_modules`, `.venv`, `.next`), `__pycache__` czyszczony **przed każdym**
+przebiegiem — także przed przebiegiem kontrolnym po cofnięciu. Kontrola bazowa kopii:
+`919 passed, 3 deselected, 1 warning`. Baza roboczA nie brała udziału: każdy test stoi na własnym
+pliku w katalogu tymczasowym.
+
+| # | Co zmieniono w kodzie produkcyjnym | Który test padł | Wynik suity |
+|---|---|---|---|
+| M1b | `wiedza/rejestr.py`: kolumna `niezweryfikowane` zdjęta z `SCHEMAT` (dialekt PostgreSQL — napis **niewykonywany** w SQLite, więc mutacja nie psuje niczego poza regułą jednego nośnika) | `test_rejestr_sqlite.py::test_oba_dialekty_niosa_DOKLADNIE_kolumny_z_jednego_nosnika` | `1 failed, 917 passed` |
+| M2 | `magazyn.zasiej_rejestr_stawek`: warunek idempotencji rozszerzony o `AND status = 'proponowana'` | `test_rejestr_sqlite.py::test_zasiew_NIE_WSKRZESZA_propozycji_po_zatwierdzeniu` | `1 failed, 917 passed` |
+| M3 | `magazyn._DOPISYWANE_KOLUMNY`: usunięty wpis `("wpisy_budzetu", "zrodlo", …)` | `test_trzy_kolumny.py::test_stara_baza_DOSTAJE_kolumny_bez_utraty_wierszy` (+ 2 dalsze z tego pliku) | `3 failed, 915 passed` |
+| M4 | `magazyn._SCHEMAT`: usunięta linia `niezbedna INTEGER,` | `test_trzy_kolumny.py::test_SAM_schemat_swiezej_bazy_NIESIE_trzy_kolumny` | `1 failed, 918 passed` |
+| M5 | `magazyn._stawka_z_wiersza`: `Decimal(str(w[1]))` → `float(w[1])` | `test_rejestr_sqlite.py::test_wczytane_stawki_niosa_Decimal_a_nie_liczbe_zmiennoprzecinkowa` | `1 failed, 918 passed` |
+| M6 | `silnik/rdzen/podatki.py`: dopisana funkcja wołająca `magazyn.wczytaj_stawki` (udawany konsument rejestru) | `test_rejestr_sqlite.py::test_rejestr_MA_dane_i_NIE_MA_konsumenta` | `1 failed, 918 passed` |
+| M7 | `magazyn.polacz`: usunięte wywołanie `zasiej_rejestr_stawek(polaczenie)` | 7 testów `test_rejestr_sqlite.py`, m.in. `test_ponowne_otwarcie_NIE_DUBLUJE_rejestru` | `7 failed, 912 passed` |
+| M8 | `magazyn._SCHEMAT`: `zrodlo … DEFAULT 'recznie'` → `DEFAULT 'historia-2025'` | `test_trzy_kolumny.py::test_zapis_wpisu_bez_podania_zrodla_daje_recznie` | `1 failed, 918 passed` |
+
+**Kontrola po cofnięciu każdej mutacji: `919 passed, 3 deselected, 1 warning`.**
+
+### M4 przeszła najpierw NA ZIELONO — i to jest najważniejsze znalezisko tego przebiegu
+
+W pierwszym podejściu M4 (zdjęcie `niezbedna INTEGER,` z `magazyn._SCHEMAT`) dała
+**`918 passed`, zero czerwonych**. Mutacja weszła — kontrola tekstowa po podmianie pokazała
+`0` wystąpień wzorca w pliku. Strażnik `test_swieza_baza_MA_wszystkie_trzy_kolumny` jej nie
+zobaczył.
+
+**Przyczyna.** Kolumna ma **dwie drogi** do bazy: `_SCHEMAT` (baza świeża) i `_DOPISYWANE_KOLUMNY`
+(baza istniejąca), a `polacz()` wykonuje **obie**. Test pytający „czy kolumna jest **po otwarciu
+bazy**" nie odróżnia, którą drogą przyszła — zdjęcie jednej z nich było dla niego niewidoczne.
+Mutacja **M4b**, zdejmująca kolumnę z **obu** nośników, czerwieniła trzy testy — czyli strażnik
+nie był całkiem ślepy, ale pilnował słabszej własności, niż deklarował.
+
+**Naprawa.** Dołożony `test_SAM_schemat_swiezej_bazy_NIESIE_trzy_kolumny`: wykonuje sam
+`magazyn._SCHEMAT` na połączeniu w pamięci, **bez `polacz()`**, i pyta o trzy kolumny. Po naprawie
+M4 czerwieni dokładnie ten jeden test (wiersz w tabeli wyżej). To ta sama klasa awarii, którą
+konstytucja firmy opisuje jako „strażnik-atrapa": mechanizm dawał sygnał „w porządku", nie
+sprawdzając tego, co miał sprawdzać.
+
+### Ile rzeczy każdy strażnik widział — bo pusta baza jest dla strażników groźna
+
+Test, który nic nie znalazł, bo nic nie ma, przechodzi tak samo jak test, który sprawdził
+i potwierdził. Przy każdym strażniku zawartości stoi kontrola liczności:
+
+| Strażnik | Ile rzeczy widział | Skąd wiadomo |
+|---|---|---|
+| `test_oba_dialekty_niosa_DOKLADNIE_kolumny_z_jednego_nosnika` | 14 kolumn po stronie PostgreSQL, 14 po stronie SQLite | `assert len(pg) >= 10` i `assert len(lite) >= 10` — parser, który zwrócił pustkę, porównałby pustkę z pustką |
+| `test_rejestr_dostaje_WSZYSTKIE_pozycje_zasilenia` | 19 wierszy | `assert ile_w_module > 0` przed porównaniem liczności |
+| `test_ZADNA_stawka_nie_jest_zatwierdzona` | 19 wierszy | `assert sum(stany.values()) > 0` |
+| `test_jawna_watpliwosc_przezywa_droge_do_bazy` | 2 pozycje z wątpliwością | `assert ile_w_module > 0` |
+| `test_rejestr_MA_dane_i_NIE_MA_konsumenta` | 31 plików `.py` w `silnik/` i `api/` | `assert len(pliki) >= 20` — wyszukiwanie, do którego nie dotarł żaden plik, zameldowałoby „zero konsumentów" przy skasowanym katalogu |
+| `test_niezbedna_startuje_jako_NIE_WIEM_a_nie_jako_nie` | 24 kategorie | `assert len(wiersze) > 0` |
+| `test_SAM_schemat_swiezej_bazy_NIESIE_trzy_kolumny` | 3 pary tabela–kolumna | `assert sprawdzone == 3` plus `assert istniejace` per tabela |
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano wiezu `zatwierdzona_ma_podpis`** przez zdjęcie go ze `SCHEMAT_SQLITE` — taka
+  mutacja psuje tworzenie tabeli i rozlewa czerwień po całej suicie, więc nie wskazuje strażnika.
+  Zamiast niej stoi **kontrola dwustronna**: `test_baza_ODRZUCA_zatwierdzona_bez_podpisu`
+  (odrzuca brak podpisu) i `test_baza_PRZYJMUJE_zatwierdzona_z_podpisem` (nie odrzuca wszystkiego).
+- **Nie mutowano `data_obowiazku_vat` po stronie rachunku VAT** — konsumenta tej kolumny **nie ma**;
+  silnik nadal sumuje VAT ze wszystkich faktur bez względu na okres. Dług z progiem,
+  `docs/PRD.md` §6.3 p.3 i rozdz. 13.
+- **Nie mutowano ścieżki podpięcia silnika pod rejestr** — nie istnieje. To jest dokładnie to,
+  czego pilnuje strażnik progu M6.

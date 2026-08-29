@@ -26,6 +26,8 @@ from pathlib import Path
 import pandas as pd
 
 from silnik.rdzen import budzet, stawki
+from wiedza import rejestr as rejestr_wiedzy
+from wiedza import stawki_poczatkowe
 
 #: KORZEN projektu — patrz komentarz w `konfiguracja.py`: po przeniesieniu
 #: do `silnik/rdzen/` modul lezy dwa poziomy nizej niz w poprzedniku.
@@ -96,9 +98,11 @@ def opis_bazy(sciezka: Path | None = None) -> OpisBazy:
                     domyslna=sciezka.resolve() == SCIEZKA_DOMYSLNA.resolve())
 
 #: Wersja schematu stemplowana w bazie. Podnoszona przy każdej zmianie
-#: nieodwracalnej — dziś: wynik przebiegu strażnika w tle, tabela
-#: `przebiegi_straznika` (Z71). Poprzednio: kotwica prognozy (Z60, wersja 9).
-WERSJA_SCHEMATU = 11
+#: nieodwracalnej — dziś (12): tabela `rejestr_stawek` plus trzy kolumny
+#: z PRD §6.3 (`wpisy_budzetu.zrodlo`, `kategorie.niezbedna`,
+#: `przychody_jdg.data_obowiazku_vat`). Poprzednio (11): wynik przebiegu
+#: strażnika w tle, tabela `przebiegi_straznika` (Z71).
+WERSJA_SCHEMATU = 12
 
 #: Klucze tabeli `ustawienia`. Rdzeń przechowuje nieprzezroczysty napis i nie
 #: wie, co on znaczy — nazwy motywów mieszkają w warstwie interfejsu.
@@ -166,12 +170,23 @@ CREATE TABLE IF NOT EXISTS przychody_jdg (
     zysk_netto TEXT NOT NULL,
     stawki_wersja TEXT NOT NULL,
     data_zaplaty TEXT,
+    -- PRD §6.3 p.3, decyzja D-35: VAT liczy sie MEMORIALOWO — obowiazek
+    -- powstaje z chwila WYSTAWIENIA faktury, nie jej zaplaty. NULL znaczy
+    -- "nie wiem" i jest stanem faktur sprzed tej kolumny; nowe faktury
+    -- dostaja date przy zapisie.
+    data_obowiazku_vat TEXT,
     wpis_budzetu_id INTEGER
 );
 CREATE TABLE IF NOT EXISTS wpisy_budzetu (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     data TEXT NOT NULL, typ TEXT NOT NULL, kategoria TEXT NOT NULL,
-    kwota TEXT NOT NULL, szczegoly TEXT NOT NULL DEFAULT ''
+    kwota TEXT NOT NULL, szczegoly TEXT NOT NULL DEFAULT '',
+    -- PRD §6.3 p.2. BRAMKA POPRAWNOSCI, nie metadana dla porzadku:
+    -- do rachunku podatkowego wchodza wylacznie wiersze o zrodle innym niz
+    -- 'historia-2025'. Bez tej kolumny "wgrac historie" i "nie liczyc jej
+    -- do podatku" sa dwiema regulami w dwoch miejscach.
+    zrodlo TEXT NOT NULL DEFAULT 'recznie',
+    CONSTRAINT zrodlo_znane CHECK (zrodlo IN ('recznie','historia-2025','import'))
 );
 CREATE TABLE IF NOT EXISTS plan_budzetu (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,6 +203,10 @@ CREATE TABLE IF NOT EXISTS kategorie (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     typ TEXT NOT NULL, nazwa TEXT NOT NULL,
     kolejnosc INTEGER NOT NULL DEFAULT 0, aktywna INTEGER NOT NULL DEFAULT 1,
+    -- PRD §6.3 p.1: czy kategoria liczy sie do progu poduszki. Bez niej prog
+    -- poduszki jest PRZEDZIALEM 29 651–63 649 zl, nie liczba. NULL znaczy
+    -- "Darek jeszcze nie rozstrzygnal" — stan rozny od "nie jest niezbedna".
+    niezbedna INTEGER,
     UNIQUE(typ, nazwa)
 );
 CREATE TABLE IF NOT EXISTS cele_oszczednosciowe (
@@ -281,6 +300,36 @@ _DOPISYWANE_KOLUMNY = (
     # odpowiedz, ktorej nikt nie udzielil, nieodrozninalna od Aliora, ktory
     # naprawde ma 0%.
     ("zobowiazania", "oprocentowanie", "TEXT"),
+    # TRZY KOLUMNY Z PRD §6.3, dolozone 2026-08-29 (schemat 12).
+    #
+    # ROZJAZD NAZWANY, NIE UKRYTY. `ALTER TABLE ADD COLUMN` w SQLite nie
+    # potrafi dolozyc wiezu `CHECK`, wiec w bazie, ktora JUZ ISTNIEJE,
+    # `zrodlo` dostaje wartosc domyslna bez wiezu `zrodlo_znane`; w bazie
+    # swiezej wiez jest, bo idzie z `_SCHEMAT`. Roznica dotyczy WYLACZNIE
+    # odrzucania wartosci spoza trojki i nie zmienia zadnej liczby.
+    # PROG: wiez wraca po obu stronach przy przejsciu na PostgreSQL
+    # (`silnik/baza/schemat.sql` juz go niesie). Pilnuje tego
+    # `testy/test_trzy_kolumny.py::test_swieza_baza_ODRZUCA_zrodlo_spoza_trojki`.
+    #
+    # DRUGI ROZJAZD, TEZ NAZWANY: wiersze sprzed tej migracji dostaja
+    # `zrodlo = 'recznie'` — w bazie ROBOCZEJ znaczy to, ze 204 wpisy
+    # historii 2025 wygladaja jak wpisane recznie. Nie ma to dzis skutku,
+    # bo kolumna NIE MA JESZCZE KONSUMENTA (zero odczytow w silniku).
+    # PROG: przy pierwszym konsumencie `zrodlo` baza robocza wymaga
+    # jednorazowego oznaczenia historii — albo konsument filtruje po dacie.
+    # Baza PRODUKCYJNA problemu nie ma: startuje pusta (decyzja 2026-08-29).
+    ("wpisy_budzetu", "zrodlo", "TEXT NOT NULL DEFAULT 'recznie'"),
+    # NULL znaczy "Darek jeszcze nie rozstrzygnal". Wartosc domyslna 0 albo 1
+    # bylaby odpowiedzia, ktorej nikt nie udzielil — ta sama klasa wady co
+    # forma opodatkowania zgadnieta wartoscia domyslna.
+    ("kategorie", "niezbedna", "INTEGER"),
+    # Bez `NOT NULL`: `ALTER TABLE ADD COLUMN ... NOT NULL` bez wartosci
+    # domyslnej SQLite odrzuca, a data domyslna bylaby ZMYSLENIEM daty
+    # obowiazku podatkowego. NULL = "nie wiem" i tak zostaje faktura z bazy
+    # roboczej. `silnik/baza/schemat.sql` (PostgreSQL) niesie tu `NOT NULL`
+    # — to trzeci nazwany rozjazd, znika przy migracji na PostgreSQL,
+    # bo tam kolumne zaklada sie razem z tabela.
+    ("przychody_jdg", "data_obowiazku_vat", "TEXT"),
 )
 
 
@@ -494,6 +543,10 @@ def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
         _kopia_przed_migracja(polaczenie, Path(sciezka))
         tabele_przed = _tabele(polaczenie)
         polaczenie.executescript(_SCHEMAT)
+        # Rejestr stawek WOLA swoj napis z `wiedza/`, nie powtarza go tutaj.
+        # Tabela z liczbami z prawa ma mieszkac tam, gdzie mieszka regula
+        # „silnik czyta wylacznie zatwierdzone" (CLAUDE.md §3.3).
+        polaczenie.executescript(rejestr_wiedzy.SCHEMAT_SQLITE)
         _dopisz_kolumny(polaczenie)
         _zdejmij_kolumny(polaczenie)
         _przebuduj_plan_budzetu(polaczenie)
@@ -501,6 +554,7 @@ def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
         if "wydatki_osobiste" in tabele_przed:
             wchlon_wydatki_osobiste(polaczenie)
         zasiej_kategorie(polaczenie)
+        zasiej_rejestr_stawek(polaczenie)
         polaczenie.execute(f"PRAGMA user_version = {WERSJA_SCHEMATU}")
         polaczenie.commit()
         return polaczenie
@@ -587,6 +641,118 @@ def zasiej_kategorie(polaczenie) -> int:
             dodane += kursor.rowcount if kursor.rowcount > 0 else 0
     polaczenie.commit()
     return dodane
+
+
+# --- rejestr stawek: liczby pochodzace z prawa ----------------------------
+#
+# DLACZEGO TA TABELA W OGOLE POWSTAJE. Do 2026-08-29 `wiedza/` bylo procedura
+# nad pustym miejscem: rejestr mial ksztalt, stany, wiezy i zasilenie
+# poczatkowe, ale ZERO tabeli w bazie i ZERO konsumentow. Zmierzone tego dnia:
+# `grep -rn wiedza silnik/ api/` dawalo jedno trafienie i bylo nim slowo
+# w komentarzu. Skutek dla czlowieka: zatwierdzenie stawki nie zmienialoby
+# zadnej liczby na ekranie, bo nie bylo gdzie jej zapisac.
+#
+# CZEGO TA ZMIANA NIE ROBI, POWIEDZIANE WPROST. Silnik NADAL liczy
+# z `silnik/rdzen/stawki.py` — 28 stalych. Rejestr ma od dzis dane i nie ma
+# konsumenta liczacego. PROG DOMKNIECIA: przy pierwszej zmianie ktorejkolwiek
+# wartosci w `silnik/rdzen/stawki.py` albo w `wiedza/stawki_poczatkowe.py`
+# — bo wtedy dwa nosniki tej samej liczby zaczna sie rozjezdzac, a rozjazd
+# wyjdzie na jaw dopiero w kwocie przelewu. Pilnuje tego
+# `testy/test_rejestr_sqlite.py::test_rejestr_MA_dane_i_NIE_MA_konsumenta`.
+
+def zasiej_rejestr_stawek(polaczenie) -> int:
+    """Wsiewa zasilenie poczatkowe rejestru. Zwraca liczbe faktycznie dodanych.
+
+    WSZYSTKO WCHODZI JAKO `proponowana`. Nie ma tu galezi tworzacej wiersz
+    `zatwierdzona` i to nie jest przeoczenie: przeniesienie liczby z pliku do
+    tabeli nie jest jej sprawdzeniem, a `zatwierdzona` ma znaczyc „czlowiek to
+    potwierdzil". Droga maszynowa do zatwierdzenia NIE ISTNIEJE (CLAUDE.md §3.4).
+
+    IDEMPOTENCJA po trojce (klucz, obowiazuje_od, wartosc), bez statusu.
+    Bez `status` swiadomie: po tym, jak Darek zatwierdzi stawke, jej status
+    przestaje byc `proponowana` — warunek z `status` uznalby ja za nieobecna
+    i wsialby propozycje jeszcze raz, obok tej samej wartosci juz podpisanej.
+    """
+    dodane = 0
+    for s in stawki_poczatkowe.WSZYSTKIE:
+        istnieje = polaczenie.execute(
+            "SELECT 1 FROM rejestr_stawek "
+            "WHERE klucz = ? AND obowiazuje_od = ? AND wartosc = ?",
+            (s.klucz, s.obowiazuje_od.isoformat(), str(s.wartosc))).fetchone()
+        if istnieje:
+            continue
+        polaczenie.execute(
+            "INSERT INTO rejestr_stawek (klucz, wartosc, jednostka,"
+            " obowiazuje_od, obowiazuje_do, podstawa_prawna, zrodlo_url,"
+            " data_odczytu, status, zatwierdzil, data_zatwierdzenia,"
+            " niezweryfikowane, opis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (s.klucz, str(s.wartosc), s.jednostka, s.obowiazuje_od.isoformat(),
+             None if s.obowiazuje_do is None else s.obowiazuje_do.isoformat(),
+             s.podstawa_prawna, s.zrodlo_url, s.data_odczytu.isoformat(),
+             s.status, s.zatwierdzil,
+             None if s.data_zatwierdzenia is None
+             else s.data_zatwierdzenia.isoformat(),
+             s.niezweryfikowane, s.opis))
+        dodane += 1
+    polaczenie.commit()
+    return dodane
+
+
+def _stawka_z_wiersza(w) -> "rejestr_wiedzy.Stawka":
+    """Wiersz bazy -> `Stawka`. Kwota przez `Decimal`, daty przez `date`.
+
+    Konwersja tutaj, a nie u wolajacego: napis „0.1952" pomnozony przez
+    podstawe daje w Pythonie blad typu, ale ten sam napis podany do `float()`
+    daje liczbe zmiennoprzecinkowa i cisze — a to jest aplikacja podatkowa
+    (CLAUDE.md §3.1).
+    """
+    return rejestr_wiedzy.Stawka(
+        klucz=w[0], wartosc=Decimal(str(w[1])), jednostka=w[2],
+        obowiazuje_od=date.fromisoformat(w[3]),
+        obowiazuje_do=None if w[4] is None else date.fromisoformat(w[4]),
+        podstawa_prawna=w[5], zrodlo_url=w[6],
+        data_odczytu=date.fromisoformat(w[7]), status=w[8],
+        zatwierdzil=w[9],
+        data_zatwierdzenia=None if w[10] is None else date.fromisoformat(w[10]),
+        niezweryfikowane=w[11], opis=w[12] or "")
+
+
+def wczytaj_stawki(polaczenie, status: str | None = None) -> list:
+    """Stawki z rejestru. Bez filtru — WSZYSTKIE, razem z propozycjami.
+
+    Filtr `status` jest tu dla ekranu Ustawien, ktory pokazuje propozycje.
+    Silnik ma wolac `wiedza.rejestr.obowiazujaca`, a nie filtrowac sam —
+    tamta funkcja jest jedynym nosnikiem reguly „licz wylacznie
+    z zatwierdzonych" i ma zostac jedynym.
+    """
+    sql = ("SELECT klucz, wartosc, jednostka, obowiazuje_od, obowiazuje_do,"
+           " podstawa_prawna, zrodlo_url, data_odczytu, status, zatwierdzil,"
+           " data_zatwierdzenia, niezweryfikowane, opis FROM rejestr_stawek")
+    parametry: tuple = ()
+    if status is not None:
+        if status not in rejestr_wiedzy.STANY:
+            raise BladMagazynu(
+                f"Nieznany stan stawki: {status!r}. Dozwolone: "
+                + ", ".join(rejestr_wiedzy.STANY) + ".")
+        sql += " WHERE status = ?"
+        parametry = (status,)
+    sql += " ORDER BY klucz, obowiazuje_od"
+    return [_stawka_z_wiersza(w)
+            for w in polaczenie.execute(sql, parametry).fetchall()]
+
+
+def policz_stawki(polaczenie) -> dict[str, int]:
+    """Ile stawek w kazdym stanie. Slownik ma ZAWSZE wszystkie trzy klucze.
+
+    Brakujacy klucz kazalby kazdemu wolajacemu pisac `.get(..., 0)` — czyli
+    powtarzac decyzje „brak znaczy zero" w kazdym miejscu z osobna. Tu ta
+    decyzja zapada raz.
+    """
+    wynik = {stan: 0 for stan in rejestr_wiedzy.STANY}
+    for stan, ile in polaczenie.execute(
+            "SELECT status, COUNT(*) FROM rejestr_stawek GROUP BY status"):
+        wynik[stan] = ile
+    return wynik
 
 
 # --- wspólne pomocnicze ---------------------------------------------------

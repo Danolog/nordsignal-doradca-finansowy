@@ -62,6 +62,11 @@ TABELE_SCHEMATU = {
     # roboczej nadpisalby wynik dotyczacy bazy produkcyjnej i pasek mowilby
     # o cudzych danych. Tabela znika razem z baza, ktora opisuje.
     "przebiegi_straznika",
+    # 2026-08-29, schemat 12: liczby pochodzace z prawa. Tabela, a nie slownik
+    # w pliku, bo wartosc ma okres obowiazywania i podpis czlowieka — a plik
+    # nie potrafi powiedziec, ze stawka sie zestarzala. Napis SQL mieszka
+    # w `wiedza/rejestr.py` (`SCHEMAT_SQLITE`), nie w `magazyn._SCHEMAT`.
+    "rejestr_stawek",
 }
 
 

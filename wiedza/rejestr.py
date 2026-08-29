@@ -86,6 +86,68 @@ CREATE UNIQUE INDEX IF NOT EXISTS rejestr_stawek_jedna_obowiazujaca
 """
 
 
+#: NAZWY KOLUMN — JEDYNY NOSNIK ODPOWIEDZI „z czego sklada sie rejestr".
+#: Oba napisy SQL nizej maja niesc DOKLADNIE te nazwy i nic ponadto.
+#: Pilnuje tego `testy/test_rejestr_sqlite.py::
+#: test_oba_dialekty_niosa_DOKLADNIE_kolumny_z_jednego_nosnika`, ktory
+#: wycina nazwy z obu napisow i porownuje je z ta krotka — w obie strony.
+KOLUMNY = (
+    "id", "klucz", "wartosc", "jednostka", "obowiazuje_od", "obowiazuje_do",
+    "podstawa_prawna", "zrodlo_url", "data_odczytu", "status", "zatwierdzil",
+    "data_zatwierdzenia", "niezweryfikowane", "opis",
+)
+
+#: DRUGI NOSNIK TEJ SAMEJ TABELI — SWIADOMY, Z PROGIEM (CLAUDE.md §3.2).
+#:
+#: DLACZEGO ISTNIEJE. `SCHEMAT` wyzej jest w dialekcie PostgreSQL (`BIGSERIAL`,
+#: `NUMERIC`, `DATE`, indeks czesciowy). Baza, na ktorej aplikacja dzis stoi,
+#: to SQLite — a SQLite nie zna ani `BIGSERIAL`, ani wiezu `CHECK` z podzapytaniem.
+#: Bez tego napisu rejestr nie ma tabeli w bazie, ktora naprawde dziala, wiec
+#: cala warstwa podstaw prawnych zostaje procedura nad pustym miejscem.
+#:
+#: CZYM SIE ROZNI OD `SCHEMAT` — trzy rzeczy, kazda wymuszona przez SQLite:
+#:   `BIGSERIAL`      -> `INTEGER PRIMARY KEY AUTOINCREMENT`
+#:   `NUMERIC(16,6)`  -> `TEXT` (SQLite nie ma typu dziesietnego; kwoty jada
+#:                       napisem i wracaja przez `Decimal`, tak jak wszedzie
+#:                       indziej w tym magazynie)
+#:   `DATE`           -> `TEXT` w zapisie ISO
+#: WIEZY SA TE SAME i to nie jest ozdoba: `zatwierdzona_ma_podpis` jest
+#: jedynym mechanizmem, ktory nie wpusci stawki uzytej do rachunku bez podpisu
+#: czlowieka. SQLite egzekwuje `CHECK` bez zadnej `PRAGMA` — inaczej niz klucze
+#: obce, ktore sa domyslnie wylaczone (patrz naglowek `silnik/rdzen/magazyn.py`).
+#:
+#: PROG KONSOLIDACJI, JAWNY: ten napis znika w chwili przejscia bazy na
+#: PostgreSQL (`silnik/baza/schemat.sql` juz czeka). Do tego czasu rozjazd
+#: obu napisow czerwieni straznika wymienionego przy `KOLUMNY`.
+SCHEMAT_SQLITE = """
+CREATE TABLE IF NOT EXISTS rejestr_stawek (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    klucz               TEXT NOT NULL,
+    wartosc             TEXT NOT NULL,
+    jednostka           TEXT NOT NULL,
+    obowiazuje_od       TEXT NOT NULL,
+    obowiazuje_do       TEXT,
+    podstawa_prawna     TEXT,
+    zrodlo_url          TEXT NOT NULL,
+    data_odczytu        TEXT NOT NULL,
+    status              TEXT NOT NULL,
+    zatwierdzil         TEXT,
+    data_zatwierdzenia  TEXT,
+    niezweryfikowane    TEXT,
+    opis                TEXT NOT NULL DEFAULT '',
+    CONSTRAINT stan_znany CHECK (status IN ('zatwierdzona','proponowana','wycofana')),
+    CONSTRAINT jednostka_znana CHECK (jednostka IN ('zl','ulamek','procent')),
+    CONSTRAINT okres_sensowny CHECK (obowiazuje_do IS NULL OR obowiazuje_do >= obowiazuje_od),
+    CONSTRAINT zatwierdzona_ma_podpis CHECK (
+        status <> 'zatwierdzona'
+        OR (zatwierdzil IS NOT NULL AND data_zatwierdzenia IS NOT NULL)
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS rejestr_stawek_jedna_obowiazujaca
+    ON rejestr_stawek (klucz, obowiazuje_od)
+    WHERE status = 'zatwierdzona';
+"""
+
 @dataclass(frozen=True)
 class Stawka:
     """Jedna wartosc z prawa, razem z metryka pochodzenia."""

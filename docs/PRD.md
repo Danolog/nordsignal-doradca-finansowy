@@ -1,5 +1,61 @@
 # Doradca Finansowy — dokument wymagań produktu (PRD)
 
+**Wersja:** v1.7 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
+
+**Changelog v1.6 → v1.7 — trzy zdania stanu faktycznego z v1.6 przestały być prawdziwe,
+bo je naprawiono. Plus jedna nowa luka, nazwana wprost.**
+
+**(1) Tabela `rejestr_stawek` ISTNIEJE w schemacie i MA dane.** v1.6 twierdziła:
+*„nie istnieje w schemacie bazy — `magazyn.py` nie wspomina jej ani razu"*. To brzmienie
+było prawdziwe 2026-08-29 rano i nieprawdziwe po południu. Pomiar po zmianie:
+
+```
+sqlite3 <pusta-baza> "SELECT status, COUNT(*) FROM rejestr_stawek GROUP BY status;"
+proponowana|19
+sqlite3 <pusta-baza> "PRAGMA user_version;"
+12
+```
+
+Napis SQL mieszka w `wiedza/rejestr.py` jako `SCHEMAT_SQLITE` — `magazyn.polacz` go **woła**,
+nie powtarza. Zasilenie: 19 pozycji z `wiedza/stawki_poczatkowe.py`, **wszystkie w statusie
+`proponowana`, żadna zatwierdzona**. Droga maszynowa do statusu `zatwierdzona` nie istnieje
+(§3.4 konstytucji projektu); pilnuje tego `test_rejestr_sqlite.py::test_ZADNA_stawka_nie_jest_zatwierdzona`.
+
+**(2) Trzy kolumny z rozdziału 6.3 ISTNIEJĄ.** v1.6 twierdziła, że „nie istnieją w schemacie
+(`0` trafień)". Po zmianie `wpisy_budzetu.zrodlo`, `kategorie.niezbedna`
+i `przychody_jdg.data_obowiazku_vat` są w `magazyn._SCHEMAT` **i** w `_DOPISYWANE_KOLUMNY`,
+więc dostaje je zarówno baza świeża, jak i istniejąca. Trzy rozjazdy wobec
+`silnik/baza/schemat.sql` (PostgreSQL) są **nazwane z progiem** przy `_DOPISYWANE_KOLUMNY`.
+
+**(3) Konsumenta rejestru NADAL NIE MA — i to jest teraz jedyna otwarta część tej sprawy.**
+Silnik liczy z `silnik/rdzen/stawki.py`. Zatwierdzenie stawki przez Darka **nadal nie zmienia
+żadnej liczby na ekranie**; różnica wobec v1.6 jest taka, że **jest już gdzie ją zatwierdzić
+po stronie danych**. Dług pilnuje **strażnik progu**
+`test_rejestr_sqlite.py::test_rejestr_MA_dane_i_NIE_MA_konsumenta` — jego czerwień jest **dobrą
+wiadomością** i wymusza zdjęcie tego akapitu. **Próg domknięcia: pierwsza zmiana którejkolwiek
+wartości w `silnik/rdzen/stawki.py` albo w `wiedza/stawki_poczatkowe.py`** — od tej chwili dwa
+nośniki tej samej liczby zaczną się rozjeżdżać, a rozjazd wyjdzie na jaw w kwocie przelewu.
+
+**(4) Sprostowanie pomiaru z v1.6: „14 poleceń `CREATE TABLE`" mierzyło wystąpienia tekstu,
+nie tabele.** Nośnik (rozdz. 6.2) mówi **13 tabel**; pomiar unikatów to potwierdza:
+
+```
+grep -oE "CREATE TABLE IF NOT EXISTS [a-z_]+|CREATE TABLE [a-z_]+ \(" silnik/rdzen/magazyn.py \
+  | sed -E 's/.*(EXISTS|TABLE) //; s/ \(//' | sort -u | wc -l
+13
+```
+
+Czternaste wystąpienie to `CREATE TABLE plan_budzetu` **wewnątrz `_przebuduj_plan_budzetu`**
+(przebudowa więzu, ta sama tabela), piętnaste — słowa `CREATE TABLE` w komentarzu.
+Nośnik i pomiar **nie były sprzeczne**; sprzeczne były dwa różne pomiary.
+
+**(5) NOWA LUKA, blokująca pierwsze uruchomienie — `docs/pierwsze-uruchomienie.md`.**
+Na pustej bazie Darek może dziś podać **dwie rzeczy z ośmiu**: stan konta i wpisy budżetu.
+Sześciu pozostałych **nie ma gdzie wpisać** — nie istnieje ani trasa, ani ekran. Szczegóły,
+liczby i werdykt: `docs/pierwsze-uruchomienie.md`. Pozycja wchodzi do rozdziału 17.
+
+**Czego ta wersja NIE robi.** Nie podpina rejestru do silnika, nie buduje brakujących ekranów
+i nie migruje żadnych danych — aplikacja startuje pusta 1 IX 2026 (decyzja Darka 2026-08-29).
 **Wersja:** v1.6 · 2026-08-29 · autor: Ethan (CTO) · **status: do sign-offu Darka**
 
 **Changelog v1.5 → v1.6 — jedno sprostowanie jawne. Zero zmian zakresu.**
@@ -260,7 +316,7 @@ Zasada: **jedna liczba ma jedno miejsce pochodzenia.** Poniższa tabela jest jej
 
 | Rodzaj liczby | Skąd pochodzi | Kto nie ma prawa jej wytworzyć |
 |---|---|---|
-| Stawka podatku, składki, próg ustawowy | **dziś: literały w `silnik/rdzen/stawki.py` — 28 sztuk.** Docelowo tabela `rejestr_stawek` (rozdz. 7), która **nie istnieje w schemacie i nie ma ani jednego konsumenta w silniku** (pomiar 2026-08-29, changelog v1.6) | silnik, interfejs, model językowy |
+| Stawka podatku, składki, próg ustawowy | **dziś: literały w `silnik/rdzen/stawki.py`.** Tabela `rejestr_stawek` (rozdz. 7) **istnieje od schematu 12 i ma 19 pozycji, wszystkie `proponowana`** — ale **nadal nie ma ani jednego konsumenta w silniku** (pomiar 2026-08-29 po zmianie, changelog v1.7 pkt 3). Strażnik progu: `test_rejestr_MA_dane_i_NIE_MA_konsumenta` | silnik, interfejs, model językowy |
 | Kwota wyliczona (zaliczka, składka, VAT) | `silnik/podatki.py` | trasa HTTP, interfejs, model językowy |
 | Saldo prognozy, dzień pod kreską | `silnik/prognoza_plynnosci.py` | jak wyżej |
 | Wykonanie planu, odchylenie | `silnik/budzet.py` | jak wyżej |
@@ -1406,7 +1462,14 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
     z tego 148 w 8 plikach przed dopisaniem 19 nowych. Liczba 154 pochodziła z poprzedniego
     projektu i **nie zgadza się** z tym.
 
-16. **Rejestr stawek nie ma ani jednego konsumenta — obietnica, nie luka do zamknięcia po drodze.**
+16. **[CZĘŚCIOWO ZAMKNIĘTA 2026-08-29, schemat 12]** Rejestr stawek **ma tabelę i 19 pozycji**
+    (wszystkie `proponowana`), ale **nadal nie ma ani jednego konsumenta w silniku**. Zdanie
+    „nie istnieje w schemacie" niżej opisuje stan **sprzed** tej zmiany i zostaje jako ślad.
+    Otwarta część: podpięcie `silnik/rdzen/stawki.py` pod rejestr. **Próg: pierwsza zmiana
+    którejkolwiek wartości w `stawki.py` albo w `wiedza/stawki_poczatkowe.py`.** Strażnik progu:
+    `testy/test_rejestr_sqlite.py::test_rejestr_MA_dane_i_NIE_MA_konsumenta`.
+    **Stare brzmienie, zacytowane dosłownie:** „Rejestr stawek nie ma ani jednego konsumenta —
+    obietnica, nie luka do zamknięcia po drodze.
     Zmierzone 2026-08-29 (Leo, przegląd Z10; powtórzone przez Ethana): `rejestr_stawek` **nie
     istnieje w schemacie** (`grep -c rejestr_stawek silnik/rdzen/magazyn.py` → `0`, przy 14
     poleceniach `CREATE TABLE`), `silnik/` i `api/` **nie importują `wiedza/` ani razu**
@@ -1414,9 +1477,12 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
     **Skutek:** zatwierdzenie stawki przez Darka (`CLAUDE.md` §3.4) nie zmienia żadnej liczby
     na ekranie; rozdział 7 opisuje procedurę nad pustym miejscem. **Nie wolno cytować rozdziału 7
     jako opisu działającego mechanizmu.** Podpięcie wymaga migracji schematu i jest osobnym
-    zadaniem — nie „drobiazgiem do zrobienia przy okazji".
+    zadaniem — nie „drobiazgiem do zrobienia przy okazji"." (koniec cytatu)
 
-17. **Trzy kolumny opisane w rozdziale 6.3 jako „nowe" nie istnieją w schemacie.**
+17. **[ZAMKNIĘTA 2026-08-29, schemat 12]** ~~Trzy kolumny opisane w rozdziale 6.3 jako „nowe" nie istnieją w schemacie.~~
+    **Istnieją** — w `magazyn._SCHEMAT` (baza świeża) i w `_DOPISYWANE_KOLUMNY` (baza istniejąca).
+    Trzy rozjazdy wobec `silnik/baza/schemat.sql` są nazwane z progiem przy `_DOPISYWANE_KOLUMNY`.
+    Strażnicy: `testy/test_trzy_kolumny.py` (10 testów). Stare brzmienie zostaje jako ślad:
     `wpisy_budzetu.zrodlo`, `kategorie.niezbedna`, `przychody_jdg.data_obowiazku_vat` — każda
     daje `0` trafień w 14 poleceniach `CREATE TABLE` (pomiar 2026-08-29). Rozdział 6.3 opisuje
     je w czasie teraźniejszym; **są projektem, nie stanem.**
@@ -1429,6 +1495,16 @@ Etykieta jest dopuszczalna; udawanie sprawdzonego nie jest.
     błędu jest **niekorzystny**, bo rezerwa wychodzi **zaniżona**, czyli obraz poprawia się
     względem prawdy. **Próg:** pierwszy wpis w kategorii „Podatki i ZUS" albo migracja dokładająca
     `wpisy_budzetu.zrodlo` — co nastąpi pierwsze. Nośnik szczegółów: nagłówek `silnik/pieniadz.py`.
+
+19. **Siedem z ośmiu rzeczy potrzebnych do pierwszego uruchomienia nie ma gdzie zostać
+    wpisanych.** Zmierzone na pustej bazie 2026-08-29: `POST /api/plan`, `POST /api/zobowiazania`,
+    `POST /api/majatek`, `PUT /api/forma`, `PUT /api/dzialalnosc`, `POST /api/stawki/zatwierdz`
+    → wszystkie **HTTP 404**; `zapiszKotwice` w interfejsie ma **1 trafienie — samą definicję,
+    zero wołających**; `interfejs/app/page.tsx` ma **0** pól `<input>` i `<form>`. Zbudowane są
+    **2 ekrany z 11**. **Skutek:** aplikacja może działać bez zarzutu na bazie roboczej
+    poprzednika i **nie dać się uruchomić od zera 1 IX 2026**. Nośnik szczegółów i lista dla
+    Darka: `docs/pierwsze-uruchomienie.md`.
+
 
 ---
 
