@@ -1,0 +1,12 @@
+.venv
+interfejs/node_modules
+interfejs/.next
+interfejs/zrzuty
+__pycache__
+.pytest_cache
+.remember
+.env
+.env.local
+makiety
+docs
+testy
