@@ -44,6 +44,11 @@ PROG_LISCI = 15
 #: Zmiana ktorejkolwiek z tych liczb jest SYGNALEM DO SPRAWDZENIA, nie
 #: pozycja do podbicia: albo ksztalt odpowiedzi sie zmienil (wtedy podnosi
 #: sie ja razem z powodem), albo obchod przestal gdzies docierac.
+#: Podniesienie D-62 (2026-08-29): PIATY wiersz podgladu („Plynnosc")
+#: doklada 4 liscie do `PodgladSkutku` (17 -> 21) i po 4 do kazdej
+#: odpowiedzi, ktora `DaneKsiegowania` w sobie niesie (74 -> 78,
+#: 84 -> 88, 78 -> 82). Trasy Plynnosci bez zmian — i to jest
+#: kontrola: gdyby urosly, wiersz trafilby nie tam, gdzie mial.
 #: PODNIESIONE W Z7b: `/api/plynnosc` i `/api/kotwica` 147 -> 152.
 #: Powod SPRAWDZONY, nie zalozony — tak, jak zada komentarz wyzej:
 #:   * roznica to dokladnie 5 lisci, a `kontrakt.PozycjaKsiegi` ma 5 pol,
@@ -58,10 +63,10 @@ LISCIE = {
     # nowe pole `ostatnieSprawdzenie` (domkniecie luki kontraktu). Zestaw
     # pol sprawdza osobno `test_ksiegowanie_oddaje_ksztalt_DaneKsiegowania`,
     # ktory czyta go z kontraktu, wiec ta liczba nie jest jedynym dowodem.
-    "GET /api/ksiegowanie": 74,
-    "POST /api/wpisy": 84,
-    "DELETE /api/wpisy/{id}": 78,
-    "POST /api/wpisy/podglad": 17,
+    "GET /api/ksiegowanie": 78,
+    "POST /api/wpisy": 88,
+    "DELETE /api/wpisy/{id}": 82,
+    "POST /api/wpisy/podglad": 21,
     "GET /api/plynnosc": 152,
     "PUT /api/kotwica": 152,
 }
@@ -218,16 +223,23 @@ def test_wycofanie_NIEISTNIEJACEGO_wpisu_jest_bledem_a_nie_cicha_zgoda(klient):
 
 # --- POST /api/wpisy/podglad ---------------------------------------------
 
-def test_podglad_ma_CZTERY_wiersze_a_czwarty_mowi_co_sie_NIE_ruszylo(klient):
-    """Czwarty wiersz nie jest wypelniaczem do rownej liczby — to JEDYNE
-    miejsce, w ktorym uzytkownik dowiaduje sie, czego wpis NIE dotknal."""
-    tresc = klient.post("/api/wpisy/podglad", json=_wpis()).json()
+def test_podglad_ma_PIEC_wierszy_a_dwa_ostatnie_mowia_co_sie_NIE_ruszylo(klient):
+    """Dwa ostatnie wiersze nie sa wypelniaczem do rownej liczby — to JEDYNE
+    miejsce, w ktorym uzytkownik dowiaduje sie, czego wpis NIE dotknal.
+
+    Piaty („Plynnosc", D-62) powstal, bo po D-20/D-61 wpis miesczacy sie
+    w planie NIE ZMIENIA sumy prognozy — a karta, ktora o tym milczy, czyni
+    poprawne dzialanie nieodroznialnym od awarii zapisu."""
+    tresc = klient.post(f"/api/wpisy/podglad?dzis={DZIS}", json=_wpis()).json()
     assert tresc["kwota"] == "274.06"
-    assert len(tresc["wiersze"]) == 4
-    czwarty = tresc["wiersze"][3]
+    assert len(tresc["wiersze"]) == 5
+    czwarty, piaty = tresc["wiersze"][3], tresc["wiersze"][4]
     assert czwarty["etykieta"] == "Wolne środki"
     assert czwarty["po"] is None, "brak wartosci po = ta liczba sie NIE zmienia"
     assert czwarty["wyjasnienie"] == "bez zmian — liczą się z planu, nie z wpisów"
+    assert piaty["etykieta"] == "Płynność"
+    assert piaty["po"] is None
+    assert piaty["wyjasnienie"], "wiersz Plynnosc bez zdania to ta sama cisza"
     # trzy pierwsze wiersze MAJA ruch — inaczej karta niczego nie zapowiada.
     # `\u00a0` to spacja NIEROZDZIELAJACA z `prezentacja.SEPARATOR_TYSIECY`:
     # kwota rozerwana miedzy wierszami przestaje byc kwota. DLUG NAZWANY,

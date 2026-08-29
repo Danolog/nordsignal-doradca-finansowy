@@ -23,7 +23,14 @@ export interface WpisDoZapisu {
   szczegoly: string;
 }
 
-// „Co ruszy ten wpis" — cztery wiersze; czwarty mowi, co sie NIE ruszylo.
+// „Co ruszy ten wpis" — PIEC wierszy; dwa ostatnie mowia, co sie NIE
+// ruszylo: „Wolne srodki" (licza sie z planu, nie z wpisow) i „Plynnosc"
+// (D-62). Piaty powstal, bo po D-20/D-61 wpis miesczacy sie w planie NIE
+// ZMIENIA sumy prognozy — a karta, ktora o tym milczy, czyni poprawne
+// dzialanie nieodroznialnym od awarii zapisu. KSZTALT SIE NIE ZMIENIL:
+// `wiersze` bylo i jest lista, wiec `silnik/kontrakt.py` nie wymagal
+// dopasowania. Zmienil sie wylacznie ten komentarz — czyli nosnik
+// LICZBY wierszy, ktory po D-62 mowilby nieprawde.
 // `po: null` znaczy „ta liczba sie nie zmienia" i wtedy `wyjasnienie` mowi
 // dlaczego. Etykieta opisuje liczbe, ktora pokazuje (CLAUDE.md §3.5).
 export interface WierszSkutku {

@@ -76,7 +76,8 @@ def wycofaj_wpis(id: int, polaczenie=Depends(wspolne.polaczenie),
 
 @trasy.post("/api/wpisy/podglad")
 def podglad_wpisu(tresc: dict = Body(...),
-                  polaczenie=Depends(wspolne.polaczenie)) -> dict:
+                  polaczenie=Depends(wspolne.polaczenie),
+                  dzis: "str | None" = Query(default=None)) -> dict:
     """`PodgladSkutku` — CZTERY wiersze, czwarty mowi, co sie NIE ruszylo.
 
     Czwarty wiersz jest jedynym miejscem, w ktorym uzytkownik dowiaduje sie,
@@ -86,4 +87,4 @@ def podglad_wpisu(tresc: dict = Body(...),
     return asdict(ekran_ksiegowanie.podglad_z_bazy(
         polaczenie, typ=tresc.get("typ"), kategoria=tresc.get("kategoria"),
         kwota=tresc.get("kwota"), dzien=wspolne.dzien(tresc.get("data")),
-        napis_kwoty=kwoty.kwota))
+        dzis=wspolne.dzien(dzis), napis_kwoty=kwoty.kwota))

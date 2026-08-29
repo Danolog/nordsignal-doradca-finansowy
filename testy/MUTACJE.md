@@ -678,3 +678,57 @@ nieodróżnialny od udanego.
   ma czego strzec: wiersz nie powstał. Powód w zgłoszeniu do Ethana/Maxa: podgląd nie
   niesie pozycji planu kategorii ani jej dnia, a bez nich trzy brzmienia D-62 nie mają
   skąd wziąć wielkości, której §3.5 żąda.
+
+---
+
+## Przebieg 2026-08-29 — D-62, wiersz „Płynność" na karcie „Co ruszy ten wpis" (`testy/test_podglad_plynnosc.py`)
+
+Kopia drzewa poza repozytorium (`scratchpad/mut-d62`), `__pycache__` czyszczony **przed każdym**
+przebiegiem, po jednej mutacji na przebieg. Kontrola bazowa kopii: **892 passed, 3 deselected**.
+Kontrola po cofnięciu wszystkich trzech: **892 passed, 3 deselected**, a `diff -rq` katalogów
+`silnik/` i `api/` wobec repozytorium — bez różnic.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M-D62-1** | `silnik/ekran_ksiegowanie.py`: piąty wiersz („Płynność") nie jest dokładany — karta wraca do czterech | `test_podglad_ma_PIEC_wierszy_a_dwa_ostatnie_mowia_co_sie_NIE_ruszylo` · wszystkie 6 testów brzmień · wszystkie 5 przypadków `test_WIELKOSC_w_zdaniu_ROWNA_SIE_ruchowi_ktory_zobaczy_uzytkownik` · `test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej` (13 czerwonych) | **czerwony** |
+| **M-D62-2** | `silnik/rdzen/prognoza_plynnosci.py`: `SkutekNaOs.roznica` bierze **kwotę wpisu** zamiast różnicy dwóch przebiegów `podziel_os` | `test_WIELKOSC_w_zdaniu_ROWNA_SIE_ruchowi_ktory_zobaczy_uzytkownik[274.06/330.00/374.06/500.00-Energia Elektryczna]` · 3 testy brzmień (7 czerwonych) | **czerwony** |
+| **M-D62-3** | `silnik/ekran_ksiegowanie.py`: zdanie zawsze mówi „pozycja schodzi z osi w całości", niezależnie od reszty | `test_wpis_MIESCI_SIE_w_planie_mowi_o_dacie_i_o_RESZCIE_pozycji` | **czerwony** |
+
+### M-D62-2 — mutacja pisana pod jedno konkretne pytanie bramki
+
+Bramka odbioru D-62 punkt 2 brzmi: *„wielkość wzięta z innego rachunku niż ta, którą opisuje,
+to wada"*. Ta mutacja **jest** tą wadą, wykonaną celowo: podmienia różnicę osi na kwotę wpisu —
+liczbę, która leży w zasięgu ręki, wygląda wiarygodnie i **w jednym z pięciu przypadków jest nawet
+prawdziwa**. Strażnik zapala się na czterech i milczy na piątym:
+
+```
+E  AssertionError: karta zapowiedziala -274.06, a prognoza ruszyla sie o 0.00
+   (wpis 274.06 w kategorii Energia Elektryczna)
+E  AssertionError: karta zapowiedziala -374.06, a prognoza ruszyla sie o -44.06
+   (wpis 374.06 w kategorii Energia Elektryczna)
+```
+
+Przypadek `[274.06-Zakupy]` **przeszedł na zielono i to jest poprawne**, nie luka: kategoria bez
+pozycji planu obciąża oś całą kwotą, więc obie liczby są tam równe. Gdyby czerwieniło się
+wszystkie pięć, znaczyłoby to, że strażnik reaguje na sam fakt zmiany, a nie na kłamstwo.
+
+### M-D62-3 — dokładnie ta pułapka, przed którą ostrzegało zlecenie
+
+Wpis 274,06 zł z pozycji planu 330,00 zł **nie przesuwa całej pozycji** — D-61 mówi „konsumuje aż
+do zera", więc 55,94 zł zostaje na 20 X i użytkownik ten wypływ na Płynności zobaczy. Zdanie
+mówiące „pozycja schodzi z osi w całości" byłoby fałszem widocznym na sąsiednim ekranie:
+
+```
+E  - ziernika; zostaje z niej 55,94 zł na 20 października
+E  + ziernika; pozycja schodzi z osi w całości
+```
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano `_wejscia_planu`** — funkcji wydzielonej w tym zadaniu z `zbuduj`. Wydzielenie jest
+  neutralne (suita przed i po: 880 passed), ale **żaden test nie pilnuje, że oba wołania dostają tę
+  samą listę**; gdyby ktoś rozdzielił je z powrotem, nic by się nie zaczerwieniło. Etykieta jawna:
+  **niepotwierdzone**. Próg: przy pierwszej zmianie reguły dnia płatności (`_dzien_pozycji`).
+- **Nie ma strażnika na zdanie w przeglądarce.** Testy czytają odpowiedź trasy, nie wyrenderowany
+  ekran. Że wiersz z `po: null` rysuje się jako etykieta + wyjaśnienie, wiadomo z Z1 — nie
+  z pomiaru wykonanego dziś.

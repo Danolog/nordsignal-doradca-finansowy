@@ -37,6 +37,7 @@ import pandas as pd
 
 from silnik import kontrakt
 from silnik.rdzen import budzet, magazyn, prezentacja
+from silnik.rdzen import prognoza_plynnosci as pp
 
 #: Funkcja zamieniajaca kwote na napis kontraktu. W produkcji `api.kwoty.kwota`.
 NapisKwoty = Callable[..., "str | None"]
@@ -59,6 +60,20 @@ KATEGORIE_POZA_EKRANEM = (budzet.KATEGORIA_KOSZTY_JDG,)
 #: przechodza granice HTTP jako DANE: przegladarka je pokazuje, nie sklada.
 ETYKIETA_WOLNYCH_SRODKOW = "Wolne środki"
 WYJASNIENIE_WOLNYCH_SRODKOW = "bez zmian — liczą się z planu, nie z wpisów"
+
+#: PIATY wiersz — „Plynnosc" (D-62). Brzmienia stoja OBOK siostrzanego
+#: „Wolne srodki", bo obie odpowiadaja na to samo pytanie: co ten wpis robi
+#: z liczba, ktorej uzytkownik na tej karcie NIE WIDZI.
+#:
+#: DLACZEGO TEN WIERSZ MUSIAL POWSTAC. Po D-20/D-61 wpis miesczacy sie
+#: w planie NIE ZMIENIA sumy prognozy — konsumuje pozycje planu, ktora i tak
+#: mial zaplacic. Karta bez tego wiersza milczala, wiec uzytkownik nie mial
+#: jak odroznic POPRAWNEGO DZIALANIA od AWARII: wpisal 274,06 zl, Plynnosc
+#: pokazala te sama liczbe, i to wyglada identycznie jak zepsuty zapis.
+#:
+#: KAZDE Z TYCH BRZMIEN NIESIE WIELKOSC, nie samo slowo (CLAUDE.md §3.5):
+#: „bez zmian" bez liczby jest tym samym, czym byla cisza.
+ETYKIETA_PLYNNOSCI = "Płynność"
 
 #: Trzeci wiersz, gdy planu na ten miesiac nie ma. `po=None` znaczy „ta liczba
 #: sie nie zmienia" — i wtedy wyjasnienie mowi dlaczego. Zero procent
@@ -225,17 +240,83 @@ def _wykonane_kategorii(wpisy: pd.DataFrame, plan: pd.DataFrame, rok: int,
     return Decimal("0.00")
 
 
-def podglad(*, wpisy: pd.DataFrame, plan: pd.DataFrame, typ: str,
-            kategoria: str, kwota: Decimal, dzien: date,
-            napis_kwoty: NapisKwoty) -> kontrakt.PodgladSkutku:
-    """„Co ruszy ten wpis" — CZTERY wiersze, czwarty mowi, co sie NIE ruszylo.
+def wyjasnienie_plynnosci(skutek: "pp.SkutekNaOs", *, dzien: date) -> str:
+    """JEDEN NOSNIK brzmien wiersza „Plynnosc" — piec stanow, kazdy z wielkoscia.
 
-    Czwarty wiersz nie jest wypelniaczem do rownej liczby. Jest to JEDYNE
-    miejsce, w ktorym uzytkownik dowiaduje sie, czego wpis NIE dotknal —
-    bez niego szukalby ruchu, ktorego nie ma, i uznalby jego brak za wade
-    obliczen. Wolne srodki licza sie z planu, a nie z wpisow (budzet zerowy:
-    pieniadz przestaje byc do dyspozycji w chwili WPISANIA go w plan, nie
-    w chwili zaplaty — `budzet.do_alokacji_z_planu`).
+    Stany sa PIEC, nie trzy, i dwa dolozone nie sa ozdoba:
+
+    * `poza_osia` — kategoria, ktorej wpisy silnik liczy z innego zrodla
+      (daniny z faktur, przychod JDG z godzin). Wpis w niej naprawde nie
+      rusza osi, ale z zupelnie innego powodu niz brak planu — zlanie tych
+      dwoch stanow w jedno zdanie mowiloby, ze kategoria „nie ma pozycji
+      planu", podczas gdy ona po prostu nie nalezy do tej osi;
+    * kwota zerowa — karta na wejsciu, zanim uzytkownik cokolwiek wpisal.
+      Zdanie „niżej o 0,00 zl" byloby tu falszywym alarmem.
+
+    DLACZEGO ZDANIE NIE MOWI „cala pozycja przesuwa sie na dzis". Bo sie nie
+    przesuwa. Wpis 274,06 zl z pozycji 330,00 zl zostawia 55,94 zl na dniu
+    tej pozycji (D-61: konsumpcja idzie AZ DO ZERA, nie caloscia). Reszta
+    jest w zdaniu wymieniona z kwota i z data — inaczej nastepny czytelnik
+    zobaczylby na Plynnosci wyplyw, o ktorym karta powiedziala, ze zniknal.
+
+    OBIE DATY POCHODZA Z DANYCH, zadna nie jest wzorcem tekstowym: dzien
+    pozycji z `skutek.data_pozycji`, dzien wpisu z argumentu.
+    """
+    if skutek.poza_osia:
+        return ("bez zmian — daniny i przychód z faktur liczy silnik "
+                "z własnych źródeł, nie z wpisów")
+    if skutek.roznica == 0 and skutek.pochloniete == 0:
+        return "bez zmian — dopóki nie wpiszesz kwoty, nie ma czego przeliczyć"
+
+    kierunek = ("niżej" if skutek.roznica < 0 else "wyżej")
+    wielkosc = prezentacja.zloty(abs(skutek.roznica))
+
+    if skutek.pochloniete == 0:
+        return (f"{kierunek} o {wielkosc} — kategoria nie ma pozycji planu "
+                f"na ten miesiąc")
+
+    kiedy_plan = _slownie(skutek.data_pozycji)
+    if skutek.roznica != 0:
+        return (f"{kierunek} o {wielkosc} — o tyle wydatek przekracza "
+                f"pozycję planu {prezentacja.zloty(skutek.kwota_pozycji)} "
+                f"z {kiedy_plan}")
+
+    ogon = (f"; zostaje z niej {prezentacja.zloty(skutek.reszta_pozycji)} "
+            f"na {kiedy_plan}" if skutek.reszta_pozycji > 0
+            else "; pozycja schodzi z osi w całości")
+    return (f"bez zmian co do sumy — {prezentacja.zloty(skutek.pochloniete)} "
+            f"wchodzi na {_slownie(dzien)} w miejsce pozycji planu "
+            f"{prezentacja.zloty(skutek.kwota_pozycji)} z {kiedy_plan}{ogon}")
+
+
+def _slownie(dzien: date) -> str:
+    """„20 października" — dzien i miesiac w dopelniaczu.
+
+    Ten sam zapis, ktorym zdania serwera mowia o datach gdzie indziej
+    (`ekran_plynnosc.zdanie_werdyktu`). Zapis rzymski z ramki („20 X")
+    sklada `interfejs/lib/kwota.ts` i robi to dla dat, ktore dostaje POLEM;
+    tutaj data siedzi WEWNATRZ zdania, wiec sklada ja ta strona granicy.
+    """
+    return f"{dzien.day} {prezentacja.MIESIACE_DOPELNIACZ[dzien.month - 1]}"
+
+
+def podglad(*, wpisy: pd.DataFrame, plan: pd.DataFrame, typ: str,
+            kategoria: str, kwota: Decimal, dzien: date, dzis: date,
+            napis_kwoty: NapisKwoty) -> kontrakt.PodgladSkutku:
+    """„Co ruszy ten wpis" — PIEC wierszy, dwa ostatnie mowia, co sie NIE ruszylo.
+
+    Czwarty i piaty wiersz nie sa wypelniaczem do rownej liczby. Sa jedynym
+    miejscem, w ktorym uzytkownik dowiaduje sie, czego wpis NIE dotknal —
+    bez nich szukalby ruchu, ktorego nie ma, i uznalby jego brak za wade
+    obliczen.
+
+    * WOLNE SRODKI licza sie z planu, a nie z wpisow (budzet zerowy:
+      pieniadz przestaje byc do dyspozycji w chwili WPISANIA go w plan, nie
+      w chwili zaplaty — `budzet.do_alokacji_z_planu`);
+    * PLYNNOSC (D-62) po D-20/D-61 czesto NIE ZMIENIA sumy, bo wpis
+      konsumuje pozycje planu, ktora i tak miala byc zaplacona. Milczenie
+      karty w tym stanie jest nieodroznialne od awarii zapisu — dlatego
+      wiersz stoi ZAWSZE i ZAWSZE niesie wielkosc.
 
     ANI JEDNEJ KWOTY POLICZONEJ TU OD ZERA. Sumy przychodza z `budzet`,
     formatowanie z `prezentacja`, zamiana na napis kontraktu z `napis_kwoty`.
@@ -277,6 +358,17 @@ def podglad(*, wpisy: pd.DataFrame, plan: pd.DataFrame, typ: str,
     wiersze.append(kontrakt.WierszSkutku(
         etykieta=ETYKIETA_WOLNYCH_SRODKOW, przed="", po=None,
         wyjasnienie=WYJASNIENIE_WOLNYCH_SRODKOW))
+
+    # Wielkosc liczy `podziel_os` — TEN SAM nosnik, ktory rysuje Plynnosc.
+    # Wlasny rachunek „kwota minus plan" zgadzalby sie do pierwszej zmiany
+    # D-61 i rozjechal cicho: karta obiecywalaby ruch inny niz ekran.
+    wiersze.append(kontrakt.WierszSkutku(
+        etykieta=ETYKIETA_PLYNNOSCI, przed="", po=None,
+        wyjasnienie=wyjasnienie_plynnosci(
+            pp.skutek_wpisu_na_os(
+                plan=plan, wpisy=wpisy, typ=typ, kategoria=kategoria,
+                kwota=kwota, dzien=dzien, dzis=dzis),
+            dzien=dzien)))
 
     return kontrakt.PodgladSkutku(kwota=napis_kwoty(kwota),
                                   wiersze=tuple(wiersze))
@@ -382,7 +474,7 @@ def zbierz(polaczenie, *, dzis: date, napis_kwoty: NapisKwoty,
         liczbaWpisowWMiesiacu=len(w_miesiacu),
         nazwaMiesiaca=prezentacja.MIESIACE_MIEJSCOWNIK[dzis.month - 1],
         podglad=podglad(wpisy=wpisy, plan=plan, typ=typ, kategoria=kategoria,
-                        kwota=kwota_podgladu, dzien=dzis,
+                        kwota=kwota_podgladu, dzien=dzis, dzis=dzis,
                         napis_kwoty=napis_kwoty))
 
 
@@ -502,7 +594,7 @@ def wycofaj(polaczenie, *, wpis_id: int, dzis: date, typ: str = TYP_DOMYSLNY,
 
 
 def podglad_z_bazy(polaczenie, *, typ: str, kategoria: str, kwota,
-                   dzien: date, napis_kwoty: NapisKwoty
+                   dzien: date, dzis: date, napis_kwoty: NapisKwoty
                    ) -> kontrakt.PodgladSkutku:
     """„Co ruszy ten wpis" dla wpisu, ktorego jeszcze nie ma w bazie.
 
@@ -517,4 +609,5 @@ def podglad_z_bazy(polaczenie, *, typ: str, kategoria: str, kwota,
     return podglad(
         wpisy=magazyn.wczytaj_wpisy(polaczenie, od=dzialalnosc_od),
         plan=magazyn.wczytaj_plan(polaczenie), typ=typ, kategoria=kategoria,
-        kwota=rozstrzygniecie.kwota, dzien=dzien, napis_kwoty=napis_kwoty)
+        kwota=rozstrzygniecie.kwota, dzien=dzien, dzis=dzis,
+        napis_kwoty=napis_kwoty)

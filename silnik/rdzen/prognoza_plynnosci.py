@@ -417,6 +417,138 @@ def _wpisy_wg_miesiaca(wpisy) -> dict[tuple[int, int], tuple[_Wejscie, ...]]:
     return {k: tuple(v) for k, v in wynik.items()}
 
 
+def _wejscia_planu(plan, rok: int,
+                   miesiac: int) -> "tuple[list[_Wejscie], Decimal, bool]":
+    """Pozycje planu jednego miesiaca przelozone na wejscia osi.
+
+    JEDEN NOSNIK odpowiedzi „jak wiersz planu staje sie pozycja osi".
+    Wydzielone z `zbuduj` w D-62, bo od tej pory pyta o to DRUGI wolajacy:
+    karta „Co ruszy ten wpis" musi wiedziec, ktora pozycja planu zostanie
+    skonsumowana i ile z niej zostanie. Kopia tej petli w drugim miejscu
+    rozjechalaby sie przy pierwszej zmianie reguly dnia platnosci
+    (`_dzien_pozycji`) — i rozjechalaby sie CICHO, bo obie wersje nadal
+    zwracalyby poprawnie wygladajace pozycje.
+
+    Zwraca `(wejscia, suma planowanych przychodow, czy miesiac jest bez planu)`.
+    Trzecia wartosc jest osobno, bo „brak planu" to nie to samo co „plan
+    zlozony z samych podatkow": po odsianiu danin lista bywa pusta, a miesiac
+    plan MIAL.
+    """
+    wiersze = budzet.plan_na_miesiac(plan, rok, miesiac)
+    pusty = bool(wiersze.empty)
+    # Podatki liczy silnik, przychod JDG liczą godziny — obie kategorie
+    # wypadają z planu, inaczej wchodzą do salda drugi raz.
+    wiersze = budzet.bez_podatkow(wiersze)
+    wejscia: list[_Wejscie] = []
+    suma_przychodow = Decimal("0.00")
+    if not wiersze.empty:
+        for _, w in wiersze.iterrows():
+            if w["kategoria"] == budzet.KATEGORIA_PRZYCHOD_JDG:
+                continue
+            kwota = stawki.do_groszy(Decimal(str(w["kwota_planowana"])))
+            ze_znakiem = kwota * budzet.znak(w["typ"])
+            dzien_p, domniemany = _dzien_pozycji(rok, miesiac, w)
+            if w["typ"] == budzet.TYP_PRZYCHODY:
+                suma_przychodow += kwota
+            wejscia.append(_Wejscie(
+                dzien=dzien_p, nazwa=str(w["opis"] or w["kategoria"]),
+                kwota=ze_znakiem, rodzaj=RODZAJ_PLAN,
+                rodzaj_typ=str(w["typ"]), kategoria=str(w["kategoria"]),
+                domniemany=domniemany))
+    return wejscia, suma_przychodow, pusty
+
+
+#: Kategorie, ktorych wpis NIE WCHODZI na os — bo silnik liczy je z innego
+#: zrodla (`_wpisy_wg_miesiaca`). Nosnik jest jeden i stoi tutaj, zeby karta
+#: „Co ruszy ten wpis" mowila o tym samym zbiorze, o ktorym milczy os.
+KATEGORIE_POZA_OSIA = (budzet.KATEGORIA_PODATKI, budzet.KATEGORIA_PRZYCHOD_JDG)
+
+
+@dataclass(frozen=True)
+class SkutekNaOs:
+    """Co JEDEN wpis zrobi z osia prognozy w swoim miesiacu.
+
+    KAZDA LICZBA POCHODZI Z `podziel_os`, nie z osobnego rachunku. To nie
+    jest ostroznosc stylistyczna: karta „Co ruszy ten wpis" ma OPISAC ruch,
+    ktory zobaczy uzytkownik na Plynnosci. Wielkosc policzona drugim
+    sposobem zgadzalaby sie dopoty, dopoki obie wersje reguly sa te same —
+    czyli do pierwszej zmiany D-61.
+
+    * `roznica` — o ile zmieni sie SUMA osi w tym miesiacu, ZE ZNAKIEM.
+      Ujemna = plynnosc schodzi nizej. Zero = wpis miesci sie w planie
+      i zmienia wylacznie DATE wyplywu, nie sume.
+    * `pochloniete` — ile z pozycji planu tej kategorii wpis zjadl (D-61).
+    * `kwota_pozycji`, `data_pozycji` — PIERWSZA pozycja planu, ktora zostaje
+      na osi i ktora wpis konsumuje. `None`, gdy kategoria nie ma zadnej.
+    * `reszta_pozycji` — ile z TEJ pozycji zostaje po wpisie. To jest liczba,
+      ktorej brak zrodzil D-62: wpis 274,06 zl z pozycji 330,00 zl NIE
+      przesuwa calej pozycji, zostawia 55,94 zl na jej wlasnym dniu.
+    * `poza_osia` — kategoria, ktorej wpisy w ogole nie wchodza na os.
+    """
+
+    roznica: Decimal
+    pochloniete: Decimal
+    kwota_pozycji: "Decimal | None"
+    data_pozycji: "date | None"
+    reszta_pozycji: "Decimal | None"
+    poza_osia: bool = False
+
+
+def skutek_wpisu_na_os(*, plan, wpisy, typ: str, kategoria: str,
+                       kwota: Decimal, dzien: date, dzis: date) -> SkutekNaOs:
+    """Co wpis zrobi z osia — policzone TYM SAMYM `podziel_os`, co prognoza.
+
+    Metoda jest jedna i jest nia ROZNICA DWOCH PRZEBIEGOW: os bez wpisu
+    i os z wpisem. Nie ma tu wlasnej arytmetyki reguly D-61, bo kazda taka
+    arytmetyka byla by jej drugim nosnikiem — a rozjazd wychodzilby na jaw
+    dopiero wtedy, gdy karta obiecuje ruch inny niz ten, ktory pokazuje
+    Plynnosc.
+
+    ZAWEZENIE DO JEDNEJ PARY (typ, kategoria) NIE ZMIENIA WYNIKU i jest
+    swiadome: `podziel_os` konsumuje po kluczu `(typ, kategoria)`, wiec
+    pozycje pozostalych kategorii przechodza przez oba przebiegi bez zmian
+    i skracaja sie w roznicy. Zawezenie zostawia w wyniku wylacznie to,
+    co ten wpis naprawde ruszyl.
+    """
+    rok, miesiac = dzien.year, dzien.month
+    if kategoria in KATEGORIE_POZA_OSIA:
+        return SkutekNaOs(roznica=Decimal("0.00"), pochloniete=Decimal("0.00"),
+                          kwota_pozycji=None, data_pozycji=None,
+                          reszta_pozycji=None, poza_osia=True)
+
+    wszystkie_wejscia, _, _ = _wejscia_planu(plan, rok, miesiac)
+    klucz = (typ, kategoria)
+    plan_kategorii = [p for p in wszystkie_wejscia
+                      if (p.rodzaj_typ, p.kategoria) == klucz]
+    wpisy_kategorii = tuple(
+        w for w in _wpisy_wg_miesiaca(wpisy).get((rok, miesiac), ())
+        if (w.rodzaj_typ, w.kategoria) == klucz)
+    kandydat = _Wejscie(
+        dzien=dzien, nazwa=kategoria,
+        kwota=stawki.do_groszy(abs(Decimal(str(kwota)))) * budzet.znak(typ),
+        rodzaj=RODZAJ_WPIS, rodzaj_typ=typ, kategoria=kategoria)
+
+    przed = podziel_os(pozycje_planu=plan_kategorii, wpisy=wpisy_kategorii,
+                       dzis=dzis)
+    po = podziel_os(pozycje_planu=plan_kategorii,
+                    wpisy=wpisy_kategorii + (kandydat,), dzis=dzis)
+
+    plan_przed = [p for p in przed if p.rodzaj == RODZAJ_PLAN]
+    plan_po = {p.dzien: abs(p.kwota) for p in po if p.rodzaj == RODZAJ_PLAN}
+    suma_planu_przed = sum((abs(p.kwota) for p in plan_przed), Decimal("0.00"))
+    suma_planu_po = sum(plan_po.values(), Decimal("0.00"))
+
+    pierwsza = min(plan_przed, key=lambda p: p.dzien, default=None)
+    return SkutekNaOs(
+        roznica=(sum((p.kwota for p in po), Decimal("0.00"))
+                 - sum((p.kwota for p in przed), Decimal("0.00"))),
+        pochloniete=suma_planu_przed - suma_planu_po,
+        kwota_pozycji=None if pierwsza is None else abs(pierwsza.kwota),
+        data_pozycji=None if pierwsza is None else pierwsza.dzien,
+        reszta_pozycji=(None if pierwsza is None
+                        else plan_po.get(pierwsza.dzien, Decimal("0.00"))))
+
+
 def zbuduj(*, plan, kotwica: Kotwica | None, wolumen: Wolumen | None,
            forma: magazyn.FormaRoku, zaleglosci, przychod_narastajaco: Decimal,
            dzis: date, horyzont_miesiecy: int = HORYZONT_DOMYSLNY,
@@ -504,28 +636,9 @@ def zbuduj(*, plan, kotwica: Kotwica | None, wolumen: Wolumen | None,
     wpisy_wg_miesiaca = _wpisy_wg_miesiaca(wpisy)
 
     for rok, miesiac in miesiace:
-        wiersze = budzet.plan_na_miesiac(plan, rok, miesiac)
-        # Podatki liczy silnik, przychod JDG liczą godziny — obie kategorie
-        # wypadają z planu, inaczej wchodzą do salda drugi raz.
-        wiersze = budzet.bez_podatkow(wiersze)
-        wejscia_planu: list[_Wejscie] = []
-        suma_przychodow = Decimal("0.00")
-        if wiersze.empty:
+        wejscia_planu, suma_przychodow, pusty = _wejscia_planu(plan, rok, miesiac)
+        if pusty:
             miesiecy_bez_planu += 1
-        else:
-            for _, w in wiersze.iterrows():
-                if w["kategoria"] == budzet.KATEGORIA_PRZYCHOD_JDG:
-                    continue
-                kwota = stawki.do_groszy(Decimal(str(w["kwota_planowana"])))
-                ze_znakiem = kwota * budzet.znak(w["typ"])
-                dzien_p, domniemany = _dzien_pozycji(rok, miesiac, w)
-                if w["typ"] == budzet.TYP_PRZYCHODY:
-                    suma_przychodow += kwota
-                wejscia_planu.append(_Wejscie(
-                    dzien=dzien_p, nazwa=str(w["opis"] or w["kategoria"]),
-                    kwota=ze_znakiem, rodzaj=RODZAJ_PLAN,
-                    rodzaj_typ=str(w["typ"]), kategoria=str(w["kategoria"]),
-                    domniemany=domniemany))
         przychody_planu[(rok, miesiac)] = suma_przychodow
 
         # D-20 + D-61 — JEDEN NOSNIK. Tu tylko wolanie i wstawienie na os.
