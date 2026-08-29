@@ -151,3 +151,46 @@ export const NAPISY_PLYNNOSCI = {
   coMnieCzeka: (pozycji: number, doDnia: string) =>
     `Co mnie czeka — ${pozycji} pozycji do ${doDnia}`,
 } as const;
+
+/* ---------- KARTA „CO MAM ZROBIC" (D-54, D-56) ---------- */
+
+// Trzecie pytanie aplikacji: „co mam z tym zrobic". Brzmienia przeniesione
+// doslownie z ramki `makiety/CoMamZrobic.dc.html`, ktora opisuje TRZY stany
+// karty; strazniki w `interfejs/testy/karta.test.ts` porownuja je znak
+// po znaku z tekstem wycietym z ramek.
+//
+// KARTA NIE ZNIKA W DOBRYM MIESIACU. Karta znikajaca uczy, ze jej pojawienie
+// sie oznacza klopot — a to buduje odruch nieotwierania aplikacji wtedy,
+// gdy jest najbardziej potrzebna.
+//
+// ZAKRES v1 TO DOKLADNIE JEDNO DZIALANIE (D-56): C1 „ile moge odlozyc".
+// Nie ma tu ukladu na dwie ani na trzy pozycje i nie dorabiamy tresci
+// do pustych miejsc.
+export const NAPISY_KARTY = {
+  tytul: "Co mam zrobić",
+
+  // Stan 1 — jest co robic. Kwota jest UJEMNA WERSJA tej samej liczby, ktora
+  // jako dodatnia bylaby kwota do odlozenia: karta nie liczy niczego nowego,
+  // tylko czyta ten sam wynik inaczej. Zdanie mowi to wprost, zeby nikt nie
+  // szukal drugiego rachunku.
+  deficytZdanie: (kwota: string, dzien: string) =>
+    `Nie odkładaj nic w tym miesiącu — brakuje ${kwota}, żeby ${dzien} zostać na plusie. ` +
+    "To ta sama kwota, co „Najniżej” wyżej.",
+  deficytKoszt: (dzien: string) =>
+    `Koszt: żadnej nowej poduszki do ${dzien} — pierwsza okazja na oszczędności wraca po tym dniu.`,
+
+  // Stan 2 — wszystko w porzadku. Jedna pozycja, bez wymyslonego drugiego
+  // dzialania na sile.
+  nadwyzkaZdanie: (kwota: string) =>
+    `Możesz odłożyć nawet ${kwota} w tym miesiącu — linia ostrożna zostaje dodatnia ` +
+    "do końca okna. To ta sama kwota, co „Najniżej” wyżej.",
+  nadwyzkaKoszt:
+    "Koszt: o tyle mniej luzu w budżecie, gdyby w tym miesiącu wypadł nieplanowany wydatek.",
+
+  // Stan 3 — brak danych. Karta nie znika i NIE ZMYSLA liczby: nazywa, czego
+  // brakuje, i wskazuje istniejaca akcje na tym samym ekranie, zamiast
+  // dokladac drugi przycisk robiacy to samo.
+  brakDanych:
+    "Jeszcze nie wiem, ile możesz odłożyć — brakuje stanu konta, od którego liczy się " +
+    "prognoza. Podaj go wyżej, żeby zobaczyć tę liczbę.",
+} as const;

@@ -52,10 +52,12 @@ body {
   padding: 14px 40px;
 }
 
+/* Swiatlo 0,12 em, nie 0,16 em (D-57): przy 0,16 em wiersz naglowka
+   przekracza budzet 1360 px. Wartosc z ramki, przeniesiona doslownie. */
 .znak-slowny {
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
 }

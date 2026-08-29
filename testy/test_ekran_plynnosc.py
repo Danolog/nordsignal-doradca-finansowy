@@ -18,6 +18,10 @@ NAPISY = KATALOG / "interfejs" / "lib" / "napisy.ts"
 DANE = KATALOG / "interfejs" / "lib" / "dane" / "plynnosc.ts"
 WYKRES = KATALOG / "interfejs" / "lib" / "wykres.ts"
 STYL = KATALOG / "interfejs" / "app" / "style.module.css"
+EKRANY = KATALOG / "interfejs" / "lib" / "ekrany.ts"
+POWLOKA_CSS = KATALOG / "interfejs" / "app" / "powloka.css"
+KARTA = KATALOG / "interfejs" / "lib" / "karta-dzialania.ts"
+RAMKI = KATALOG / "makiety"
 
 FRAZY_Z_RAMKI = (
     "Najniżej",              # etykieta wielkiej liczby
@@ -28,11 +32,12 @@ FRAZY_Z_RAMKI = (
     "Saldo po tym dniu",
     "pod kreską",
     "Masz ",
+    "Co mam zrobić",   # karta stoi na tym ekranie od D-54
 )
 
 
 def _zrodla() -> list[pathlib.Path]:
-    return [EKRAN, NAPISY, DANE, WYKRES, STYL]
+    return [EKRAN, NAPISY, DANE, WYKRES, STYL, KARTA]
 
 
 def _tekst_ekranu() -> str:
@@ -178,3 +183,150 @@ def test_ekran_NIE_MOWI_o_formie_opodatkowania():
     tekst = _tekst_ekranu()
     for slowo in ("ryczałt", "Ryczałt", "ryczalt", "liniowy"):
         assert slowo not in tekst, f"forma opodatkowania na ekranie płynności: {slowo}"
+
+
+# --- znak słowny: dwa nośniki jednej rzeczy, które już raz się rozjechały ---
+
+# Wzorzec trafia w znak słowny nagłówka, nie w dowolne wystąpienie słowa:
+# szuka spanu o wadze 700 i wersalikach, czyli dokładnie tej roli.
+WZORZEC_ZNAKU = re.compile(
+    r'font-weight: 700; letter-spacing: (0\.\d+)em; text-transform: uppercase;">([^<]+)<'
+)
+
+
+def test_znak_slowny_MA_JEDNA_wartosc_w_kodzie_i_w_ramkach():
+    """D-57. Ramki niosły „AI CFO", kod „Doradca" — dwa nośniki jednej rzeczy,
+    rozjechane w ciągu doby. Ten strażnik czerwieni się, gdy znów powiedzą
+    co innego, i podaje, która strona odstaje."""
+    kod = re.search(r'ZNAK_SLOWNY = "([^"]+)"', EKRANY.read_text(encoding="utf-8"))
+    assert kod, "nie znalazłem stałej ZNAK_SLOWNY w lib/ekrany.ts"
+    z_kodu = kod.group(1)
+
+    trafienia = []
+    for plik in sorted(RAMKI.glob("*.dc.html")):
+        trafienia += [(plik.name, s, w) for s, w in WZORZEC_ZNAKU.findall(plik.read_text(encoding="utf-8"))]
+
+    # Kontrola liczności: pomiar, do którego nic nie dociera, melduje sukces.
+    # Znak słowny stoi w każdej ramce niosącej nagłówek — tych jest kilkadziesiąt.
+    assert len(trafienia) >= 30, f"wzorzec znaku słownego trafił tylko {len(trafienia)} razy"
+
+    odstajace = sorted({(n, w) for n, _, w in trafienia if w != z_kodu})
+    assert odstajace == [], (
+        f"kod niesie {z_kodu!r}, a ramki co innego: {odstajace}"
+    )
+
+    # ŚWIATŁO. Wiążące są ramki, które aplikacja odwzorowuje; ramki
+    # kierunków odrzuconych (pismo ręczne, §12.3 nośnika projektowego) nie
+    # są ekranami i zostały przy 0,16 em. Sprawdzamy więc dwie rzeczy:
+    # (a) każda ramka WIĄŻĄCA niesie 0,12 em,
+    # (b) odstępstwa nie wychodzą poza znany zbiór eksploracji — gdyby
+    #     doszła trzecia ramka z innym światłem, ten strażnik ją pokaże.
+    WIAZACE = {
+        "Main.dc.html", "Main-Ciemny.dc.html", "Main-Dobrze.dc.html",
+        "NieWiem.dc.html", "Ksiegowanie.dc.html", "CoMamZrobic.dc.html",
+    }
+    ZNANE_EKSPLORACJE = {"Main-Reka.dc.html", "Main-Reka-Papier.dc.html"}
+
+    zle_wiazace = sorted({(n, s) for n, s, _ in trafienia if n in WIAZACE and s != "0.12"})
+    assert zle_wiazace == [], f"ramki wiążące ze światłem innym niż 0,12 em: {zle_wiazace}"
+    # Kontrola liczności: wszystkie sześć ramek wiążących musi mieć znak słowny,
+    # inaczej sprawdzenie wyżej przechodzi na pustym zbiorze.
+    zmierzone_wiazace = {n for n, _, _ in trafienia} & WIAZACE
+    assert zmierzone_wiazace == WIAZACE, f"bez znaku słownego: {sorted(WIAZACE - zmierzone_wiazace)}"
+
+    odstepstwa = {n for n, s, _ in trafienia if s != "0.12"}
+    assert odstepstwa <= ZNANE_EKSPLORACJE, (
+        f"nowe ramki ze światłem innym niż 0,12 em: {sorted(odstepstwa - ZNANE_EKSPLORACJE)}"
+    )
+
+    css = re.search(r"\.znak-slowny\s*\{[^}]*letter-spacing:\s*([0-9.]+)em", POWLOKA_CSS.read_text(encoding="utf-8"))
+    assert css, "nie znalazłem światła znaku słownego w powloce"
+    assert css.group(1) == "0.12", f"powłoka niesie światło {css.group(1)}em zamiast 0.12em"
+
+
+def test_pelna_nazwa_aplikacji_ZOSTAJE_w_tytule_okna():
+    """D-47 nazywa aplikację, D-57 tylko napis w pasku. Nazwa nie może zniknąć
+    z systemu — stoi w tytule okna."""
+    layout = (KATALOG / "interfejs" / "app" / "layout.tsx").read_text(encoding="utf-8")
+    assert "Doradca Finansowy" in layout
+
+
+# --- drabina wielkości: 56 / 28 / 20 / 15 ---
+
+
+def test_kotwica_STOI_STOPIEN_WYZEJ_niz_salda_posrednie():
+    """Test pięciu sekund przechodził dla „co mnie czeka", a nie przechodził
+    dla „ile mam pieniędzy": stan na dziś stał w tej samej wadze co cztery
+    salda pośrednie. 56/28 = 2,00× wobec progu 1,5×."""
+    css = bez_komentarzy(STYL.read_text(encoding="utf-8"))
+    kotwica = re.search(r"\.komorkaSaldaKotwicy\s*\{[^}]*font-size:\s*(\d+)px", css)
+    zamkniecie = re.search(r"\.liczbaZamkniecia\s*\{[^}]*font-size:\s*(\d+)px", css)
+    assert kotwica and zamkniecie, "brak stopnia kotwicy albo wiersza zamknięcia"
+    assert int(kotwica.group(1)) == 28, f"kotwica ma {kotwica.group(1)}px, ma mieć 28px"
+    assert int(zamkniecie.group(1)) == 56, f"zamknięcie ma {zamkniecie.group(1)}px, ma mieć 56px"
+    assert int(zamkniecie.group(1)) / int(kotwica.group(1)) >= 1.5
+
+    # Reguła stoi PO `.komorkaSalda`, bo obie mają tę samą szczegółowość
+    # i rozstrzyga kolejność. Zmierzone: przy odwrotnej kolejności kotwica
+    # zostawała przy 15 px, a strażnik czytający sam arkusz tego nie widział.
+    assert css.index(".komorkaSaldaKotwicy") > css.index(".komorkaSalda {"), (
+        "reguła kotwicy stoi PRZED `.komorkaSalda` i zostanie przez nią nadpisana"
+    )
+
+
+def test_ekran_WOLA_stopien_kotwicy_dla_wiersza_otwarcia():
+    """Sam arkusz stylów nie wystarcza: klasa musi być komuś przypisana."""
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert "s.komorkaSaldaKotwicy" in ekran, "stopień kotwicy nie jest wołany przez ekran"
+    assert "w.kwota === null" in ekran, "ekran nie rozpoznaje wiersza otwarcia"
+
+
+# --- karta „Co mam zrobić" ---
+
+
+def test_karta_STOI_NA_EKRANIE_miedzy_werdyktem_a_wezwaniem():
+    """D-54: karta jest komponentem podrzędnym wobec wiersza zamknięcia
+    i stoi między werdyktem a przyciskiem „Co mnie czeka"."""
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert "<KartaDzialania />" in ekran, "karty nie ma na ekranie"
+    assert ekran.index("s.werdykt") < ekran.index("<KartaDzialania />") < ekran.index("s.wierszWezwania"), (
+        "karta stoi poza miejscem wyznaczonym przez D-54"
+    )
+
+
+def test_karta_NIE_ZNIKA_w_zadnym_stanie():
+    """Karta znikająca uczy, że jej pojawienie się oznacza kłopot — a to
+    buduje odruch nieotwierania aplikacji wtedy, gdy jest najbardziej
+    potrzebna. Trzy stany, każdy z własną gałęzią w kodzie."""
+    karta = bez_komentarzy(KARTA.read_text(encoding="utf-8"))
+    for stan in ('"deficyt"', '"nadwyzka"', '"brak-danych"'):
+        assert stan in karta, f"brak stanu karty: {stan}"
+    ekran = bez_komentarzy(EKRAN.read_text(encoding="utf-8"))
+    assert 'karta.stan === "brak-danych"' in ekran, "ekran nie obsługuje stanu bez danych"
+
+
+def test_karta_NIE_LICZY_niczego_nowego():
+    """Karta czyta `saldoMinimalne` — tę samą liczbę, która stoi w wierszu
+    zamknięcia. Własny rachunek byłby drugim nośnikiem tej liczby."""
+    karta = bez_komentarzy(KARTA.read_text(encoding="utf-8"))
+    for zakazane in ("+", "*", "/", "Number(", "parseFloat"):
+        assert f" {zakazane} " not in karta.replace("=>", ""), f"rachunek w karcie: {zakazane}"
+    assert "saldoMinimalne" in karta
+
+
+def test_karta_NIE_DORABIA_drugiego_dzialania():
+    """D-56: zakres v1 to dokładnie JEDNO działanie (C1). C2 czeka na
+    oprocentowanie zobowiązań — bez niego „zysk na odsetkach" trzeba by
+    zmyślić."""
+    tekst = _tekst_ekranu()
+    for slowo in ("nadpłat", "odsetk", "oprocentowan"):
+        assert slowo not in tekst.lower(), f"drugie działanie w karcie: {slowo}"
+
+
+def test_element_zdjety_decyzja_D55_NIE_WRACA():
+    """D-16 (Darek) uchyliła D-10: `9 920,79 + (−10 131,46) = −210,67`, czyli
+    co do grosza liczba, którą wiersz zamknięcia pokazuje wyżej na tym samym
+    ekranie. Miejscem docelowym jest ekran Budżet."""
+    tekst = _tekst_ekranu()
+    assert "rozdysponować" not in tekst
+    assert "10 131,46" not in tekst and "10131.46" not in tekst

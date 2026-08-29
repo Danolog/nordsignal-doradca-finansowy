@@ -95,8 +95,12 @@ export interface DanePlynnosci {
   ksiega: readonly PozycjaKsiegi[];
   wykres: readonly PunktWykresu[];
   dzienPodKreska: Data | null;        // null = zaden dzien nie schodzi pod zero
-  saldoMinimalne: Kwota;
-  dataSaldaMinimalnego: Data;
+  // `null` w obu polach = STAN STARTOWY: nie ma kotwicy, wiec prognozy nie ma
+  // od czego liczyc. Rozszerzenie kontraktu z planu, wymuszone D-54: karta
+  // „Co mam zrobic" stoi TAKZE w tym stanie i musi umiec powiedziec, czego
+  // brakuje, zamiast pokazac obietnice bez pokrycia (§3.7).
+  saldoMinimalne: Kwota | null;
+  dataSaldaMinimalnego: Data | null;
   zdanieWerdyktu: string;             // nazywa PRZYCZYNE, nie tylko fakt
   horyzontDni: number;                // „Masz 23 dni."
   liczbaPozycjiCoMnieCzeka: number;

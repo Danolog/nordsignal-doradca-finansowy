@@ -134,6 +134,13 @@
   text-align: right;
 }
 
+/* Kotwica — stan na dzis — jest odpowiedzia na pytanie „ile mam pieniedzy",
+   wiec stoi o stopien wyzej niz salda posrednie: 28 px wobec 15 px.
+   Regula stoi PO `.komorkaSalda`, bo obie maja te sama szczegolowosc
+   i rozstrzyga kolejnosc — zmierzone: przy odwrotnej kolejnosci kotwica
+   zostawala przy 15 px, a wiersz mial 44 px zamiast 61 px. */
+.komorkaSaldaKotwicy { font-size: 28px; }
+
 /* ---- wiersz zamkniecia: etykieta + jedyna wielka liczba ---- */
 
 .wierszZamkniecia { padding: 16px 0 10px; }
@@ -176,6 +183,24 @@
    barwa i pozycja, wiec ikona bylaby trzecim nosnikiem tej samej rzeczy. */
 .zdanieWerdyktu { margin: 0; font-size: 20px; line-height: 1.45; }
 .horyzont { margin: 0; font-size: 15px; color: var(--atrament-cichy); }
+
+/* ---- karta „Co mam zrobic" ---- */
+
+/* Karta jest komponentem PODRZEDNYM wobec wiersza zamkniecia: wypelnienie
+   kontrolki i cichy obrys, zaden stopien pisma powyzej 15 px. */
+.karta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--pole-kontrolki);
+  border: 1px solid var(--obrys-kontrolki);
+  border-radius: 3px;
+}
+
+.trescKarty { display: flex; flex-direction: column; gap: 4px; }
+.zdanieKarty { margin: 0; font-size: 15px; line-height: 1.5; }
+.kosztKarty { margin: 0; font-size: 13px; color: var(--atrament-cichy); }
 
 /* ---- jedyne wezwanie na ekranie ---- */
 

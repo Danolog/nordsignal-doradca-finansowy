@@ -20,6 +20,8 @@ import { Powloka } from "./powloka";
 import { NAPISY_PLYNNOSCI } from "@/lib/napisy";
 import { sformatujDzien, sformatujDzienSlownie, sformatujKwote, znakKwoty } from "@/lib/kwota";
 import { DANE } from "@/lib/dane/plynnosc";
+import { ulozKarte } from "@/lib/karta-dzialania";
+import { NAPISY_KARTY } from "@/lib/napisy";
 import { ODCZYT_NAGLOWKA } from "@/lib/dane/powloka";
 import {
   SZEROKOSC,
@@ -75,12 +77,44 @@ function Wykres() {
   );
 }
 
+// KARTA „CO MAM ZROBIC" — trzecie pytanie aplikacji, osadzone na ekranie
+// pierwszym miedzy werdyktem a przyciskiem „Co mnie czeka" (D-54).
+//
+// Karta STOI ZAWSZE, takze w miesiacu bez deficytu i w stanie startowym.
+// Znikajaca uczylaby, ze jej pojawienie sie oznacza klopot — a to buduje
+// odruch nieotwierania aplikacji wtedy, gdy jest najbardziej potrzebna.
+//
+// Karta NIE POWTARZA werdyktu: nazywa DZIALANIE, nie fakt. Fakt stoi wyzej
+// przy 56 px; najwiekszy stopien wewnatrz karty to 15 px, czyli 3,73x mniej —
+// pierwszenstwo wiersza zamkniecia zostaje nienaruszone.
+function KartaDzialania() {
+  const karta = ulozKarte(DANE);
+  return (
+    <div className={s.karta}>
+      <span className={s.etykietaSekcji}>{NAPISY_KARTY.tytul}</span>
+      {karta.stan === "brak-danych" ? (
+        <p className={s.zdanieKarty}>{karta.zdanie}</p>
+      ) : (
+        <div className={s.trescKarty}>
+          <p className={s.zdanieKarty}>{karta.zdanie}</p>
+          <p className={s.kosztKarty}>{karta.koszt}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Plynnosc() {
   const ksiega = DANE.ksiega;
   const tenSamDzien = (a: number, b: number) =>
     a >= 0 && b < ksiega.length && ksiega[a]?.dzien === ksiega[b]?.dzien;
 
-  const saldoUjemne = znakKwoty(DANE.saldoMinimalne) === "ujemna";
+  // `null` = stan startowy: nie ma kotwicy, wiec nie ma czego zamykac.
+  // Wiersz zamkniecia znika, a karta „Co mam zrobic" mowi, czego brakuje.
+  const zamkniecie =
+    DANE.saldoMinimalne !== null && DANE.dataSaldaMinimalnego !== null
+      ? { kwota: DANE.saldoMinimalne, dzien: DANE.dataSaldaMinimalnego }
+      : null;
 
   return (
     <Powloka
@@ -153,36 +187,55 @@ export default function Plynnosc() {
                     {sformatujKwote(w.kwota, znakKwoty(w.kwota))}
                   </span>
                 )}
-                <span className={s.komorkaSalda}>
+                {/* Stan na dzis dostaje 28 px, reszta kolumny 15 px.
+                    Drabina 56 / 28 / 20 / 15: test pieciu sekund przechodzil
+                    dla „co mnie czeka", a nie przechodzil dla „ile mam
+                    pieniedzy" — kotwica stala w tej samej wadze, co cztery
+                    salda posrednie. Wiersz zamkniecia zostaje jedyna
+                    czerwienia i jedynym stopniem 56 px: 56/28 = 2,00x
+                    przy progu 1,5x. */}
+                <span
+                  className={
+                    w.kwota === null ? `${s.komorkaSalda} ${s.komorkaSaldaKotwicy}` : s.komorkaSalda
+                  }
+                >
                   {w.saldoPoDniu === null ? "" : sformatujKwote(w.saldoPoDniu, "neutralna")}
                 </span>
               </div>
             );
           })}
 
-          <div className={s.wierszZamkniecia}>
-            <span />
-            <span className={s.etykietaZamkniecia}>
-              {NAPISY_PLYNNOSCI.najnizej(sformatujDzienSlownie(DANE.dataSaldaMinimalnego))}
-            </span>
-            <span />
-            <span
-              className={`${s.liczbaZamkniecia} ${
-                saldoUjemne ? s.zamknieciePonizejZera : s.zamknieciePowyzejZera
-              }`}
-            >
-              {sformatujKwote(DANE.saldoMinimalne, znakKwoty(DANE.saldoMinimalne))}
-            </span>
-          </div>
-          <div className={s.kreska} />
-          <div className={s.przerwa} />
-          <div className={s.kreska} />
+          {zamkniecie && (
+            <>
+              <div className={s.wierszZamkniecia}>
+                <span />
+                <span className={s.etykietaZamkniecia}>
+                  {NAPISY_PLYNNOSCI.najnizej(sformatujDzienSlownie(zamkniecie.dzien))}
+                </span>
+                <span />
+                <span
+                  className={`${s.liczbaZamkniecia} ${
+                    znakKwoty(zamkniecie.kwota) === "ujemna"
+                      ? s.zamknieciePonizejZera
+                      : s.zamknieciePowyzejZera
+                  }`}
+                >
+                  {sformatujKwote(zamkniecie.kwota, znakKwoty(zamkniecie.kwota))}
+                </span>
+              </div>
+              <div className={s.kreska} />
+              <div className={s.przerwa} />
+              <div className={s.kreska} />
+            </>
+          )}
         </div>
 
         <div className={s.werdykt}>
           <p className={s.zdanieWerdyktu}>{DANE.zdanieWerdyktu}</p>
           <p className={s.horyzont}>{NAPISY_PLYNNOSCI.horyzont(DANE.horyzontDni)}</p>
         </div>
+
+        <KartaDzialania />
 
         <div className={s.wierszWezwania}>
           <span className={s.rozpychacz} />

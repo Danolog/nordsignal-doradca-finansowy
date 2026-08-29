@@ -12,18 +12,21 @@
 // pieniadze w czasie — przyszlosc, biezacy miesiac, postanowienia; czwarta
 // domyka te rodzine czasem, ktory juz byl.
 
-// ZNAK SLOWNY — jeden nosnik napisu w naglowku.
+// ZNAK SLOWNY — jeden nosnik napisu w naglowku po stronie kodu.
 //
-// ODSTEPSTWO OD RAMKI, NAZWANE I ZMIERZONE. Ramki niosą znak „AI CFO"
-// (64,5 px przy 15 px / waga 700 / odstep liter 0,16em). Aplikacja nazywa sie
-// „Doradca Finansowy" (D-47), a AI CFO jest wygaszane (D-37) — wiec napisu
-// z ramki przepisac nie mozna. Pelna nazwa w tej samej typografii ma jednak
-// 213,2 px, czyli o 148,7 px wiecej, a caly wiersz naglowka ma zapasu
-// 26,2 px (pomiar rendera ramki, 2026-08-29): naglowek by sie rozjechal
-// i wiersz przestalby miescic sie w 1440 px.
-// Stoi tu wiec forma krotka — 92,6 px, +28,1 px wobec ramki. To jedyne
-// miejsce, w ktorym trzeba to zmienic, gdy zapadnie decyzja projektowa.
-export const ZNAK_SLOWNY = "Doradca";
+// WARTOSC WIAZACA: „FINANSE", swiatlo 0,12 em (D-57, PRD v1.4 §16).
+// Ramki niosly „AI CFO", kod „Doradca" — byly to DWA NOSNIKI jednej rzeczy
+// i rozjechaly sie w ciagu jednej doby. Od Z3 ramki niosa „FINANSE";
+// straznik `test_znak_slowny_MA_JEDNA_wartosc_w_kodzie_i_w_ramkach`
+// czerwieni sie, gdy kod i ramki znowu powiedza co innego.
+//
+// DLACZEGO NIE PELNA NAZWA. Budzet wiersza naglowka to 1360 px przy ramce
+// 1440 px. Pomiar 2026-08-29 z doliczonym wskaznikiem daty (171,2 px):
+// „Doradca Finansowy" przy 0,12 em daje 1439,2 px, czyli zapas −79,2 px —
+// nie miesci sie. „Doradca" miesci sie, ale to samo slowo stoi w pasku jako
+// nazwa ekranu i znaczyloby w jednym wierszu dwie rzeczy.
+// Pelna nazwa aplikacji (D-47) zyje w tytule okna — `app/layout.tsx`.
+export const ZNAK_SLOWNY = "FINANSE";
 
 export type Ekran = {
   klucz: string;
