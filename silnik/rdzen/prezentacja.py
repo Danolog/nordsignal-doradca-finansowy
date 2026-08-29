@@ -151,12 +151,20 @@ def podpis_zrodla(opis: "OpisBazy") -> str:
     i wygladalo dobrze" (plan Z52). Sama zmienna srodowiskowa go nie zamyka —
     zamyka go dopiero WIDOCZNOSC tego, co zostalo otwarte.
 
-    Nazwa pliku, nie sciezka: sciezka w pasku to szum, a szum sie przestaje
-    czytac.
+    CO SIE ZMIENILO W W4 (2026-08-29). Baza nie jest plikiem, tylko adresem
+    polaczenia, wiec „nazwa pliku" nie ma juz przedmiotu. Pasek pokazuje
+    `serwer:port/nazwa` — bez hasla, bo `magazyn.adres_bez_hasla` jest jedynym
+    nosnikiem tej reguly i to on sklada ten napis.
+
+    ODWROCIL SIE TEZ SENS SLOWA „domyslna": u poprzednika znaczylo „plik
+    w repozytorium", czyli baze roboczą. Teraz znaczy „serwer NIE na tej
+    maszynie", czyli baze produkcyjna — i to o niej pasek ma milczec, bo
+    to jest stan normalny. Ostrzegamy o bazie LOKALNEJ, bo to ona jest
+    wyjatkiem: kopia robocza, na ktorej pracuje zespol.
     """
     if opis.domyslna:
         return PODPIS_ZRODLA_DOMYSLNY
-    return f"{PODPIS_ZRODLA_DOMYSLNY} · baza: {opis.sciezka.name}"
+    return f"{PODPIS_ZRODLA_DOMYSLNY} · baza: {opis.adres}"
 
 
 #: Nazwy miesiecy w mianowniku — „wrzesien 2026". Nosnik przeniesiony tutaj

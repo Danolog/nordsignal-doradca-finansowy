@@ -47,9 +47,10 @@ import pytest
 
 from silnik.rdzen import budzet, magazyn
 #: JEDEN NOSNIK liczby kolumn kwotowych. Stala mieszka w strazniku schematu
-#: (W1) i jest tu WOLANA, nie powtorzona — dwie kopie rozjechalyby sie przy
-#: pierwszej zmianie `_KWOTOWE`, a ten plik nadal meldowalby sukces.
-from testy.test_schemat_dwa_dialekty import ILE_KOLUMN_KWOTOWYCH
+#: (W1, po W4 w `test_schemat_wobec_bazy`) i jest tu WOLANA, nie powtorzona —
+#: dwie kopie rozjechalyby sie przy pierwszej zmianie `_KWOTOWE`, a ten plik
+#: nadal meldowalby sukces.
+from testy.test_schemat_wobec_bazy import ILE_KOLUMN_KWOTOWYCH
 
 #: Ile tabel niesie kwoty. Pomiar `_KWOTOWE` z 2026-08-29: dziewiec.
 ILE_TABEL_KWOTOWYCH = 9
@@ -57,7 +58,7 @@ ILE_TABEL_KWOTOWYCH = 9
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "test.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     yield polaczenie
     polaczenie.close()
 
@@ -189,22 +190,31 @@ def test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej(p, monkeypat
     """Tu zaczerwieni sie migracja — i to jest cel istnienia tego testu.
 
     `_wczytaj` naprawia typ PO odczycie, wiec kontrakt wyjscia (test wyzej)
-    przezyje nawet wtedy, gdy `pd.read_sql` odda `float64`: mapa opakuje
+    przezyje nawet wtedy, gdy droga odczytu odda `float64`: mapa opakuje
     liczbe z powrotem w `Decimal` i strata bedzie niewidoczna. Ten test patrzy
-    na ramke TAK, JAK WYSZLA ZE STEROWNIKA — podglada `pandas.read_sql`
-    w locie, nie powtarzajac ani jednego zapytania SQL z magazynu.
+    na ramke TAK, JAK WYSZLA ZE STEROWNIKA — podglada w locie, nie powtarzajac
+    ani jednego zapytania SQL z magazynu.
+
+    PODGLAD PRZENIESIONY, NIE WYCISZONY (W4, 2026-08-29). Do podmiany
+    sterownika szpieg siedzial na `pandas.read_sql`. Po podmianie magazyn tej
+    funkcji NIE WOLA — biblioteka ramek obsluguje surowe polaczenie wylacznie
+    dla SQLite, a jej `coerce_float` zamienialby `Decimal` na liczbe
+    zmiennoprzecinkowa. Straznik wykryl wtedy WLASNE OSLEPIENIE i padl
+    z komunikatem „szpieg nie zobaczyl ani jednego odczytu" (mutacja M10) —
+    to zachowanie bylo zamierzone. Szpieg stoi teraz na `magazyn._ramka`,
+    czyli na nowej i jedynej drodze odczytu do ramki.
     """
     zebrane: dict[str, list] = {}
-    prawdziwy = pd.read_sql
+    prawdziwy = magazyn._ramka
 
-    def szpieg(sql, con, *a, **k):
-        ramka = prawdziwy(sql, con, *a, **k)
+    def szpieg(polaczenie, sql, parametry=()):
+        ramka = prawdziwy(polaczenie, sql, parametry)
         dopasowanie = re.search(r"FROM\s+(\w+)", sql)
         if dopasowanie:
             zebrane.setdefault(dopasowanie.group(1), []).append(ramka.copy())
         return ramka
 
-    monkeypatch.setattr(pd, "read_sql", szpieg)
+    monkeypatch.setattr(magazyn, "_ramka", szpieg)
     _zasil_wszystkie_tabele_kwotowe(p)
     for odczyt in ODCZYTY.values():
         odczyt(p)
@@ -227,7 +237,9 @@ def test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej(p, monkeypat
 def _polaczenie_oddajace_Decimal(tmp_path):
     """Sterownik oddajacy `Decimal` — ten sam ksztalt wejscia co psycopg
     na kolumnie `NUMERIC`. Zbudowany na SQLite, bo mechanizm, ktory badamy,
-    siedzi w pandas, nie w sterowniku.
+    siedzi w bibliotece ramek, nie w sterowniku. Po W4 to jest JEDYNE miejsce
+    w tej suicie, ktore jeszcze dotyka SQLite — i dotyka go jako PRZYRZADU
+    POMIAROWEGO, nie jako bazy aplikacji.
 
     `register_converter` jest globalny dla modulu `sqlite3`, ale dziala
     WYLACZNIE na polaczeniach otwartych z `detect_types`. `magazyn.

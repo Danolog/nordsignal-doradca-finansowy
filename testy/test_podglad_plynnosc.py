@@ -47,7 +47,6 @@ PLAN_DZIEN = 20
 
 @pytest.fixture
 def klient(tmp_path, monkeypatch):
-    monkeypatch.setenv(magazyn.ZMIENNA_BAZY, str(tmp_path / "d62.db"))
     polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 9, 1))

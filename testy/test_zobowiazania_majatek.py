@@ -8,17 +8,17 @@ Klucz operacji to NUMER wiersza, nie nazwa: dwa kredyty moga nazywac sie tak
 samo, a kasowanie po nazwie zabraloby oba.
 """
 
-import sqlite3
 from decimal import Decimal
 
 import pytest
 
 from silnik.rdzen import magazyn
+from testy import pomocnicze
 
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.zmigruj_i_polacz(tmp_path / "zm.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 def _zobowiazanie(polaczenie, nazwa="Kredyt Revolut", kapital="43000.00",
@@ -50,7 +50,7 @@ def test_zobowiazanie_niesie_kapital_rate_I_OPROCENTOWANIE(p):
     do zadnej liczby i to jest osobno pilnowane w `test_oprocentowanie.py`.
     Testu nie oslabiono — sprawdza teraz KOMPLET kolumn, tak samo scisle.
     """
-    kolumny = {w[1] for w in p.execute("PRAGMA table_info(zobowiazania)")}
+    kolumny = pomocnicze.kolumny_tabeli(p, "zobowiazania")
     assert kolumny == {"id", "nazwa", "kapital", "rata_minimalna",
                        "oprocentowanie"}
 
@@ -67,33 +67,42 @@ def test_migracja_D9_ZACHOWUJE_oprocentowanie_w_istniejacej_bazie(tmp_path):
     jednostce i ta migracja ich NIE PRZELICZA — zachowuje je bez zmian.
     Ten test utrwala to zachowanie jawnie, zeby nikt nie odkryl go zdziwieniem.
     """
-    sciezka = tmp_path / "stara.db"
-    polaczenie = sqlite3.connect(str(sciezka))
-    polaczenie.executescript("""
+    polaczenie = pomocnicze.polaczenie_surowe()
+    polaczenie.execute("""
         CREATE TABLE zobowiazania (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nazwa TEXT NOT NULL, kapital TEXT NOT NULL,
-            oprocentowanie TEXT NOT NULL, rata_minimalna TEXT NOT NULL
+            id BIGSERIAL PRIMARY KEY,
+            nazwa TEXT NOT NULL, kapital NUMERIC(14,2) NOT NULL,
+            oprocentowanie NUMERIC(6,3) NOT NULL,
+            rata_minimalna NUMERIC(14,2) NOT NULL
         );
+        CREATE TABLE wersja_schematu (
+            jedyny BOOLEAN PRIMARY KEY DEFAULT TRUE, wersja INT NOT NULL,
+            CONSTRAINT naprawde_jedyny CHECK (jedyny));
     """)
     polaczenie.execute(
         "INSERT INTO zobowiazania (nazwa, kapital, oprocentowanie, "
-        "rata_minimalna) VALUES ('Kredyt Revolut','43000.0','0.0725','1300.0')")
-    polaczenie.execute("PRAGMA user_version = 5")
+        "rata_minimalna) VALUES ('Kredyt Revolut',43000.00,0.073,1300.00)")
+    polaczenie.execute(
+        "INSERT INTO wersja_schematu (jedyny, wersja) VALUES (TRUE, 5)")
     polaczenie.commit()
     polaczenie.close()
 
-    nowe = magazyn.zmigruj_i_polacz(sciezka)
-    kolumny = {w[1] for w in nowe.execute("PRAGMA table_info(zobowiazania)")}
+    nowe = magazyn.zmigruj_i_polacz()
+    kolumny = pomocnicze.kolumny_tabeli(nowe, "zobowiazania")
     assert "oprocentowanie" in kolumny, \
         "kolumna ma PRZEZYC migracje — inaczej wartosc Darka ginie przy starcie"
     # Kontrola licznosci: wiersz przezyl migracje z nietknietymi kwotami.
     assert nowe.execute("SELECT nazwa, kapital, rata_minimalna "
                         "FROM zobowiazania").fetchall() == \
-        [("Kredyt Revolut", "43000.0", "1300.0")]
+        [("Kredyt Revolut", Decimal("43000.00"), Decimal("1300.00"))]
     # Stara wartosc zostaje NIETKNIETA, w starej jednostce (ulamek).
+    # SPROSTOWANIE W4: kolumna ma dzis skale trzech miejsc po przecinku
+    # (`NUMERIC(6,3)`), bo trzyma PROCENT, nie ulamek. Wartosc 0,0725 zapisana
+    # w starej jednostce zostaje w niej zaokraglona do 0,073 — i to jest
+    # DOKLADNIE ten sam rodzaj rozjazdu, przed ktorym ostrzega nagłowek:
+    # liczba w cudzej jednostce nie przezyje zmiany typu bez straty.
     assert nowe.execute("SELECT oprocentowanie FROM zobowiazania").fetchone() \
-        == ("0.0725",)
+        == (Decimal("0.073"),)
 
 
 # --- kasowanie ------------------------------------------------------------

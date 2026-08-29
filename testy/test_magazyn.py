@@ -11,13 +11,14 @@ from pathlib import Path
 import pytest
 
 from silnik.rdzen import budzet, magazyn
+from testy import pomocnicze
 
 KATALOG = Path(__file__).parent.parent
 
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.zmigruj_i_polacz(tmp_path / "test.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 def _faktura(polaczenie, **nadpisania):
@@ -35,7 +36,7 @@ def _faktura(polaczenie, **nadpisania):
 # --- stan poczatkowy ------------------------------------------------------
 
 def test_brak_pliku_bazy_to_stan_poczatkowy_nie_awaria(tmp_path):
-    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "jeszcze_nie_istnieje.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     assert magazyn.wczytaj_faktury(polaczenie).empty
     assert magazyn.wczytaj_godziny(polaczenie).empty
 
@@ -65,8 +66,13 @@ TABELE_SCHEMATU = {
     # 2026-08-29, schemat 12: liczby pochodzace z prawa. Tabela, a nie slownik
     # w pliku, bo wartosc ma okres obowiazywania i podpis czlowieka — a plik
     # nie potrafi powiedziec, ze stawka sie zestarzala. Napis SQL mieszka
-    # w `wiedza/rejestr.py` (`SCHEMAT_SQLITE`), nie w `magazyn._SCHEMAT`.
+    # w `wiedza/rejestr.py` (`SCHEMAT`), a nie w `silnik/baza/schemat.sql` —
+    # tam, gdzie mieszka regula "silnik czyta wylacznie stawki zatwierdzone".
     "rejestr_stawek",
+    # W4, 2026-08-29: nastepca `PRAGMA user_version`. SQLite trzymal wersje
+    # schematu w naglowku PLIKU bazy; PostgreSQL pliku nie ma, wiec liczba
+    # musi miec wlasna tabele. Jeden wiersz, wymuszony wiezem.
+    "wersja_schematu",
 }
 
 
@@ -79,12 +85,11 @@ def test_zbior_tabel_jest_dokladnie_taki_jak_w_schemacie(p):
     W nazwie testu nie ma liczby celowo: liczba w nazwie obok listy, ktora ja
     niesie, rozjezdza sie przy pierwszej zmianie i nikt tego nie zauwaza.
     """
-    # sqlite_sequence to tabela wewnetrzna SQLite, tworzona przez AUTOINCREMENT -
-    # nie nasza, wiec ja pomijamy.
-    tabele = {w[0] for w in p.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name NOT LIKE 'sqlite_%'").fetchall()}
-    assert tabele == TABELE_SCHEMATU
+    # Poprzednik odsiewal tu `sqlite_sequence` — tabele, ktora sterownik
+    # zakladal sam przy `AUTOINCREMENT`. PostgreSQL trzyma liczniki
+    # `BIGSERIAL` w obiektach osobnego rodzaju, wiec katalog tabel ich
+    # nie pokazuje i nie ma czego odsiewac.
+    assert pomocnicze.tabele_w_bazie(p) == TABELE_SCHEMATU
 
 
 # --- straznik PKWiU -------------------------------------------------------
@@ -192,3 +197,80 @@ def test_blad_daje_komunikat_po_polsku_nie_slad_wyjatku(p):
     assert "PKWiU" in tresc
     assert "Traceback" not in tresc
     assert any(slowo in tresc.lower() for slowo in ("wymagane", "puste", "brak"))
+
+
+# --- W4: sprzegniecie ze sterownikiem, zmierzone w zrodle -----------------
+
+def test_ZADEN_literal_SQL_nie_niesie_placeholdera_SQLite():
+    """`?` jest znacznikiem parametru w SQLite; psycopg czyta `%s`.
+
+    Pozostawiony `?` nie objawia sie zla liczba — objawia sie wyjatkiem
+    sterownika przy PIERWSZYM uzyciu tej jednej sciezki, czyli u Darka,
+    a nie tutaj. Pomiar 2026-08-29 przed W4: 214 znacznikow w 83 literalach
+    (`docs/plan-chmura-2026-08-29.md` mowil „~89" — nosnik pomylil sie
+    o rzad wielkosci, bo liczyl wywolania, nie znaczniki).
+
+    KONTROLA LICZNOSCI: liczba sprawdzonych literalow SQL stoi w asercji.
+    Przeszukanie, do ktorego nie dotarl zaden literal, meldowaloby „zero
+    znacznikow" takze dla pustego pliku.
+    """
+    import ast
+
+    zrodlo = (KATALOG / "silnik" / "rdzen" / "magazyn.py").read_text(encoding="utf-8")
+    drzewo = ast.parse(zrodlo)
+    docstringi = set()
+    for w in ast.walk(drzewo):
+        if isinstance(w, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                          ast.ClassDef)):
+            c = getattr(w, "body", None)
+            if c and isinstance(c[0], ast.Expr) \
+                    and isinstance(c[0].value, ast.Constant) \
+                    and isinstance(c[0].value.value, str):
+                docstringi.add(id(c[0].value))
+
+    import re
+    SQL = re.compile(r"\b(SELECT|INSERT|UPDATE|DELETE|VALUES|WHERE|CONFLICT)\b")
+    literaly, z_pytajnikiem = 0, []
+    for w in ast.walk(drzewo):
+        if not isinstance(w, ast.Constant) or not isinstance(w.value, str):
+            continue
+        if id(w) in docstringi or not SQL.search(w.value):
+            continue
+        literaly += 1
+        if "?" in w.value:
+            z_pytajnikiem.append(w.value[:60])
+    assert literaly >= 60, (
+        f"przeszukanie zobaczylo {literaly} literalow SQL — za malo, zeby "
+        f"cokolwiek orzec")
+    assert z_pytajnikiem == [], (
+        f"literaly SQL ze znacznikiem SQLite: {z_pytajnikiem}")
+
+
+def test_ODCZYT_idzie_wylacznie_do_tabel_ze_SCHEMATU():
+    """`_wczytaj` wkleja nazwe tabeli do napisu SQL — i to WYGLADA jak dziura.
+
+    Dziury nie ma: sprawdzone 2026-08-29, czternascie z czternastu wywolan
+    podaje literal wpisany w module. Zeby to przestalo byc obietnica,
+    `_wczytaj` odmawia nazwy spoza `_TABELE_ZNANE` — zbioru wyprowadzonego
+    z NAPISU DDL, nie wypisanego recznie.
+
+    KONTROLA DWUSTRONNA: bramka ma odrzucac nazwe nieznana i przepuszczac
+    znana. Bramka, ktora blokuje wszystko, nie jest bramka.
+    """
+    assert len(magazyn._TABELE_ZNANE) >= 14, (
+        f"zbior nazw tabel ma {len(magazyn._TABELE_ZNANE)} pozycji")
+    assert "wpisy_budzetu" in magazyn._TABELE_ZNANE
+    assert "wydatki_osobiste" not in magazyn._TABELE_ZNANE, (
+        "tabela wchlonieta i skasowana nie ma prawa stac w zbiorze znanych")
+
+    polaczenie = magazyn.zmigruj_i_polacz()
+    try:
+        with pytest.raises(magazyn.BladMagazynu) as blad:
+            magazyn._wczytaj(polaczenie, "wpisy_budzetu; DROP TABLE kategorie")
+        assert "Nieznana tabela" in str(blad.value)
+        # druga strona: nazwa znana przechodzi
+        assert magazyn._wczytaj(polaczenie, "wpisy_budzetu").empty
+        assert len(magazyn.wczytaj_kategorie(polaczenie)) > 0, \
+            "kontrola licznosci: tabela kategorii ma przezyc probe"
+    finally:
+        polaczenie.close()

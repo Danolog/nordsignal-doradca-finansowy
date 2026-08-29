@@ -96,4 +96,12 @@ def test_straznik_naprawde_czyta_importy():
     """
     assert "decimal" in _importowane_moduly(SILNIK / "rdzen" / "stawki.py")
     assert "silnik" in _importowane_moduly(SILNIK / "rdzen" / "podatki.py")
-    assert "sqlite3" in _importowane_moduly(SILNIK / "rdzen" / "magazyn.py")
+    # Po W4 magazyn importuje sterownik PostgreSQL. Ten wiersz jest kontrola
+    # dwustronna mechanizmu (czy parser w ogole cokolwiek widzi), a przy
+    # okazji straznikiem tego, ze sterownik jest DOKLADNIE JEDEN: `sqlite3`
+    # nie ma prawa wrocic do silnika tylnymi drzwiami.
+    importy = _importowane_moduly(SILNIK / "rdzen" / "magazyn.py")
+    assert "psycopg" in importy
+    assert "sqlite3" not in importy, (
+        "magazyn importuje sterownik SQLite — po W4 baza jest PostgreSQL, "
+        "a dwa sterowniki naraz znaczyloby dwa zachowania tej samej funkcji")

@@ -48,7 +48,7 @@ def zrodla_bez_sieci(monkeypatch):
 
 @pytest.fixture
 def polaczenie(tmp_path):
-    p = magazyn.zmigruj_i_polacz(tmp_path / "n.db")
+    p = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_fakture(
         p, data=date(2026, 9, 30), numer_faktury=f"FV/1/2026 dla {NAZWA_KLIENTA}",
         kwota_netto=Decimal("11200.00"), stawka_vat=Decimal("0.23"),
@@ -263,7 +263,7 @@ def test_stan_finansow_liczy_wylacznie_wydatki_nie_caly_budzet(polaczenie):
                             kategoria=kategoria, kwota=Decimal(kwota))
 
     wszystkie = magazyn.wczytaj_wpisy(polaczenie)
-    biezace = wszystkie[wszystkie["data"].str.startswith(
+    biezace = wszystkie[wszystkie["data"].astype(str).str.startswith(
         f"{dzis.year:04d}-{dzis.month:02d}")]
     assert len(biezace) == 3, "kontrola licznosci: pomiar ma widziec trzy typy"
 

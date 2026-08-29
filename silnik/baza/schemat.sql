@@ -1,24 +1,42 @@
--- SCHEMAT BAZY — PostgreSQL. Odpowiednik schematu 12 z SQLite (`magazyn._SCHEMAT`).
+-- SCHEMAT BAZY — PostgreSQL. JEDYNY nosnik schematu (od W4, 2026-08-29).
 --
 -- TEN PLIK NIE JEST CALYM SCHEMATEM I TO JEST DECYZJA, NIE UBYTEK.
 -- Niesie TRZYNASCIE tabel. Czternasta — `rejestr_stawek` — mieszka w
 -- `wiedza/rejestr.py` (`SCHEMAT`, dialekt PostgreSQL), bo tam mieszka regula
 -- "silnik czyta wylacznie stawki zatwierdzone przez czlowieka" (CLAUDE.md
 -- §3.3/§3.4). Przepisanie jej tutaj byloby DRUGIM NOSNIKIEM liczb z ustaw.
--- Pelny napis DDL sklada `silnik.baza.schemat_postgresql()` — dokladnie tak,
--- jak `magazyn.polacz()` sklada `_SCHEMAT` + `rejestr.SCHEMAT_SQLITE`.
+-- Pelny napis DDL sklada `silnik.baza.schemat_postgresql()`.
 -- NIGDY nie stawiaj bazy z samego tego pliku: rejestr zostanie pusty,
 -- a aplikacja nie ma skad wziac ani jednej stawki.
 --
 -- TRZY ZMIANY TYPOW WOBEC POPRZEDNIKA, wszystkie w jedna strone — mniej obejsc:
---   kwota TEXT   -> NUMERIC(14,2)  (SQLite nie ma typu dziesietnego)
+--   kwota TEXT   -> NUMERIC(14,2)  (poprzednik nie mial typu dziesietnego)
 --   data  TEXT   -> DATE           (koniec porownan dat na napisach)
 --   flaga INTEGER-> BOOLEAN        (koniec pytania "czy 0 znaczy nie, czy brak")
 --
--- ROZJAZD Z DIALEKTEM SQLite JEST PILNOWANY, NIE ZAKLADANY:
--- `testy/test_schemat_dwa_dialekty.py` porownuje oba nosniki kolumna po
--- kolumnie — typ, obowiazkowosc, wartosc domyslna, dziedzina wartosci —
--- i trzyma jawny rejestr roznic swiadomych (wiezy, ktorych SQLite nie uniesie).
+-- ZGODNOSC Z BAZA JEST PILNOWANA, NIE ZAKLADANA:
+-- `testy/test_schemat_wobec_bazy.py` stawia baze z tego napisu i porownuje
+-- go z katalogiem systemowym serwera kolumna po kolumnie — typ,
+-- obowiazkowosc, dziedzina wartosci, wiezy jednoznacznosci, indeksy.
+-- Blad skladni czerwieni sie tam w fiksturze, a nie przechodzi po cichu.
+
+-- ── wersja schematu ───────────────────────────────────────────────────────
+-- NASTEPCA `PRAGMA user_version` (W4, 2026-08-29). SQLite trzymal wersje
+-- schematu w naglowku PLIKU bazy; PostgreSQL pliku nie ma, wiec liczba musi
+-- gdzies zamieszkac. Tutaj, a NIE w osobnym module migracji, bo baza
+-- postawiona z `schemat_postgresql()` ma byc kompletna — tabela wersji
+-- dolozona obok byla by dokladnie ta klasa przeoczenia, ktora daje
+-- "migracja przeszla, tylko rejestr pusty".
+--
+-- JEDEN WIERSZ, WYMUSZONY WIEZEM. Kolumna `jedyny` przyjmuje wylacznie
+-- wartosc prawda i jest kluczem glownym, wiec drugiego wiersza nie da sie
+-- wpisac. Dwa wiersze znaczylyby dwie odpowiedzi na pytanie "w jakiej wersji
+-- jest ta baza", a `_wersja_bazy` musialby miedzy nimi wybierac.
+CREATE TABLE IF NOT EXISTS wersja_schematu (
+    jedyny BOOLEAN PRIMARY KEY DEFAULT TRUE,
+    wersja INT NOT NULL,
+    CONSTRAINT naprawde_jedyny CHECK (jedyny)
+);
 
 -- ── slownik kategorii ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS kategorie (
@@ -83,7 +101,14 @@ CREATE TABLE IF NOT EXISTS plan_budzetu (
 -- ── dzialalnosc gospodarcza ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS przychody_jdg (
     id             BIGSERIAL PRIMARY KEY,
-    numer_faktury  TEXT          NOT NULL UNIQUE,
+    -- WIEZ Z NAZWA WLASNA (W4). Bez `CONSTRAINT ...` PostgreSQL nadalby mu
+    -- nazwe automatyczna `przychody_jdg_numer_faktury_key`, w ktorej
+    -- przypadkiem siedzi napis "numer_faktury" — i dawne dopasowanie po
+    -- TRESCI komunikatu sterownika przezylo by migracje PRZYPADKIEM, wiszac
+    -- na nazwie, ktorej nikt nie wybral. Teraz `magazyn._zapisz` rozpoznaje
+    -- naruszenie po `e.diag.constraint_name` rownym tej nazwie.
+    numer_faktury  TEXT          NOT NULL,
+    CONSTRAINT numer_faktury_niepowtarzalny UNIQUE (numer_faktury),
     data           DATE          NOT NULL,   -- data WYSTAWIENIA
     data_zaplaty   DATE,
     kwota_netto    NUMERIC(14,2) NOT NULL,
@@ -117,7 +142,15 @@ CREATE TABLE IF NOT EXISTS przychody_jdg (
     --   nie stad. Jej ISTNIENIE nie jest wada — wada byloby liczenie z niej
     --   czegokolwiek DOMYSLNIE, bo Darek jest na SKALI (CLAUDE.md §2).
     --   Zostaje jako slad, czym policzono te konkretna fakture.
-    stawka_ryczaltu NUMERIC(6,4) NOT NULL,
+    --   BEZ `NOT NULL` (W4, 2026-08-29) — dlug odlozony imiennie do tego
+    --   zadania. Kolumna byla obowiazkowa przy pisarzu, ktory nie ma jej skad
+    --   wziac: Darek jest na SKALI (CLAUDE.md §2), a przy skali stawka
+    --   ryczaltu nie istnieje. Jedyna droga do spelnienia wiezu bylo wpisanie
+    --   ZERA — czyli odpowiedzi, ktorej nikt nie udzielil, nieodrozninalnej
+    --   od ryczaltu 0%. NULL znaczy "nie dotyczy: ta faktura nie zostala
+    --   policzona ryczaltem". To ta sama regula, co w
+    --   `forma_opodatkowania.stawka_ryczaltu`.
+    stawka_ryczaltu NUMERIC(6,4),
     -- `zaplacony_zus` — czytana: `magazyn.czy_skladki_naliczone_w_miesiacu`,
     --   `narzedzia` (suma skladek), `podatki.ryczalt_z_faktury`.
     zaplacony_zus  NUMERIC(14,2) NOT NULL,

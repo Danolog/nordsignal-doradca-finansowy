@@ -42,7 +42,7 @@ from silnik.rdzen import magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "test.db")
+    polaczenie = magazyn.zmigruj_i_polacz()
     yield polaczenie
     polaczenie.close()
 
@@ -119,33 +119,52 @@ def test_zero_i_brak_NIE_ROZNIA_sie_prawdziwoscia(p):
 
 # --- 2. czy niebezpieczenstwo jest realne, czy tylko opisane --------------
 
-def test_BEZ_normalizacji_NaN_faktycznie_WRACA(p):
-    """Pomiar, nie przypuszczenie: surowy odczyt tej samej tabeli oddaje NaN.
+def test_SUROWY_odczyt_NIE_ODDAJE_juz_NaN_i_to_jest_ZMIERZONE(p):
+    """Pomiar, nie przypuszczenie: co surowy odczyt tej tabeli naprawde oddaje.
 
     Bez tego testu straznik wyzej moglby byc zielony dlatego, ze `NaN` nigdy
-    nie powstaje — czyli pilnowac niczego.
+    nie powstaje — czyli pilnowac niczego. Ten test mowi, KTORA z dwoch
+    mozliwosci zachodzi, zamiast zostawiac to domysleniu.
     """
     _zobowiazanie(p, "Alior 0%", Decimal("0"))
     _zobowiazanie(p, "nieznane", None)
-    surowa = pd.read_sql("SELECT * FROM zobowiazania ORDER BY id", p)
+    # SPROSTOWANIE W4 (2026-08-29). Do podmiany sterownika ten test mierzyl
+    # `pd.read_sql`, ktore na kolumnie `TEXT` z `NULL`-em oddawalo `NaN`.
+    # Nowa droga odczytu (`magazyn._ramka`) sklada ramke z wierszy-slownikow
+    # i `dtype=object`, wiec `NULL` wraca jako `None` — `NaN` po prostu
+    # NIE POWSTAJE. Sam straznik zostaje, bo pytanie „czy niebezpieczenstwo
+    # jest realne" ma teraz odpowiedz „nie na tej drodze" — i ta odpowiedz
+    # musi byc ZMIERZONA, nie zalozona. Pulapki pilnuje od drugiej strony
+    # `test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN`, ktory
+    # podstawia ramke zmiennoprzecinkowa wprost.
+    surowa = magazyn._ramka(p, "SELECT * FROM zobowiazania ORDER BY id")
     braki = [w for w in surowa["oprocentowanie"]
              if isinstance(w, float) and w != w]
-    assert len(braki) == 1, (
-        f"surowy odczyt mial oddac dokladnie jeden NaN, oddal "
+    assert braki == [], (
+        f"nowa droga odczytu oddala NaN, choc nie ma prawa: "
         f"{[repr(w) for w in surowa['oprocentowanie']]}")
-    assert bool(braki[0]) is True, (
-        "i ten NaN jest w warunku PRAWDZIWY — na tym polega pulapka")
+    assert list(surowa["oprocentowanie"]) == [Decimal("0"), None], (
+        f"brak danych ma wracac jako None, zero jako Decimal: "
+        f"{[repr(w) for w in surowa['oprocentowanie']]}")
+    assert bool(float("nan")) is True, (
+        "a gdyby NaN wrocil, bylby w warunku PRAWDZIWY — na tym polegala "
+        "pulapka i dlatego test obok podstawia go wprost")
 
 
 # --- 3. stan PO MIGRACJI, wytworzony podstawionym sterownikiem ------------
 
 def test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN(p, monkeypatch):
-    """Kolumna `oprocentowanie NUMERIC(6,3)` (`schemat.sql:179`) plus
-    `coerce_float=True` da ramke W CALOSCI zmiennoprzecinkowa. Podstawiamy
-    dokladnie taka ramke pod prawdziwa `wczytaj_zobowiazania`.
+    """Kolumna `oprocentowanie NUMERIC(6,3)` czytana droga, ktora zamienia
+    `Decimal` na liczbe zmiennoprzecinkowa, da ramke W CALOSCI
+    zmiennoprzecinkowa. Podstawiamy dokladnie taka ramke pod prawdziwa
+    `wczytaj_zobowiazania`.
 
-    Tu wlasnie widac, ze normalizacja zostaje potrzebna po migracji — i to
-    z innego powodu niz dzis.
+    PO CO TO NADAL STOI, skoro `_ramka` takiej ramki nie produkuje: bo
+    normalizacja `NaN -> None` w `wczytaj_zobowiazania` jest JEDYNYM, co
+    stoi miedzy taka ramka a odwroceniem znaczenia „nie wiem" i „0%".
+    Gdyby ktos kiedys wrocil do biblioteki ramek albo dolozyl warstwe
+    posrednia, ten test powie o tym natychmiast — a nie dopiero wtedy, gdy
+    kredyt Aliora zacznie wygladac na kredyt, o ktory nikt nie zapytal.
     """
     po_migracji = pd.DataFrame({
         "id": [1, 2, 3],
@@ -157,7 +176,10 @@ def test_odczyt_z_kolumny_NUMERYCZNEJ_tez_nie_przepuszcza_NaN(p, monkeypatch):
     assert pd.api.types.is_float_dtype(po_migracji["oprocentowanie"]), (
         "zalozenie testu: kolumna ma byc w calosci zmiennoprzecinkowa")
 
-    monkeypatch.setattr(pd, "read_sql", lambda *a, **k: po_migracji.copy())
+    # Podstawiamy pod NOWA droge odczytu (`_ramka`), nie pod `pd.read_sql` —
+    # magazyn tej drugiej po W4 nie wola, wiec podstawienie jej nic by nie
+    # zmienilo i straznik meldowalby sukces nad nietknietym kodem.
+    monkeypatch.setattr(magazyn, "_ramka", lambda *a, **k: po_migracji.copy())
     ramka = magazyn.wczytaj_zobowiazania(p)
 
     assert len(ramka) == 3, "kontrola licznosci"

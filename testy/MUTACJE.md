@@ -1232,3 +1232,66 @@ z komunikatem „szpieg nie zobaczył ani jednego odczytu". Kontrola liczności 
 - **Nie mutowano ścieżki HTTP.** Wszystkie trzy strażniki kończą się na granicy magazynu. Czy
   `Decimal` przeżywa drogę przez `api/` i z powrotem, mówią inne pliki — ten przebieg tego nie
   mierzył.
+
+---
+
+## Przebieg 2026-08-29 — W4: podmiana sterownika SQLite → PostgreSQL
+
+**Kontrola przed mutacjami** (kopia drzewa poza repozytorium, `PYTHONDONTWRITEBYTECODE=1`,
+`__pycache__` czyszczone przed każdym przebiegiem): **991 passed, 3 deselected** na PostgreSQL 16
+w kontenerze `doradca-postgres` (port 5434, baza `doradca_test`, przestrzeń nazw na test).
+
+**Pułapka przyrządu, zmierzona przy tym przebiegu.** Pierwsze pięć mutacji uruchomiono z jawnym
+`-q` w komendzie. `pytest.ini` ma `-q` w `addopts`, więc powstało `-qq` — i **linia podsumowania
+zniknęła**; raport pokazywał wyłącznie nazwy testów, bez liczb. Przebieg powtórzono bez dodatkowego
+`-q`. Liczby poniżej pochodzą z powtórzenia.
+
+| # | Mutacja | Który test padł | Wynik | Kontrola po cofnięciu |
+|---|---|---|---|---|
+| **M-W4-1** | `magazyn._ramka`: ramka rzutowana na `float64` po odczycie (odtworzenie tego, co robi `coerce_float`) | `test_SUROWY_odczyt_z_bazy_nie_oddaje_liczby_zmiennoprzecinkowej` | `1 failed, 5 passed` | `6 passed` |
+| **M-W4-2** | `magazyn.WIEZ_NUMER_FAKTURY` → `"przychody_jdg_numer_faktury_key"` (nazwa **automatyczna**, czyli ta, której nikt nie wybrał) | `test_PRAWDZIWA_baza_podaje_te_sama_nazwe_wiezu` · `test_duplikat_numeru_MOWI_o_numerze_a_nie_o_bazie` · `test_nazwa_wiezu_z_KODU_zgadza_sie_z_nazwa_z_BAZY` · `test_rozpoznanie_NIE_TRAFIA_w_wiez_o_nazwie_AUTOMATYCZNEJ` · `test_wiez_numeru_faktury_MA_NAZWE_ktora_zna_kod` | `5 failed, 18 passed` | `23 passed` |
+| **M-W4-3** | `silnik/baza/schemat.sql`: `NOT NULL` → `NOT NUL` (błąd składni) | 16 testów `test_schemat_wobec_bazy.py`, w tym `test_napis_DDL_DA_SIE_wykonac_a_nie_tylko_sparsowac` | `3 failed, 13 errors` | `16 passed` |
+| **M-W4-4** | `magazyn._kopia_przed_migracja`: zawsze `return None` (kopia po cichu nie powstaje) | `test_migracja_ZOSTAWIA_kopie_w_wersji_sprzed` · `test_kopia_PRZENOSI_WSZYSTKIE_wiersze_a_nie_same_tabele` · `test_kopia_DA_SIE_odtworzyc` · `test_kopia_ISTNIEJACA_zatrzymuje_migracje_zanim_ruszy` · `test_nazwa_kopii_niesie_ZNACZNIK_CZASU_co_do_minuty` · `test_nazwa_kopii_niesie_nazwe_KOPIOWANEJ_przestrzeni` · `test_migracja_z_OSEMKI_doklada_tabele_i_ZOSTAWIA_kopie` | `7 failed, 14 passed` | `21 passed` |
+| **M-W4-5** | `magazyn.odtworz_z_kopii`: pętla wgrywająca wiersze zamieniona na `pass` (kopia jest, odtworzyć się nie da) | `test_kopia_DA_SIE_odtworzyc` | `1 failed, 11 passed` | `12 passed` |
+| **M-W4-6** | `magazyn.zapisz_koszt`: powrót do DWÓCH osobnych zapisów z zatwierdzeniem każdego | `test_zapisz_koszt_ZATWIERDZA_RAZ_a_nie_dwa_razy` · `test_zapisz_koszt_NIE_ZOSTAWIA_osieroconego_wpisu_gdy_drugi_zapis_padnie` · `test_lista_ATOMOWYCH_jest_KOMPLETNA` | `3 failed, 5 passed` | `8 passed` |
+| **M-W4-7** | `magazyn._zapisz`: rozpoznanie duplikatu z powrotem po TREŚCI komunikatu (`if "numer_faktury" in str(e)`) | `test_rozpoznanie_NIE_ZALEZY_od_tresci_komunikatu` · `test_rozpoznanie_NIE_TRAFIA_w_wiez_o_nazwie_AUTOMATYCZNEJ` · `test_ILE_miejsc_rozstrzyga_po_TRESCI_komunikatu_sterownika` · `test_ZADEN_INNY_modul_nie_rozstrzyga_po_tresci_komunikatu` | `4 failed, 3 passed` | `7 passed` |
+| **M-W4-8** | `magazyn.czy_lokalny`: zawsze `True` (każdy serwer uznany za maszynę lokalną) | `test_pod_pytestem_serwer_ZDALNY_jest_BLEDEM` · `test_opis_bazy_przy_serwerze_ZDALNYM_mowi_ze_produkcyjna` | `2 failed, 14 passed` | `16 passed` |
+| **M-W4-9** | `magazyn.adres_bez_hasla`: zwraca adres SUROWY (z hasłem) | `test_ZADEN_opis_ani_komunikat_NIE_NIESIE_hasla` · `test_podpis_zrodla_NIGDY_nie_niesie_hasla` · `test_opis_bazy_mowi_ktora_baze_otwarto` | `3 failed, 50 passed` | `53 passed` |
+| **M-W4-10** | `magazyn.zmigruj`: DDL znowu wykonywany w całości, PRZED dołożeniem brakujących kolumn | `test_stara_baza_DOSTAJE_kolumny_bez_utraty_wierszy` · `test_stara_baza_znaczy_wiersze_sprzed_migracji_jako_RECZNE` · `test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane` | `3 failed, 7 passed` | `10 passed` |
+| **M-W4-11** | `magazyn._wczytaj`: bramka `_TABELE_ZNANE` wyłączona (`if False`) | `test_ODCZYT_idzie_wylacznie_do_tabel_ze_SCHEMATU` | `1 failed, 15 passed` | `16 passed` |
+| **M-W4-12** | jeden literał SQL wraca do znacznika SQLite (`klucz = %s` → `klucz = ?`) | `test_ZADEN_literal_SQL_nie_niesie_placeholdera_SQLite` | `1 failed, 15 passed` | `16 passed` |
+
+**Dwanaście mutacji, dwanaście czerwonych, zero strażników-atrap w tym zestawie.**
+
+### Trzy progi, które zadziałały — i strażnicy, którzy zaczerwienili się CELOWO
+
+Wszystkie trzy były wcześniej zapisane jako dług z jawnym progiem „przy W4":
+
+1. **`test_transakcje_przed_postgresql.py`** („te dwa strażniki mają wtedy zaczerwienić się
+   CELOWO") → plik przemianowany na `test_transakcje.py`, dwa strażniki **odwrócone**: pilnują
+   teraz, że atomowość JEST, a nie że jej nie ma. Poprzednie brzmienie: `assert ile == 2` oraz
+   `assert po == przed + 1` („osierocony wpis budżetu miał zostać").
+2. **`test_komunikat_duplikatu_faktury.py`** (tripwire `1 / 10 / 1` → „mają zejść do zera") →
+   liczby zeszły do `0 / 0 / 0`, dołożona czwarta: `ILE_KLAUZUL_EXCEPT_PSYCOPG = 17` jako kontrola
+   liczności, żeby trzy zera nie były prawdziwe także dla modułu bez żadnego tłumaczenia błędów.
+3. **`wiedza/rejestr.SCHEMAT_SQLITE`** i **`magazyn._SCHEMAT`** („napis znika w chwili przejścia
+   bazy na PostgreSQL") → oba skasowane; `test_schemat_dwa_dialekty.py` zastąpiony przez
+   `test_schemat_wobec_bazy.py`, który porównuje napis DDL z **bazą postawioną z tego napisu**.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano ścieżki HTTP po podmianie sterownika.** Że `Decimal` przeżywa drogę przez `api/`
+  i z powrotem, mówi `test_trasy_dwa_ekrany.py::test_ZADNA_z_szesciu_tras_nie_wypuszcza_liczby_zmiennoprzecinkowej`
+  (zielony, z asercją na liczbę odwiedzonych liści) — ale **żadna mutacja W4 nie celowała w tę
+  granicę**. Poprzedni przebieg mutował `kwota()` i pokazał, że pięć z sześciu ścieżek z `float`
+  leży poniżej pierwszego poziomu; ten przebieg tego nie powtórzył.
+- **Nie mutowano bazy produkcyjnej.** Schemat postawiony w Neonie (2026-08-29) jest zweryfikowany
+  odczytem (15 tabel, 24 kategorie, 19 stawek, forma 2026 = `SKALA`), ale **nie mutacją** —
+  mutowanie produkcji nie wchodzi w grę, a strażnicy biegną na bazie lokalnej.
+- **Nie mutowano izolacji testów.** Że każdy test dostaje własną przestrzeń nazw, jest widoczne
+  z zieleni całej suity, ale **nie ma strażnika, który by się zaczerwienił, gdyby izolacja
+  zniknęła** — dwa testy dzielące tabele nie muszą zderzyć się od razu. To jest **nazwana luka
+  dla W5**.
+- **Nie zmierzono czasu zimnego startu** ani liczby jednoczesnych sesji przy prawdziwym ruchu.
+  Suita otwiera połączenie na test; produkcja otwiera je na żądanie HTTP i limit sesji u dostawcy
+  jest zasobem. To należy do W6.

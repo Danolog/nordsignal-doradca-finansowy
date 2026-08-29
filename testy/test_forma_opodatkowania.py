@@ -14,16 +14,18 @@ planu, nie jako wartosc domyslna kodu. Roznica jest widoczna w zachowaniu:
 rok 2027 zostaje pusty i zachowuje sie jak NIEROZSTRZYGNIETA.
 """
 
-import sqlite3
 
 import pytest
 
+from decimal import Decimal
+
 from silnik.rdzen import magazyn
+from testy import pomocnicze
 
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.zmigruj_i_polacz(tmp_path / "forma.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 # --- trzy stany -----------------------------------------------------------
@@ -62,7 +64,10 @@ def test_zapis_formy_WRACA_przy_odczycie(p):
                          stawka_ryczaltu="0.085")
     forma = magazyn.forma_na_rok(p, 2027)
     assert forma.forma == magazyn.FORMA_RYCZALT
-    assert str(forma.stawka_ryczaltu) == "0.085"
+    # Porownujemy WARTOSC, nie jej zapis: kolumna ma skale czterech miejsc
+    # po przecinku (`NUMERIC(6,4)`), wiec sterownik oddaje `Decimal("0.0850")`.
+    # Zapis nalezy do warstwy prezentacji, nie do magazynu.
+    assert forma.stawka_ryczaltu == Decimal("0.085")
 
 
 def test_zmiana_formy_na_2027_NIE_RUSZA_2026(p):
@@ -124,18 +129,18 @@ def test_wpis_USZKODZONY_w_bazie_jest_bledem_przy_odczycie(p):
 
     ZMIANA W1 (2026-08-29): od dolozenia wiezu `forma_znana` do `_SCHEMAT`
     baza SWIEZA takiego wiersza nie wpusci — i to jest cel, nie przeszkoda.
-    Ale wiez dostaje wylacznie baza swieza (`CREATE TABLE IF NOT EXISTS` nie
-    rusza tabeli, ktora juz jest, a `ALTER TABLE` w SQLite nie dolozy
-    `CHECK`), wiec baza ROBOCZA Darka nadal moze taki wiersz niesc. Ta
-    sciezka musi zostac sprawdzona — `PRAGMA ignore_check_constraints`
-    odtwarza ksztalt bazy bez wiezu na czas samego wstawienia.
-    Odczyt idzie juz normalnie, z wiezem wlaczonym z powrotem.
+    SPROSTOWANIE W4 (2026-08-29): wiez jest teraz po OBU stronach — baza
+    produkcyjna startuje pusta, a `ALTER TABLE` w PostgreSQL potrafi dolozyc
+    `CHECK`. Sciezka „w bazie stoi forma, ktorej silnik nie zna" nadal jednak
+    MUSI byc sprawdzona: wiersz moze pochodzic sprzed wiezu albo z recznej
+    ingerencji w baze. Poprzednik zdejmowal wiez na chwile `PRAGMA
+    ignore_check_constraints`; w PostgreSQL rownowaznikiem jest zdjecie wiezu
+    i zalozenie go z powrotem — czyli dokladnie to, co robi ten test.
     """
-    p.execute("PRAGMA ignore_check_constraints = ON")
-    p.execute("INSERT INTO forma_opodatkowania (rok, forma) VALUES (2029, ?)",
+    p.execute("ALTER TABLE forma_opodatkowania DROP CONSTRAINT forma_znana")
+    p.execute("INSERT INTO forma_opodatkowania (rok, forma) VALUES (2029, %s)",
               ("KARTA_PODATKOWA",))
     p.commit()
-    p.execute("PRAGMA ignore_check_constraints = OFF")
     assert p.execute(
         "SELECT forma FROM forma_opodatkowania WHERE rok = 2029"
     ).fetchone()[0] == "KARTA_PODATKOWA", (
@@ -157,28 +162,29 @@ def test_wersja_schematu_OBEJMUJE_forme_i_stempluje_baze(p):
     jest stemplowana wersja, ktora zna kod (a nie liczba wpisana obok).
     """
     assert magazyn.WERSJA_SCHEMATU >= 8
-    assert p.execute("PRAGMA user_version").fetchone()[0] \
+    assert p.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny").fetchone()[0] \
         == magazyn.WERSJA_SCHEMATU
 
 
 def test_migracja_z_siodemki_TWORZY_tabele_i_wpis(tmp_path):
     """Pierwsza migracja cwiczaca Z53. Baza w wersji 7 bez tabeli formy —
     dokladnie stan produkcyjny Darka przed tym zadaniem."""
-    sciezka = tmp_path / "stara.db"
-    magazyn.zmigruj_i_polacz(sciezka).close()
-    surowe = sqlite3.connect(str(sciezka))
+    magazyn.zmigruj_i_polacz().close()
+    surowe = pomocnicze.polaczenie_surowe()
     surowe.execute("DROP TABLE forma_opodatkowania")
-    surowe.execute("PRAGMA user_version = 7")
+    surowe.execute("UPDATE wersja_schematu SET wersja = 7")
     surowe.commit()
     surowe.close()
 
-    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz()
     assert magazyn.forma_na_rok(polaczenie, 2026).forma == magazyn.FORMA_SKALA
-    assert polaczenie.execute("PRAGMA user_version").fetchone()[0] \
+    assert polaczenie.execute(
+        "SELECT wersja FROM wersja_schematu WHERE jedyny").fetchone()[0] \
         == magazyn.WERSJA_SCHEMATU
-    polaczenie.close()
 
-    kopie = sorted(tmp_path.glob("*-kopia-przed-migracja-*"))
+    kopie = magazyn.kopie(polaczenie)
+    polaczenie.close()
     assert len(kopie) == 1, "migracja schematu ma zostawic kopie (Z53)"
 
 
@@ -187,11 +193,11 @@ def test_zaczep_NIE_nadpisuje_istniejacego_wyboru(tmp_path):
     cofalaby sie po restarcie aplikacji — i wygladalo by to jak niezapisany
     formularz."""
     sciezka = tmp_path / "wybor.db"
-    pierwsze = magazyn.zmigruj_i_polacz(sciezka)
+    pierwsze = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(pierwsze, rok=2026, forma=magazyn.FORMA_RYCZALT,
                          stawka_ryczaltu="0.085")
     pierwsze.close()
 
-    drugie = magazyn.zmigruj_i_polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz()
     assert magazyn.forma_na_rok(drugie, 2026).forma == magazyn.FORMA_RYCZALT
     drugie.close()

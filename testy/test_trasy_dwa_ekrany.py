@@ -81,7 +81,6 @@ def klient(tmp_path, monkeypatch):
     liczy prognozy w ogole — i to jest zachowanie zamierzone
     (`testy/test_forma_bez_domyslnej.py`), a nie stan do testowania szczescia.
     """
-    monkeypatch.setenv(magazyn.ZMIENNA_BAZY, str(tmp_path / "trasy.db"))
     polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 9, 1))

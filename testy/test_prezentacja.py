@@ -218,13 +218,20 @@ def test_separator_jest_ZAPISANY_ucieczka_a_nie_wklejony():
 
 # --- Z52: ktora baze widzi uzytkownik -------------------------------------
 
-def test_podpis_zrodla_MILCZY_o_bazie_domyslnej():
-    """Nazwa pliku przy kazdym uruchomieniu bylaby szumem — i przestalaby
-    znaczyc „uwaga, to nie Twoja baza"."""
+def test_podpis_zrodla_MILCZY_o_bazie_PRODUKCYJNEJ():
+    """Adres serwera przy kazdym uruchomieniu bylby szumem — i przestalby
+    znaczyc „uwaga, to nie Twoja baza".
+
+    ODWROCENIE SENSU W W4 (2026-08-29). U poprzednika „domyslna" znaczylo
+    „plik w repozytorium", czyli baze robocza. Po podmianie sterownika znaczy
+    „serwer NIE na tej maszynie", czyli baze produkcyjna — i to o niej pasek
+    ma milczec, bo to jest stan normalny.
+    """
     from silnik.rdzen.magazyn import OpisBazy
     podpis = prezentacja.podpis_zrodla(
-        OpisBazy(sciezka=Path("/gdzies/cfo_database.db"), domyslna=True))
-    assert "cfo_database" not in podpis
+        OpisBazy(adres="ep-cos.eu-central-1.aws.neon.tech/doradca",
+                 domyslna=True))
+    assert "neon.tech" not in podpis
     assert "lokalnie" in podpis
 
 
@@ -233,9 +240,25 @@ def test_podpis_zrodla_NAZYWA_baze_nietypowa():
     i wygladalo dobrze" (plan Z52)."""
     from silnik.rdzen.magazyn import OpisBazy
     podpis = prezentacja.podpis_zrodla(
-        OpisBazy(sciezka=Path("/tmp/kopia-robocza.db"), domyslna=False))
-    assert "kopia-robocza.db" in podpis
-    assert "/tmp" not in podpis, "sciezka w pasku to szum; nazwa pliku wystarczy"
+        OpisBazy(adres="localhost:5434/kopia_robocza", domyslna=False))
+    assert "localhost:5434/kopia_robocza" in podpis
+
+
+def test_podpis_zrodla_NIGDY_nie_niesie_hasla():
+    """CLAUDE.md §8. Adres bazy niesie haslo do produkcji, a pasek aplikacji
+    jest miejscem, w ktore patrzy sie przez caly dzien.
+
+    Straznik jest tutaj, a nie tylko przy `adres_bez_hasla`, bo to `pasek`
+    jest miejscem, w ktorym wyciek bylby widoczny — i to on musi czerwienic
+    sie, gdyby ktos podal mu adres surowy.
+    """
+    from silnik.rdzen.magazyn import OpisBazy, adres_bez_hasla
+    tajne = "haslo-ktorego-nie-wolno-zobaczyc"
+    adres = f"postgresql://kto:{tajne}@localhost:5434/doradca_test"
+    podpis = prezentacja.podpis_zrodla(
+        OpisBazy(adres=adres_bez_hasla(adres), domyslna=False))
+    assert tajne not in podpis
+    assert "localhost:5434/doradca_test" in podpis
 
 
 # --- Z55: podpis kafelka rezerwy -----------------------------------------

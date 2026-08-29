@@ -24,9 +24,16 @@ def polaczenie():
     """Zaleznosc FastAPI: otwiera baze na czas zadania i zamyka ja zawsze.
 
     Ktora baze — rozstrzyga JEDYNY nosnik tej odpowiedzi,
-    `magazyn.sciezka_bazy()` (zmienna `AI_CFO_BAZA` albo sciezka domyslna),
-    razem z bramka, ktora pod pytestem odmawia otwarcia bazy produkcyjnej.
-    Warstwa sieciowa nie ma tu wlasnego zdania.
+    `magazyn.adres_bazy()` (zmienna `DATABASE_URL`), razem z bramka, ktora
+    pod pytestem odmawia otwarcia bazy spoza bazy testowej. Warstwa sieciowa
+    nie ma tu wlasnego zdania.
+
+    OD W4 (2026-08-29) BAZA JEST ADRESEM, NIE PLIKIEM. Zmienilo to koszt tej
+    zaleznosci: otwarcie polaczenia do serwera trwa dluzej niz otwarcie pliku,
+    a liczba jednoczesnych sesji jest u dostawcy zasobem z limitem. Aplikacja
+    jest jednoosobowa, wiec „polaczenie na zadanie" nadal sie broni — ale
+    jesli zaczna sie limity sesji, TU jest miejsce na pule polaczen, nie
+    w silniku.
     """
     otwarte = magazyn.polacz()
     try:

@@ -97,9 +97,13 @@ def zbuduj(polaczenie) -> dict[str, Callable]:
 
         wydatki_mc = Decimal("0")
         if not wydatki.empty:
+            # `.astype(str)` przed `.str`: po W4 kolumna `data` wraca
+            # z bazy jako OBIEKT DATY (kolumna `DATE`), a nie jako napis —
+            # dostep `.str` na obiektach daty konczy sie bledem typu.
             prefiks = f"{dzis.year:04d}-{dzis.month:02d}"
-            wydatki_mc = sum(wydatki[wydatki["data"].str.startswith(prefiks)]["kwota"],
-                             Decimal("0"))
+            wydatki_mc = sum(
+                wydatki[wydatki["data"].astype(str).str.startswith(prefiks)]["kwota"],
+                Decimal("0"))
 
         # „Wolne srodki" maja JEDEN nosnik i jest nim `budzet.wolne_srodki`
         # (Z56). Do niego stalo tu `zostaje - wydatki_mc` — zysk z faktur
@@ -250,7 +254,9 @@ def zbuduj(polaczenie) -> dict[str, Callable]:
         df = magazyn.wczytaj_faktury(polaczenie)
         rok = rok or date.today().year
         if not df.empty:
-            df = df[df["data"].str.startswith(f"{rok:04d}-")]
+            # `.astype(str)` — patrz komentarz przy `stan_finansow`: po W4
+            # kolumna `data` jest obiektem daty, nie napisem.
+            df = df[df["data"].astype(str).str.startswith(f"{rok:04d}-")]
         if df.empty:
             return {"rok": rok, "liczba_faktur": 0, "suma_netto": "0.00",
                     "suma_vat": "0.00", "suma_skladek": "0.00", "suma_zostaje": "0.00"}
@@ -366,7 +372,12 @@ def zbuduj(polaczenie) -> dict[str, Callable]:
             p = budzet.postep_celu(
                 wpisy, nazwa=wiersz["nazwa"], kategoria=wiersz["kategoria"],
                 kwota_docelowa=wiersz["kwota_docelowa"],
-                termin=_date.fromisoformat(wiersz["termin"]))
+                # `termin` wraca z bazy jako OBIEKT DATY (kolumna `DATE`,
+                # W4), a nie jako napis ISO. `fromisoformat` na obiekcie daty
+                # konczy sie bledem typu, wiec konwersja idzie tylko wtedy,
+                # gdy jest co konwertowac.
+                termin=(wiersz["termin"] if isinstance(wiersz["termin"], _date)
+                        else _date.fromisoformat(str(wiersz["termin"]))))
             pozycje.append({
                 "cel": p.nazwa, "kategoria": p.kategoria,
                 "kwota_docelowa": _kwota(p.kwota_docelowa),

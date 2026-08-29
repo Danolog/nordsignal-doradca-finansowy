@@ -111,7 +111,7 @@ def arkusz(tmp_path):
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.zmigruj_i_polacz(tmp_path / "import.db")
+    return magazyn.zmigruj_i_polacz()
 
 
 # --- kontrola dwustronna --------------------------------------------------

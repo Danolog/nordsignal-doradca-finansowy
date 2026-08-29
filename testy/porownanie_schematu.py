@@ -2,7 +2,7 @@
 """Przyrzad pomiarowy do porownania dwoch nosnikow schematu bazy.
 
 NIE JEST TESTEM. Jest narzedziem, ktorego uzywa
-`testy/test_schemat_dwa_dialekty.py`. Wydzielony, zeby straznik mowil o tym,
+`testy/test_schemat_wobec_bazy.py`. Wydzielony, zeby straznik mowil o tym,
 CO porownuje, a nie o tym, JAK czyta SQL.
 
 CO TEN PARSER WIDZI — i tylko to wolno na niego powolywac:
@@ -28,7 +28,7 @@ CZEGO NIE WIDZI — nazwane wprost, zeby nikt nie wzial ciszy za zgode:
 
 Parser jest swiadomie prostszy niz pelny SQL. Parser bogatszy niz napis,
 ktory parsuje, sam zaczyna byc miejscem wady — ta sama zasada, co przy
-`testy/test_rejestr_sqlite.py::_kolumny_z_napisu`.
+`testy/test_rejestr_ddl.py::_kolumny_z_napisu`.
 """
 from __future__ import annotations
 
@@ -129,6 +129,19 @@ def parsuj(sql: str) -> dict[str, Tabela]:
                     m = re.match(r"CONSTRAINT\s+([a-z_]+)\s+(.*)", czesc,
                                  re.IGNORECASE | re.DOTALL)
                     if m:
+                        # `CONSTRAINT x UNIQUE (...)` — wiez jednoznacznosci
+                        # Z NAZWA WLASNA. Do W4 parser go NIE WIDZIAL: caly
+                        # `CONSTRAINT ...` szedl do zbioru nazw wiezow, wiec
+                        # nazwanie istniejacego `UNIQUE` po cichu zabieralo
+                        # go z porownania. Wyszlo to na jaw dopiero wtedy, gdy
+                        # `numer_faktury` dostal nazwe wlasna (2026-08-29):
+                        # napis niosl trzy wiezy, baza cztery.
+                        mu = re.search(r"UNIQUE\s*\(([^)]*)\)", m.group(2),
+                                       re.IGNORECASE)
+                        if mu:
+                            tabela.unikalne.add(tuple(sorted(
+                                k.strip() for k in mu.group(1).split(","))))
+                            continue
                         tabela.wiezy.add(m.group(1))
                         # `CHECK (kolumna IN (...))` — dziedzina przypisana
                         # do kolumny, zeby dalo sie ja porownac miedzy
@@ -251,3 +264,31 @@ def ile_polecen_create_table(sql: str) -> int:
     nie sprawdza niczego.
     """
     return len(re.findall(r"CREATE\s+TABLE", _bez_komentarzy(sql), re.IGNORECASE))
+
+
+def dziedzina_z_bazy(definicja: str) -> tuple[str, ...] | None:
+    """Dziedzina wyliczeniowa z odpowiedzi serwera na `pg_get_constraintdef`.
+
+    DLACZEGO OSOBNA FUNKCJA. Serwer NIE oddaje wiezu w postaci, w ktorej go
+    zapisalismy: `CHECK (typ IN ('a','b'))` wraca jako
+    `CHECK ((typ = ANY (ARRAY['a'::text, 'b'::text])))`. Parser napisu DDL
+    czyta nasz zapis, ten czyta zapis serwera — i to jest cala roznica miedzy
+    „napis obiecuje" a „baza egzekwuje".
+    """
+    m = re.search(r"\(\s*([a-z_]+)\s*=\s*ANY\s*\(\s*ARRAY\[(.*?)\]",
+                  definicja, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return None
+    wartosci = []
+    for kawalek in m.group(2).split(","):
+        w = kawalek.strip()
+        if "::" in w:
+            w = w.split("::")[0].strip()
+        wartosci.append(w.strip().strip("'"))
+    return tuple(sorted(wartosci))
+
+
+def kolumna_wiezu_z_bazy(definicja: str) -> str | None:
+    """Nazwa kolumny, ktorej dotyczy dziedzina z `pg_get_constraintdef`."""
+    m = re.search(r"\(\s*([a-z_]+)\s*=\s*ANY\s*\(", definicja, re.IGNORECASE)
+    return m.group(1) if m else None

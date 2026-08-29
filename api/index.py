@@ -59,7 +59,8 @@ async def cykl_zycia(_aplikacja: FastAPI):
     otwarciu bazy. Poniewaz polaczenie jest zaleznoscia NA ZADANIE
     (`api/wspolne.polaczenie`), znaczylo to pelny DDL przy kazdym zadaniu HTTP:
     zmierzone sonda `set_trace_callback` — **98 polecen SQL, 59 piszacych**.
-    Przy pliku SQLite niewidoczne, przy PostgreSQL nie do utrzymania.
+    U poprzednika (plik na dysku) niewidoczne; przy PostgreSQL nie do
+    utrzymania — od W4 baza jest serwerem, a nie plikiem obok kodu.
 
     Po rozdzieleniu migracja jest tutaj i tylko tutaj. `polacz()` bazy
     niezmigrowanej NIE naprawia po cichu — odmawia otwarcia i mowi, co

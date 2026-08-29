@@ -201,7 +201,7 @@ def test_doradca_i_pulpit_podaja_te_sama_rezerwe(tmp_path):
 
     from silnik.rdzen import magazyn, narzedzia
 
-    p = magazyn.zmigruj_i_polacz(tmp_path / "rezerwa.db")
+    p = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_fakture(
         p, data=date(2026, 8, 25), numer_faktury="FV/1/2026",
         kwota_netto=Decimal("11200.00"), stawka_vat=Decimal("0.23"),

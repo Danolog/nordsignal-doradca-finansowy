@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 """PRZENIESIENIE DANYCH: SQLite poprzednika -> PostgreSQL.
 
+STAN NA 2026-08-29 (W4): TEN MODUL NIE MA DZIS ZADANIA I TO JEST DECYZJA,
+NIE PRZEOCZENIE. Darek rozstrzygnal (08:44 i 09:19), ze **aplikacja startuje
+PUSTA od 1 IX 2026**: 204 wpisy i 46 pozycji planu poprzednika NIE MIGRUJA,
+a jego baza zyje wylacznie jako dane robocze do budowy
+(`~/Dane-robocze-doradca-finansowy/`, poza repozytorium). Baza produkcyjna
+zostala postawiona pusta 2026-08-29 i taka ma zostac.
+
+MODUL ZOSTAJE, bo opisuje TRZY ZAMIANY TYPOW, ktore i tak zaszly w schemacie,
+i bo bramka odbioru (dwie rowne liczby) jest jedynym sensownym ksztaltem
+kazdego przyszlego zaciagu danych — w tym miesiecznego zaciagu danych rynku.
+**To JEDYNE miejsce w tym projekcie, ktore po W4 nadal importuje `sqlite3`**
+— i importuje go jako czytnik CUDZEGO pliku, nie jako sterownik naszej bazy.
+Straznik `testy/test_granice.py` pilnuje, zeby nie wrocil do `silnik/`.
+
 JEDNORAZOWE. Uruchamiane raz, z kopia bazy zrodlowej zrobiona PRZED.
 
 BRAMKA ODBIORU — DWIE LICZBY, KTORE MUSZA BYC ROWNE (PRD §6.5):
