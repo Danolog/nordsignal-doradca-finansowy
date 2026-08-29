@@ -36,8 +36,9 @@ sqlite3 <pusta-baza> "PRAGMA user_version;"
 12
 ```
 
-Napis SQL mieszka w `wiedza/rejestr.py` jako `SCHEMAT_SQLITE` — `magazyn.polacz` go **woła**,
-nie powtarza. Zasilenie: 19 pozycji z `wiedza/stawki_poczatkowe.py`, **wszystkie w statusie
+Napis SQL mieszka w `wiedza/rejestr.py` jako `SCHEMAT_SQLITE` — `magazyn.zmigruj` go **woła**,
+nie powtarza (do W2, 2026-08-29, wołało go `magazyn.polacz`; od rozdzielenia „otwórz" od
+„zmigruj" `polacz` nie wykonuje żadnego polecenia piszącego). Zasilenie: 19 pozycji z `wiedza/stawki_poczatkowe.py`, **wszystkie w statusie
 `proponowana`, żadna zatwierdzona**. Droga maszynowa do statusu `zatwierdzona` nie istnieje
 (§3.4 konstytucji projektu); pilnuje tego `test_rejestr_sqlite.py::test_ZADNA_stawka_nie_jest_zatwierdzona`.
 

@@ -25,14 +25,14 @@ from silnik.rdzen import budzet, magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "test.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "test.db")
     yield polaczenie
     polaczenie.close()
 
 
 def _baza_w_wersji(sciezka: Path, wersja: int) -> None:
     """Realna baza z danymi, ostemplowana podana wersja schematu."""
-    magazyn.polacz(sciezka).close()
+    magazyn.zmigruj_i_polacz(sciezka).close()
     surowe = sqlite3.connect(str(sciezka))
     surowe.execute(
         "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, szczegoly) "
@@ -139,7 +139,7 @@ def test_migracja_z_OSEMKI_doklada_tabele_i_ZOSTAWIA_kopie(tmp_path):
     sciezka = tmp_path / "stara.db"
     _baza_w_wersji(sciezka, 8)
 
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     magazyn.zapisz_stan_konta(polaczenie, data=date(2026, 8, 27),
                               kwota=Decimal("1840.55"))
     assert polaczenie.execute("PRAGMA user_version").fetchone()[0] \

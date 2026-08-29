@@ -22,7 +22,7 @@ from silnik.rdzen import budzet, magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "most.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "most.db")
     magazyn.zapisz_fakture(
         polaczenie, data=date(2026, 8, 25), numer_faktury="FV/1/2026",
         kwota_netto=Decimal("11200.00"), stawka_vat=Decimal("0.23"),

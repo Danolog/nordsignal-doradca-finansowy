@@ -40,7 +40,7 @@ def _kolumny(polaczenie, tabela: str) -> set[str]:
 
 @pytest.fixture
 def baza(tmp_path):
-    p = magazyn.polacz(tmp_path / "test.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "test.db")
     yield p
     p.close()
 
@@ -72,7 +72,7 @@ def test_kolumna_DOKLADA_SIE_do_bazy_ktora_jej_nie_ma(tmp_path):
     p.execute("PRAGMA user_version = 10")
     p.commit(); p.close()
 
-    nowe = magazyn.polacz(sciezka)
+    nowe = magazyn.zmigruj_i_polacz(sciezka)
     assert "oprocentowanie" in _kolumny(nowe, "zobowiazania")
     wiersze = magazyn.wczytaj_zobowiazania(nowe)
     assert len(wiersze) == 1, "kontrola licznosci: migracja zgubila wiersz"
@@ -87,16 +87,16 @@ def test_kolumna_PRZEZYWA_ponowne_otwarcie_bazy(tmp_path):
     otwarciu i jest nieodwracalne — gdyby wpis o oprocentowaniu tam zostal,
     wartosc Darka ginelaby przy kazdym starcie aplikacji."""
     sciezka = tmp_path / "test.db"
-    p = magazyn.polacz(sciezka)
+    p = magazyn.zmigruj_i_polacz(sciezka)
     magazyn.zapisz_zobowiazanie(p, nazwa="Revolut", kapital=Decimal("51234.00"),
                                 rata_minimalna=Decimal("1305.05"),
                                 oprocentowanie=Decimal("9"))
     p.close()
     for _ in range(2):                       # dwa kolejne uruchomienia
-        p = magazyn.polacz(sciezka)
+        p = magazyn.zmigruj_i_polacz(sciezka)
         wiersze = magazyn.wczytaj_zobowiazania(p)
         p.close()
-    assert "oprocentowanie" in _kolumny(magazyn.polacz(sciezka), "zobowiazania")
+    assert "oprocentowanie" in _kolumny(magazyn.zmigruj_i_polacz(sciezka), "zobowiazania")
     assert len(wiersze) == 1
     assert Decimal(str(wiersze.iloc[0]["oprocentowanie"])) == Decimal("9")
 

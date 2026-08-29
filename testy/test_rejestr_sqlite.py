@@ -27,7 +27,7 @@ KORZEN = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "rejestr.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "rejestr.db")
 
 
 def _kolumny_z_napisu(sql: str) -> set[str]:
@@ -173,8 +173,8 @@ def test_baza_PRZYJMUJE_zatwierdzona_z_podpisem(p):
 def test_ponowne_otwarcie_NIE_DUBLUJE_rejestru(tmp_path):
     """`polacz` wykonuje zasiew przy KAŻDYM otwarciu bazy."""
     sciezka = tmp_path / "dwa-razy.db"
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
+    magazyn.zmigruj_i_polacz(sciezka).close()
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     ile = drugie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     assert ile == len(stawki_poczatkowe.WSZYSTKIE)
 
@@ -188,7 +188,7 @@ def test_zasiew_NIE_WSKRZESZA_propozycji_po_zatwierdzeniu(tmp_path):
     zatwierdzałby ją w kółko.
     """
     sciezka = tmp_path / "podpisana.db"
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     przed = polaczenie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     polaczenie.execute(
         "UPDATE rejestr_stawek SET status='zatwierdzona', zatwierdzil='Darek',"
@@ -196,7 +196,7 @@ def test_zasiew_NIE_WSKRZESZA_propozycji_po_zatwierdzeniu(tmp_path):
     polaczenie.commit()
     polaczenie.close()
 
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     po = drugie.execute("SELECT COUNT(*) FROM rejestr_stawek").fetchone()[0]
     assert przed > 0
     assert po == przed

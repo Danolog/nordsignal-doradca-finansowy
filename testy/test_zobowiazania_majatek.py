@@ -18,7 +18,7 @@ from silnik.rdzen import magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "zm.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "zm.db")
 
 
 def _zobowiazanie(polaczenie, nazwa="Kredyt Revolut", kapital="43000.00",
@@ -83,7 +83,7 @@ def test_migracja_D9_ZACHOWUJE_oprocentowanie_w_istniejacej_bazie(tmp_path):
     polaczenie.commit()
     polaczenie.close()
 
-    nowe = magazyn.polacz(sciezka)
+    nowe = magazyn.zmigruj_i_polacz(sciezka)
     kolumny = {w[1] for w in nowe.execute("PRAGMA table_info(zobowiazania)")}
     assert "oprocentowanie" in kolumny, \
         "kolumna ma PRZEZYC migracje — inaczej wartosc Darka ginie przy starcie"

@@ -19,7 +19,7 @@ from silnik.rdzen import budzet, magazyn
 
 def _baza_w_wersji(sciezka: Path, wersja: int) -> None:
     """Realna baza z danymi, ostemplowana podana wersja schematu."""
-    magazyn.polacz(sciezka).close()
+    magazyn.zmigruj_i_polacz(sciezka).close()
     p = sqlite3.connect(str(sciezka))
     p.execute("INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, szczegoly) "
               "VALUES ('2026-08-01', ?, 'Zakupy', '10.00', '')",
@@ -43,7 +43,7 @@ def test_migracja_ZOSTAWIA_kopie_w_wersji_sprzed(tmp_path, monkeypatch):
     _baza_w_wersji(baza, 7)
     monkeypatch.setattr(magazyn, "WERSJA_SCHEMATU", 8)
 
-    magazyn.polacz(baza).close()
+    magazyn.zmigruj_i_polacz(baza).close()
 
     kopie = _kopie(tmp_path)
     assert len(kopie) == 1, f"kopii jest {len(kopie)}, nie jedna"
@@ -58,13 +58,13 @@ def test_kopia_NIE_powstaje_gdy_nie_ma_migracji(tmp_path):
     i przestalaby cokolwiek znaczyc — a limit miejsca jest realny."""
     baza = tmp_path / "cfo.db"
     _baza_w_wersji(baza, magazyn.WERSJA_SCHEMATU)
-    magazyn.polacz(baza).close()
+    magazyn.zmigruj_i_polacz(baza).close()
     assert _kopie(tmp_path) == []
 
 
 def test_kopia_NIE_powstaje_dla_nowej_bazy(tmp_path):
     """Brak pliku to normalny stan poczatkowy, nie awaria — nie ma czego kopiowac."""
-    magazyn.polacz(tmp_path / "swieza.db").close()
+    magazyn.zmigruj_i_polacz(tmp_path / "swieza.db").close()
     assert _kopie(tmp_path) == []
 
 
@@ -74,7 +74,7 @@ def test_nazwa_kopii_niesie_ZNACZNIK_CZASU_co_do_minuty(tmp_path, monkeypatch):
     _baza_w_wersji(baza, 6)
     monkeypatch.setattr(magazyn, "_teraz",
                         lambda: datetime(2026, 8, 27, 14, 5))
-    magazyn.polacz(baza).close()
+    magazyn.zmigruj_i_polacz(baza).close()
     assert [p.name for p in _kopie(tmp_path)] \
         == ["cfo.db-kopia-przed-migracja-2026-08-27-1405"]
 
@@ -84,7 +84,7 @@ def test_kopia_bierze_nazwe_od_OTWIERANEJ_bazy_a_nie_od_stalej(tmp_path, monkeyp
     nazwalaby plik, ktorego w tym katalogu nie ma."""
     baza = tmp_path / "cfo_database.db-robocza"
     _baza_w_wersji(baza, 6)
-    magazyn.polacz(baza).close()
+    magazyn.zmigruj_i_polacz(baza).close()
     assert _kopie(tmp_path)[0].name.startswith("cfo_database.db-robocza-kopia-")
 
 
@@ -99,7 +99,7 @@ def test_brak_miejsca_ZATRZYMUJE_migracje_zanim_ruszy(tmp_path, monkeypatch):
     monkeypatch.setattr(magazyn, "_wolne_miejsce", lambda katalog: 1)
 
     with pytest.raises(magazyn.BladMagazynu) as blad:
-        magazyn.polacz(baza)
+        magazyn.zmigruj_i_polacz(baza)
 
     assert "miejsca" in str(blad.value).lower()
     assert _kopie(tmp_path) == [], "kopia niepelna jest gorsza niz jej brak"
@@ -113,7 +113,7 @@ def test_miejsca_STARCZA_gdy_jest_go_duzo(tmp_path):
     """Kontrola dwustronna: bramka, ktora blokuje zawsze, nie jest bramka."""
     baza = tmp_path / "cfo.db"
     _baza_w_wersji(baza, 6)
-    magazyn.polacz(baza).close()
+    magazyn.zmigruj_i_polacz(baza).close()
     assert len(_kopie(tmp_path)) == 1
 
 
@@ -137,7 +137,7 @@ def test_nieudana_kontrola_licznosci_WYCOFUJE_wiersze(tmp_path, monkeypatch):
     kod obok: wola `commit()` i sprawdza, czy wiersze znikly.
     """
     baza = tmp_path / "cfo.db"
-    polaczenie = magazyn.polacz(baza)
+    polaczenie = magazyn.zmigruj_i_polacz(baza)
     polaczenie.execute("CREATE TABLE wydatki_osobiste "
                        "(data TEXT, kategoria TEXT, kwota TEXT)")
     polaczenie.execute("INSERT INTO wydatki_osobiste VALUES "
@@ -164,7 +164,7 @@ def test_nieudana_kontrola_licznosci_WYCOFUJE_wiersze(tmp_path, monkeypatch):
 def test_udana_migracja_NIE_wycofuje_niczego(tmp_path):
     """Kontrola dwustronna: wycofanie ma dotykac wylacznie sciezki bledu."""
     baza = tmp_path / "cfo.db"
-    polaczenie = magazyn.polacz(baza)
+    polaczenie = magazyn.zmigruj_i_polacz(baza)
     polaczenie.execute("CREATE TABLE wydatki_osobiste "
                        "(data TEXT, kategoria TEXT, kwota TEXT)")
     polaczenie.execute("INSERT INTO wydatki_osobiste VALUES "

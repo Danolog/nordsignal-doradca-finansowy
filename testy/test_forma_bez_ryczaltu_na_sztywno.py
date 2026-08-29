@@ -62,7 +62,7 @@ def _wybuchowy(*_a, **_k):
 @pytest.fixture
 def baza_skala(tmp_path):
     """Baza z forma SKALA na rok faktury i jedna faktura w historii."""
-    p = magazyn.polacz(tmp_path / "skala.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "skala.db")
     magazyn.zapisz_forme(p, rok=ROK, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_fakture(
         p, data=date(ROK, 9, 30), numer_faktury="FV/1/2026",
@@ -81,7 +81,7 @@ def baza_ryczalt(tmp_path):
     rysuje zdanie „Brak faktur" zamiast tabeli, a pomiar kolumn dostaje pusty
     zbior i melduje sukces bez ogladania czegokolwiek.
     """
-    p = magazyn.polacz(tmp_path / "ryczalt.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "ryczalt.db")
     magazyn.zapisz_forme(p, rok=ROK, forma=magazyn.FORMA_RYCZALT,
                          stawka_ryczaltu=Decimal("0.085"))
     magazyn.zapisz_fakture(
@@ -236,7 +236,7 @@ def test_bez_formy_nikt_nie_zgaduje(tmp_path):
     test, ktory mierzy co innego, niz mysli.
     """
     rok_bez_wpisu = magazyn.ROK_ZACZEPU_FORMY + 4
-    p = magazyn.polacz(tmp_path / "pusta.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "pusta.db")
     assert magazyn.forma_na_rok(p, rok_bez_wpisu).forma == \
         magazyn.FORMA_NIEROZSTRZYGNIETA
     with pytest.raises(magazyn.BladMagazynu) as blad:

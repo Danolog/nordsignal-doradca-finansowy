@@ -47,7 +47,7 @@ def test_polacz_BEZ_argumentu_idzie_za_zmienna(tmp_path, monkeypatch):
     """To jest sedno zadania: `app.py:86` wola `polacz()` bez argumentu."""
     cel = tmp_path / "wskazana.db"
     monkeypatch.setenv("AI_CFO_BAZA", str(cel))
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     polaczenie.close()
     assert cel.exists(), "polacz() otworzyl inna baze niz wskazana"
 
@@ -56,7 +56,7 @@ def test_argument_WYGRYWA_ze_zmienna(tmp_path, monkeypatch):
     """Parametr `sciezka` zostaje — uzywaja go wszystkie 500+ testow."""
     monkeypatch.setenv("AI_CFO_BAZA", str(tmp_path / "ze-zmiennej.db"))
     jawna = tmp_path / "z-argumentu.db"
-    magazyn.polacz(jawna).close()
+    magazyn.zmigruj_i_polacz(jawna).close()
     assert jawna.exists()
     assert not (tmp_path / "ze-zmiennej.db").exists()
 

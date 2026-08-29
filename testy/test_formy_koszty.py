@@ -124,7 +124,7 @@ def test_doradca_bierze_koszty_z_ewidencji(tmp_path):
 
     from silnik.rdzen import magazyn, narzedzia
 
-    p = magazyn.polacz(tmp_path / "formy.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "formy.db")
     rok = date.today().year
     magazyn.zapisz_koszt(p, data=date(rok, 3, 10), opis="laptop",
                          kwota_netto=Decimal("4000.00"),
@@ -140,7 +140,7 @@ def test_doradca_bierze_NETTO_a_nie_brutto(tmp_path):
 
     from silnik.rdzen import magazyn
 
-    p = magazyn.polacz(tmp_path / "netto.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "netto.db")
     rok = date.today().year
     magazyn.zapisz_koszt(p, data=date(rok, 3, 10), opis="laptop",
                          kwota_netto=Decimal("4000.00"),
@@ -153,7 +153,7 @@ def test_koszty_z_innego_roku_nie_wchodza(tmp_path):
 
     from silnik.rdzen import magazyn
 
-    p = magazyn.polacz(tmp_path / "rok.db")
+    p = magazyn.zmigruj_i_polacz(tmp_path / "rok.db")
     magazyn.zapisz_koszt(p, data=date(2025, 3, 10), opis="stare",
                          kwota_netto=Decimal("9999.00"),
                          kwota_vat=Decimal("0.00"))

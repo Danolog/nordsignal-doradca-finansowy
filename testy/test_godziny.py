@@ -11,7 +11,7 @@ OD, DO = date(2026, 9, 1), date(2026, 9, 30)
 
 @pytest.fixture
 def p(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "g.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "g.db")
     magazyn.zapisz_godziny(polaczenie, data=date(2026, 9, 5),
                            rodzaj_czynnosci="pozyskiwanie klientow",
                            pkwiu="46.19.10.0", liczba_godzin=Decimal("120"), opis="")

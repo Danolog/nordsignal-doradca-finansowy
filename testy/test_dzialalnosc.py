@@ -20,7 +20,7 @@ from silnik.rdzen import magazyn, podatki, prezentacja
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "dzialalnosc.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "dzialalnosc.db")
 
 
 # --- ustawienie: zapis i odczyt ------------------------------------------
@@ -37,10 +37,10 @@ def test_zapisana_data_WRACA_jako_data(p):
 def test_data_PRZEZYWA_ponowne_otwarcie_bazy(tmp_path):
     """Ustawienie ma mieszkac w bazie, nie w pamieci procesu."""
     sciezka = tmp_path / "trwalosc.db"
-    pierwsze = magazyn.polacz(sciezka)
+    pierwsze = magazyn.zmigruj_i_polacz(sciezka)
     magazyn.zapisz_dzialalnosc_od(pierwsze, date(2026, 9, 1))
     pierwsze.close()
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     assert magazyn.odczytaj_dzialalnosc_od(drugie) == date(2026, 9, 1)
     drugie.close()
 

@@ -33,7 +33,7 @@ TRZY = (
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "kolumny.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "kolumny.db")
 
 
 def _kolumny(polaczenie, tabela: str) -> set[str]:
@@ -150,7 +150,7 @@ def test_stara_baza_DOSTAJE_kolumny_bez_utraty_wierszy(tmp_path):
     sciezka = tmp_path / "stara.db"
     _stara_baza(sciezka, wpisow=17)
 
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     assert polaczenie.execute(
         "SELECT COUNT(*) FROM wpisy_budzetu").fetchone()[0] == 17
     assert "zrodlo" in _kolumny(polaczenie, "wpisy_budzetu")
@@ -174,7 +174,7 @@ def test_stara_baza_znaczy_wiersze_sprzed_migracji_jako_RECZNE(tmp_path):
     """
     sciezka = tmp_path / "historia.db"
     _stara_baza(sciezka, wpisow=5)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     zrodla = {w[0] for w in polaczenie.execute(
         "SELECT DISTINCT zrodlo FROM wpisy_budzetu")}
     assert zrodla == {"recznie"}
@@ -189,7 +189,7 @@ def test_stara_baza_dostaje_kolumne_BEZ_wiezu_i_to_jest_nazwane(tmp_path):
     """
     sciezka = tmp_path / "bez-wiezu.db"
     _stara_baza(sciezka, wpisow=1)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     polaczenie.execute(
         "INSERT INTO wpisy_budzetu (data, typ, kategoria, kwota, zrodlo)"
         " VALUES ('2026-09-01','Wydatki','Zakupy','10.00','skądinąd')")

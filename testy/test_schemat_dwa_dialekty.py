@@ -408,7 +408,7 @@ def test_swieza_baza_ODRZUCA_forme_spoza_dwojki(tmp_path):
     """
     import sqlite3
 
-    polaczenie = magazyn.polacz(tmp_path / "forma.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "forma.db")
     with pytest.raises(sqlite3.IntegrityError):
         polaczenie.execute(
             "INSERT INTO forma_opodatkowania (rok, forma) VALUES (?,?)",
@@ -432,7 +432,7 @@ def test_swieza_baza_PRZYJMUJE_kazdy_typ_z_budzet_TYPY(tmp_path):
     wiez odrzucalby POPRAWNY typ, a straznik porownujacy napisy nadal bylby
     zielony. Ten test pyta baze, nie napis.
     """
-    polaczenie = magazyn.polacz(tmp_path / "typy.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "typy.db")
     assert len(budzet.TYPY) == 3
     for i, typ in enumerate(budzet.TYPY):
         polaczenie.execute(

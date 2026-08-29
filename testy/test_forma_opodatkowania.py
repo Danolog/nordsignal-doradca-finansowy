@@ -23,7 +23,7 @@ from silnik.rdzen import magazyn
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "forma.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "forma.db")
 
 
 # --- trzy stany -----------------------------------------------------------
@@ -165,14 +165,14 @@ def test_migracja_z_siodemki_TWORZY_tabele_i_wpis(tmp_path):
     """Pierwsza migracja cwiczaca Z53. Baza w wersji 7 bez tabeli formy —
     dokladnie stan produkcyjny Darka przed tym zadaniem."""
     sciezka = tmp_path / "stara.db"
-    magazyn.polacz(sciezka).close()
+    magazyn.zmigruj_i_polacz(sciezka).close()
     surowe = sqlite3.connect(str(sciezka))
     surowe.execute("DROP TABLE forma_opodatkowania")
     surowe.execute("PRAGMA user_version = 7")
     surowe.commit()
     surowe.close()
 
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     assert magazyn.forma_na_rok(polaczenie, 2026).forma == magazyn.FORMA_SKALA
     assert polaczenie.execute("PRAGMA user_version").fetchone()[0] \
         == magazyn.WERSJA_SCHEMATU
@@ -187,11 +187,11 @@ def test_zaczep_NIE_nadpisuje_istniejacego_wyboru(tmp_path):
     cofalaby sie po restarcie aplikacji — i wygladalo by to jak niezapisany
     formularz."""
     sciezka = tmp_path / "wybor.db"
-    pierwsze = magazyn.polacz(sciezka)
+    pierwsze = magazyn.zmigruj_i_polacz(sciezka)
     magazyn.zapisz_forme(pierwsze, rok=2026, forma=magazyn.FORMA_RYCZALT,
                          stawka_ryczaltu="0.085")
     pierwsze.close()
 
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     assert magazyn.forma_na_rok(drugie, 2026).forma == magazyn.FORMA_RYCZALT
     drugie.close()

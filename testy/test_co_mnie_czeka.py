@@ -231,7 +231,7 @@ def test_zbieracz_czyta_baze_i_NIE_liczy_sam(tmp_path):
     rachunek czysty, zbieranie osobno i cienkie."""
     from silnik.rdzen import magazyn
 
-    polaczenie = magazyn.polacz(tmp_path / "cfo.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "cfo.db")
     try:
         magazyn.zapisz_stan_konta(polaczenie, data=date(2026, 9, 1),
                                   kwota="5000.00")

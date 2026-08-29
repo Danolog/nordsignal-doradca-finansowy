@@ -298,8 +298,12 @@ class RaportMigracji:
 
 
 def _tabele(polaczenie) -> set[str]:
+    """NASZE tabele. `sqlite_sequence` odsiane — powstaje samo, przy pierwszym
+    zapisie do tabeli z `AUTOINCREMENT`, i nie należy do modelu danych.
+    Liczona razem z nimi dawała 15 tam, gdzie schemat ma 14."""
     return {w[0] for w in polaczenie.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        "SELECT name FROM sqlite_master WHERE type='table'"
+        " AND name NOT LIKE 'sqlite_%'").fetchall()}
 
 
 #: Kolumny dokladane do tabel, ktore juz istnieja. (tabela, kolumna, typ)
@@ -381,12 +385,43 @@ _ZDEJMOWANE_KOLUMNY: tuple[tuple[str, str], ...] = (
 )
 
 
+def _wymagaj_niesprzecznych_kolumn() -> None:
+    """Odmawia, gdy ta sama kolumna jest naraz DOPISYWANA i ZDEJMOWANA.
+
+    To nie jest higiena — to jedyna zmierzona droga do CICHEJ UTRATY DANYCH
+    w tym module. Wpis `("zobowiazania", "oprocentowanie")` stal w obu
+    krotkach naraz po tym, jak Darek odwrocil decyzje Z43 (2026-08-28):
+    `_dopisz_kolumny` odtwarzalo kolumne, a `_zdejmij_kolumny` kasowalo ja
+    razem z wpisanym oprocentowaniem — przy KAZDYM otwarciu bazy, po cichu
+    i przy zielonej suicie.
+
+    Sprzecznosc jest tu BLEDEM, nie ostrzezeniem: `ALTER TABLE DROP COLUMN`
+    jest nieodwracalne, wiec jedyny moment, w ktorym da sie jeszcze cokolwiek
+    zrobic, jest PRZED nim.
+    """
+    dopisywane = {(tab, kol) for tab, kol, _ in _DOPISYWANE_KOLUMNY}
+    sprzeczne = sorted(dopisywane & set(_ZDEJMOWANE_KOLUMNY))
+    if sprzeczne:
+        opis = ", ".join(f"{tab}.{kol}" for tab, kol in sprzeczne)
+        raise BladMagazynu(
+            f"Kolumna jest naraz dopisywana i zdejmowana: {opis}. "
+            f"Migracja NIE zostala rozpoczeta — baza jest nietknieta. "
+            f"`ALTER TABLE DROP COLUMN` jest nieodwracalne, wiec skasowalbym "
+            f"dane kolumny, ktora ten sam kod chwile wczesniej odtworzyl. "
+            f"Rozstrzygnij, ktora z dwoch krotek `_DOPISYWANE_KOLUMNY` / "
+            f"`_ZDEJMOWANE_KOLUMNY` niesie decyzje, i usun wpis z drugiej.")
+
+
 def _zdejmij_kolumny(polaczenie) -> None:
     """Usuwa kolumny wycofane z modelu. NIEODWRACALNE — dane kolumny znikaja.
 
     Zostawienie martwej kolumny bylo by drugim nosnikiem: tabela dalej
     niosla by wartosc, ktorej nikt nie liczy, a ktora wyglada jak dana.
+
+    Od W2 (2026-08-29) biegnie WYLACZNIE z `zmigruj()`, a nie przy kazdym
+    otwarciu bazy — czyli raz przy starcie procesu, nie raz na zadanie HTTP.
     """
+    _wymagaj_niesprzecznych_kolumn()
     for tabela, kolumna in _ZDEJMOWANE_KOLUMNY:
         istniejace = {w[1] for w in
                       polaczenie.execute(f"PRAGMA table_info({tabela})")}
@@ -528,14 +563,19 @@ def _zaczep_formy(polaczenie) -> None:
     polaczenie.commit()
 
 
-def _sprawdz_wersje(polaczenie) -> None:
+def _wersja_bazy(polaczenie) -> int:
+    """JEDEN nośnik odpowiedzi „w jakiej wersji schematu jest ta baza"."""
+    return polaczenie.execute("PRAGMA user_version").fetchone()[0]
+
+
+def _sprawdz_wersje(polaczenie, wersja: int | None = None) -> None:
     """Odmawia otwarcia bazy nowszej niż ten kod.
 
     Bez tego starszy checkout na zmigrowanej bazie odtworzyłby przez `_SCHEMAT`
     pustą tabelę i pokazał na pulpicie 0,00 zł. Cicha zła liczba jest gorsza
     niż odmowa — dlatego wersja stoi w bazie i jest sprawdzana przy otwarciu.
     """
-    wersja = polaczenie.execute("PRAGMA user_version").fetchone()[0]
+    wersja = _wersja_bazy(polaczenie) if wersja is None else wersja
     if wersja > WERSJA_SCHEMATU:
         raise BladMagazynu(
             f"Baza jest w wersji schematu {wersja}, a ten kod zna "
@@ -545,10 +585,87 @@ def _sprawdz_wersje(polaczenie) -> None:
         )
 
 
-def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
-    """Otwiera bazę, tworząc plik, tabele i słownik kategorii, jeśli ich nie ma.
+def _wymagaj_zmigrowanej(polaczenie, sciezka, wersja: int | None = None) -> None:
+    """Odmawia otwarcia bazy, której schemat jest STARSZY niż ten kod.
 
-    Brak pliku to normalny stan początkowy, nie awaria.
+    NASTĘPCA SAMOCZYNNEJ MIGRACJI (W2, 2026-08-29). Do tej zmiany `polacz()`
+    migrowało bazę samo, przy każdym otwarciu — czyli przy każdym żądaniu HTTP
+    (`api/wspolne.py`), bo połączenie jest brane na żądanie. Po rozdzieleniu
+    migracja jest osobnym, świadomym wywołaniem; gdyby nikt jej nie wywołał,
+    aplikacja wstałaby na bazie bez tabel i pokazała zera zamiast odmowy.
+
+    Dlatego odmowa jest tutaj, a nie w warstwie sieciowej: to jedyne miejsce,
+    przez które przechodzi KAŻDE otwarcie bazy. §3.7 — awaria do stanu
+    użytecznego: mówi, czego brakuje i co zrobić.
+    """
+    wersja = _wersja_bazy(polaczenie) if wersja is None else wersja
+    if wersja == WERSJA_SCHEMATU:
+        return
+    raise BladMagazynu(
+        f"Baza pod ścieżką {sciezka} jest w wersji schematu {wersja}, a ten "
+        f"kod zna {WERSJA_SCHEMATU} — odmawiam otwarcia, bo pokazałbym Ci "
+        f"zera zamiast Twoich danych albo wywrócił się na pierwszym zapisie. "
+        f"Migracja nie dzieje się już sama przy otwarciu (W2): uruchom ją "
+        f"świadomie — `magazyn.zmigruj()` albo "
+        f"`./.venv/bin/python -m silnik.rdzen.magazyn` — a potem powtórz "
+        f"tę operację. Kopia bazy powstanie przed migracją.")
+
+
+@dataclass(frozen=True)
+class RaportMigracjiSchematu:
+    """Wynik jednego przebiegu `zmigruj()` — liczby, nigdy wartość logiczna.
+
+    Ta sama zasada co w `RaportMigracji`: migracja, która nic nie zrobiła, ma
+    to powiedzieć liczbą. „Gotowe" nie odróżnia bazy postawionej od bazy,
+    której nikt nie tknął.
+    """
+
+    sciezka: Path
+    wersja_przed: int
+    wersja_po: int
+    kopia: "Path | None"
+    tabel: int
+    kategorii: int
+    stawek: int
+    wchloniete: "RaportMigracji | None"
+
+
+def _otworz_surowo(sciezka: Path) -> sqlite3.Connection:
+    """Samo otwarcie pliku. Bez schematu, bez zasiewu, bez sprawdzania wersji.
+
+    `check_same_thread=False`: narzędzia doradcy wykonują się w PULI WĄTKÓW
+    SDK, a nie w wątku, który otworzył bazę. Sterownik sqlite3 blokuje to
+    domyślnie — blokadą własną, nie biblioteki C. Zdjęcie jej jest bezpieczne,
+    bo moduł zgłasza tryb SERIALIZED (`threadsafety == 3`), czyli
+    synchronizację bierze na siebie sam SQLite. Założenie jest nazwane
+    i pilnowane testem: `test_sterownik_sqlite_jest_w_trybie_szeregowanym`.
+    """
+    try:
+        return sqlite3.connect(str(sciezka), check_same_thread=False)
+    except sqlite3.Error as e:
+        raise BladMagazynu(
+            f"Nie udało się otworzyć bazy danych pod ścieżką {sciezka}. "
+            f"Sprawdź, czy katalog istnieje i czy masz prawo zapisu. Szczegół: {e}"
+        ) from e
+
+
+def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
+    """OTWIERA BAZĘ I TYLKO OTWIERA. Zero DDL, zero zasiewu, zero stempla.
+
+    ROZDZIELENIE „OTWÓRZ" OD „ZMIGRUJ" (W2, 2026-08-29). Do tej zmiany ta
+    funkcja stawiała cały schemat przy każdym wywołaniu: **98 poleceń SQL,
+    z czego 59 piszących** (15 × `CREATE TABLE`, 44 × `INSERT` zasiewu) —
+    zmierzone sondą `sqlite3.set_trace_callback` na świeżej bazie. A połączenie
+    jest brane NA ŻĄDANIE HTTP (`api/wspolne.polaczenie`), nie na proces.
+    Przy pliku SQLite było to niewidoczne; przy PostgreSQL byłby to pełny DDL
+    na każdym żądaniu.
+
+    Migracja mieszka teraz w `zmigruj()` i jest wywoływana świadomie — raz,
+    przy starcie procesu (`api/index.py`).
+
+    Baza niezmigrowana NIE jest tu po cichu naprawiana: `polacz()` **odmawia
+    otwarcia** i mówi, co uruchomić (`_wymagaj_zmigrowanej`). Cicha zła liczba
+    jest gorsza niż odmowa.
 
     Bez argumentu pyta `sciezka_bazy()` — jeden nośnik odpowiedzi „którą bazę
     otwieramy" (Z52). Argument zostaje i wygrywa ze zmienną środowiskową:
@@ -556,18 +673,48 @@ def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
     """
     if sciezka is None:
         sciezka = sciezka_bazy()
+    polaczenie = _otworz_surowo(Path(sciezka))
     try:
-        # `check_same_thread=False`: narzędzia doradcy wykonują się w PULI
-        # WĄTKÓW SDK, a nie w wątku, który otworzył bazę. Sterownik sqlite3
-        # blokuje to domyślnie — blokadą własną, nie biblioteki C. Zdjęcie jej
-        # jest bezpieczne, bo moduł zgłasza tryb SERIALIZED (`threadsafety == 3`),
-        # czyli synchronizację bierze na siebie sam SQLite. Założenie jest
-        # nazwane i pilnowane testem: `test_sterownik_sqlite_jest_w_trybie_szeregowanym`.
-        polaczenie = sqlite3.connect(str(sciezka), check_same_thread=False)
+        # JEDEN odczyt wersji na otwarcie — obie bramki dostają tę samą liczbę.
+        # Dwa odczyty byłyby drugim nośnikiem odpowiedzi „w jakim stanie jest
+        # ta baza" i przy PostgreSQL kosztowałyby dwa obiegi do serwera.
+        wersja = _wersja_bazy(polaczenie)
+        _sprawdz_wersje(polaczenie, wersja)
+        _wymagaj_zmigrowanej(polaczenie, sciezka, wersja)
+    except BaseException:
+        # Odmowa nie zostawia otwartego uchwytu do pliku. Bez tego każde
+        # nieudane otwarcie trzymałoby połączenie do końca życia procesu.
+        polaczenie.close()
+        raise
+    return polaczenie
+
+
+def zmigruj(sciezka: Path | None = None) -> RaportMigracjiSchematu:
+    """Stawia schemat i zasiewa słowniki. ŚWIADOME, JEDNORAZOWE WYWOŁANIE.
+
+    Wszystko, co `polacz()` robiło do W2 poza samym otwarciem pliku: kopia
+    przed migracją, dwa napisy DDL, dopisanie i zdjęcie kolumn, przebudowa
+    planu, zaczep formy, wchłonięcie starej tabeli wydatków, dwa zasiewy
+    i stempel wersji.
+
+    OTWIERA I ZAMYKA WŁASNE POŁĄCZENIE — nie przyjmuje cudzego i nie oddaje
+    swojego. Gdyby oddawała, ktoś trzymałby połączenie „po migracji" i różnica
+    między „otwarte" a „zmigrowane" wróciłaby tylnymi drzwiami.
+
+    Jest bezpieczna w powtórzeniu (`CREATE TABLE IF NOT EXISTS`, zasiewy pod
+    warunkiem pustki), ale kosztuje ~98 poleceń SQL — nie należy do ścieżki
+    żądania.
+    """
+    if sciezka is None:
+        sciezka = sciezka_bazy()
+    sciezka = Path(sciezka)
+    polaczenie = _otworz_surowo(sciezka)
+    try:
         _sprawdz_wersje(polaczenie)
+        wersja_przed = _wersja_bazy(polaczenie)
         # Kopia PRZED czymkolwiek, co pisze: `_dopisz_kolumny`,
         # `_zdejmij_kolumny` (NIEODWRACALNE) i `_przebuduj_plan_budzetu`.
-        _kopia_przed_migracja(polaczenie, Path(sciezka))
+        kopia = _kopia_przed_migracja(polaczenie, sciezka)
         tabele_przed = _tabele(polaczenie)
         polaczenie.executescript(_SCHEMAT)
         # Rejestr stawek WOLA swoj napis z `wiedza/`, nie powtarza go tutaj.
@@ -578,18 +725,42 @@ def polacz(sciezka: Path | None = None) -> sqlite3.Connection:
         _zdejmij_kolumny(polaczenie)
         _przebuduj_plan_budzetu(polaczenie)
         _zaczep_formy(polaczenie)
+        wchloniete = None
         if "wydatki_osobiste" in tabele_przed:
-            wchlon_wydatki_osobiste(polaczenie)
-        zasiej_kategorie(polaczenie)
-        zasiej_rejestr_stawek(polaczenie)
+            wchloniete = wchlon_wydatki_osobiste(polaczenie)
+        kategorii = zasiej_kategorie(polaczenie)
+        stawek = zasiej_rejestr_stawek(polaczenie)
         polaczenie.execute(f"PRAGMA user_version = {WERSJA_SCHEMATU}")
         polaczenie.commit()
-        return polaczenie
+        return RaportMigracjiSchematu(
+            sciezka=sciezka,
+            wersja_przed=wersja_przed,
+            wersja_po=_wersja_bazy(polaczenie),
+            kopia=kopia,
+            tabel=len(_tabele(polaczenie)),
+            kategorii=kategorii,
+            stawek=stawek,
+            wchloniete=wchloniete,
+        )
     except sqlite3.Error as e:
+        polaczenie.rollback()
         raise BladMagazynu(
-            f"Nie udało się otworzyć bazy danych pod ścieżką {sciezka}. "
-            f"Sprawdź, czy katalog istnieje i czy masz prawo zapisu. Szczegół: {e}"
-        ) from e
+            f"Migracja schematu bazy {sciezka} nie doszła do końca. "
+            f"Szczegół: {e}") from e
+    finally:
+        polaczenie.close()
+
+
+def zmigruj_i_polacz(sciezka: Path | None = None) -> sqlite3.Connection:
+    """Migracja, a zaraz po niej otwarcie — DLA TESTÓW I NARZĘDZI Z WIERSZA POLECEŃ.
+
+    NIE DO UŻYCIA W ŚCIEŻCE ŻĄDANIA HTTP. Wołanie tego na żądanie odtwarza
+    dokładnie tę wadę, którą W2 zdejmuje: pełny DDL przy każdym żądaniu.
+    Pilnuje tego strażnik `testy/test_otworz_a_zmigruj.py::
+    test_warstwa_sieciowa_NIE_MIGRUJE_na_zadanie`, który czyta źródło `api/`.
+    """
+    zmigruj(sciezka)
+    return polacz(sciezka)
 
 
 # --- migracja i zasiew ----------------------------------------------------
@@ -1052,6 +1223,7 @@ def zapisz_plan(polaczenie, *, rok: int, miesiac: int, typ: str, kategoria: str,
              int(powtarzalna), co_ile_miesiecy))
         polaczenie.commit()
     except sqlite3.Error as e:
+        polaczenie.rollback()
         raise BladMagazynu(f"Nie udało się zapisać planu. Szczegół: {e}") from e
     return "nadpisana" if istnieje else "nowa"
 
@@ -1419,6 +1591,7 @@ def ustaw_aktywnosc_kategorii(polaczenie, *, typ: str, nazwa: str,
         "UPDATE kategorie SET aktywna = ? WHERE typ = ? AND nazwa = ?",
         (1 if aktywna else 0, typ, str(nazwa).strip()))
     if kursor.rowcount == 0:
+        polaczenie.rollback()
         raise BladMagazynu(f"Kategoria {nazwa!r} nie istnieje w typie {typ!r}.")
     polaczenie.commit()
 
@@ -1445,6 +1618,7 @@ def usun_kategorie_trwale(polaczenie, *, typ: str, nazwa: str) -> None:
     kursor = polaczenie.execute(
         "DELETE FROM kategorie WHERE typ = ? AND nazwa = ?", (typ, nazwa))
     if kursor.rowcount == 0:
+        polaczenie.rollback()
         raise BladMagazynu(f"Kategoria {nazwa!r} nie istnieje w typie {typ!r}.")
     polaczenie.commit()
 
@@ -1497,6 +1671,7 @@ def ustaw_ustawienie(polaczenie, klucz: str, wartosc: str) -> None:
             (str(klucz), str(wartosc)))
         polaczenie.commit()
     except sqlite3.Error as e:
+        polaczenie.rollback()
         raise BladMagazynu(f"Nie udało się zapisać ustawienia. Szczegół: {e}") from e
 
 
@@ -1541,6 +1716,7 @@ def zapisz_forme(polaczenie, *, rok: int, forma: str,
              None if stawka_ryczaltu is None else str(stawka_ryczaltu)))
         polaczenie.commit()
     except sqlite3.Error as e:
+        polaczenie.rollback()
         raise BladMagazynu(
             f"Nie udalo sie zapisac formy opodatkowania. Szczegol: {e}") from e
 
@@ -1681,6 +1857,7 @@ def zapisz_stan_konta(polaczenie, *, data: date, kwota: Decimal) -> None:
             (data.isoformat(), str(kwota)))
         polaczenie.commit()
     except sqlite3.Error as e:
+        polaczenie.rollback()
         raise BladMagazynu(
             f"Nie udalo sie zapisac stanu konta. Szczegol: {e}") from e
 
@@ -2295,3 +2472,14 @@ def koszty_netto_w_roku(polaczenie, rok: int) -> Decimal:
     w_roku = df[df["data"].astype(str).str.startswith(f"{rok:04d}-")]
     return stawki.do_groszy(
         sum((Decimal(str(x)) for x in w_roku["kwota_netto"]), Decimal("0.00")))
+
+
+if __name__ == "__main__":  # pragma: no cover - narzedzie wiersza polecen
+    # `./.venv/bin/python -m silnik.rdzen.magazyn` — migracja recznie, bez
+    # stawiania calej aplikacji. Ta sama sciezka co w produkcji: `sciezka_bazy()`.
+    _raport = zmigruj()
+    print(f"Baza: {_raport.sciezka}")
+    print(f"Wersja schematu: {_raport.wersja_przed} -> {_raport.wersja_po}")
+    print(f"Tabel: {_raport.tabel} | kategorii dosianych: {_raport.kategorii} "
+          f"| stawek dosianych: {_raport.stawek}")
+    print(f"Kopia przed migracja: {_raport.kopia or 'nie byla potrzebna'}")

@@ -17,7 +17,7 @@ KATALOG = Path(__file__).parent.parent
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "test.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "test.db")
 
 
 def _faktura(polaczenie, **nadpisania):
@@ -35,7 +35,7 @@ def _faktura(polaczenie, **nadpisania):
 # --- stan poczatkowy ------------------------------------------------------
 
 def test_brak_pliku_bazy_to_stan_poczatkowy_nie_awaria(tmp_path):
-    polaczenie = magazyn.polacz(tmp_path / "jeszcze_nie_istnieje.db")
+    polaczenie = magazyn.zmigruj_i_polacz(tmp_path / "jeszcze_nie_istnieje.db")
     assert magazyn.wczytaj_faktury(polaczenie).empty
     assert magazyn.wczytaj_godziny(polaczenie).empty
 

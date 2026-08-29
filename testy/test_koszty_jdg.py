@@ -23,7 +23,7 @@ from silnik.rdzen import budzet, magazyn, podatki
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "koszty.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "koszty.db")
 
 
 def _faktura(polaczenie) -> None:

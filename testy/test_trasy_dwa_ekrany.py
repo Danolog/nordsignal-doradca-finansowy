@@ -82,7 +82,7 @@ def klient(tmp_path, monkeypatch):
     (`testy/test_forma_bez_domyslnej.py`), a nie stan do testowania szczescia.
     """
     monkeypatch.setenv(magazyn.ZMIENNA_BAZY, str(tmp_path / "trasy.db"))
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_SKALA)
     magazyn.zapisz_dzialalnosc_od(polaczenie, date(2026, 9, 1))
     magazyn.zapisz_stan_konta(polaczenie, data=date(2026, 10, 5),
@@ -146,7 +146,7 @@ def test_kategoria_kosztu_firmowego_NIE_STOI_na_tym_ekranie(klient):
     nazwy = [k["nazwa"] for k in dane["kategorie"]]
     assert budzet.KATEGORIA_KOSZTY_JDG not in nazwy
     # kontrola dwustronna: kategoria JEST w bazie, wiec pomiar cos widzial
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     w_bazie = [str(w["nazwa"]) for _, w in
                magazyn.wczytaj_kategorie(polaczenie, "Wydatki").iterrows()]
     polaczenie.close()
@@ -296,7 +296,7 @@ def test_ksiega_bije_saldo_RAZ_NA_DZIEN(klient):
     # regula nie ma na czym zadzialac, a straznik meldowalby sukces, nie
     # widzac ani jednego przypadku. Stoi w tescie, nie w fiksturze: fikstura
     # odwzorowuje ramke (trzy pozycje planu), a to jest przypadek szczegolny.
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.ustal_regule_planu(
         polaczenie, rok=2026, miesiac=10, typ="Wydatki", kategoria="Gaz",
         kwota_planowana=Decimal("150.00"), dzien=10)
@@ -468,7 +468,7 @@ def test_FORMA_OPODATKOWANIA_dojezdza_az_do_odpowiedzi_HTTP(klient):
     """
     skala = klient.get(f"/api/plynnosc?dzis={DZIS}").json()["saldoMinimalne"]
 
-    polaczenie = magazyn.polacz()
+    polaczenie = magazyn.zmigruj_i_polacz()
     magazyn.zapisz_forme(polaczenie, rok=2026, forma=magazyn.FORMA_RYCZALT,
                          stawka_ryczaltu=Decimal("0.085"))
     polaczenie.close()

@@ -18,7 +18,7 @@ from testy.test_magazyn import TABELE_SCHEMATU
 
 @pytest.fixture
 def p(tmp_path):
-    return magazyn.polacz(tmp_path / "test.db")
+    return magazyn.zmigruj_i_polacz(tmp_path / "test.db")
 
 
 def _stara_baza(sciezka, wiersze) -> None:
@@ -67,8 +67,8 @@ def test_wydatki_osobiste_nie_wraca_po_ponownym_polaczeniu(tmp_path):
     """
     sciezka = tmp_path / "wraca.db"
     _stara_baza(sciezka, TRZY_WIERSZE)
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
+    magazyn.zmigruj_i_polacz(sciezka).close()
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     tabele = {w[0] for w in drugie.execute(
         "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
     assert "wydatki_osobiste" not in tabele
@@ -89,7 +89,7 @@ def test_fikstura_naprawde_ma_trzy_wiersze(tmp_path):
 def test_migracja_przenosi_wiersze_z_kwotami_i_typem(tmp_path):
     sciezka = tmp_path / "migracja.db"
     _stara_baza(sciezka, TRZY_WIERSZE)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
 
     wpisy = magazyn.wczytaj_wpisy(polaczenie, typ=budzet.TYP_WYDATKI)
     assert len(wpisy) == 3
@@ -125,9 +125,9 @@ def test_migracja_raportuje_trzy_liczby(tmp_path):
 def test_migracja_dwa_razy_nie_duplikuje(tmp_path):
     sciezka = tmp_path / "dwa_razy.db"
     _stara_baza(sciezka, TRZY_WIERSZE)
-    pierwsze = magazyn.polacz(sciezka)
+    pierwsze = magazyn.zmigruj_i_polacz(sciezka)
     pierwsze.close()
-    drugie = magazyn.polacz(sciezka)
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     assert len(magazyn.wczytaj_wpisy(drugie, typ=budzet.TYP_WYDATKI)) == 3
     raport = magazyn.wchlon_wydatki_osobiste(drugie)
     assert raport.przeniesione == 0
@@ -140,13 +140,13 @@ def test_baza_z_nowsza_wersja_schematu_odmawia_zamiast_pokazac_zera(tmp_path):
     w bazie i jest sprawdzana przy otwarciu.
     """
     sciezka = tmp_path / "z_przyszlosci.db"
-    magazyn.polacz(sciezka).close()
+    magazyn.zmigruj_i_polacz(sciezka).close()
     polaczenie = sqlite3.connect(str(sciezka))
     polaczenie.execute(f"PRAGMA user_version = {magazyn.WERSJA_SCHEMATU + 1}")
     polaczenie.commit()
     polaczenie.close()
     with pytest.raises(magazyn.BladMagazynu) as blad:
-        magazyn.polacz(sciezka)
+        magazyn.zmigruj_i_polacz(sciezka)
     assert str(magazyn.WERSJA_SCHEMATU) in str(blad.value)
 
 
@@ -168,8 +168,8 @@ def test_zasiew_daje_komplet_kategorii_ze_slownika(p):
 
 def test_zasiew_nie_duplikuje_przy_ponownym_polaczeniu(tmp_path):
     sciezka = tmp_path / "zasiew.db"
-    magazyn.polacz(sciezka).close()
-    drugie = magazyn.polacz(sciezka)
+    magazyn.zmigruj_i_polacz(sciezka).close()
+    drugie = magazyn.zmigruj_i_polacz(sciezka)
     assert len(magazyn.wczytaj_kategorie(drugie)) == sum(
         len(v) for v in budzet.KATEGORIE_STARTOWE.values())
 
@@ -693,7 +693,7 @@ def test_migracja_z42_doklada_kolumny_do_istniejacej_tabeli(tmp_path):
     """Baza Darka ma juz `plan_budzetu` — kolumny musza wejsc przez ALTER TABLE."""
     sciezka = tmp_path / "schemat4.db"
     _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     kolumny = {w[1] for w in polaczenie.execute("PRAGMA table_info(plan_budzetu)")}
     assert {"powtarzalna", "do_roku", "do_miesiaca"} <= kolumny
 
@@ -706,7 +706,7 @@ def test_migracja_z42_nie_rusza_wierszy_sprzed_migracji(tmp_path):
     """
     sciezka = tmp_path / "dane.db"
     _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     wiersze = polaczenie.execute(
         "SELECT rok, miesiac, kwota_planowana, powtarzalna, do_roku, "
         "do_miesiaca FROM plan_budzetu ORDER BY rok, miesiac").fetchall()
@@ -724,7 +724,7 @@ def test_migracja_z42_podnosi_wersje_schematu_bazy_do_wersji_kodu(tmp_path):
     """
     sciezka = tmp_path / "wersja.db"
     _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     assert polaczenie.execute("PRAGMA user_version").fetchone()[0] == \
         magazyn.WERSJA_SCHEMATU
     assert magazyn.WERSJA_SCHEMATU > 4
@@ -985,7 +985,7 @@ def test_migracja_z48_zachowuje_wszystkie_wiersze(tmp_path):
     licznosci przed i po, plus wartosci domyslne nowych kolumn."""
     sciezka = tmp_path / "przed_z48.db"
     _baza_schemat_4(sciezka, DWA_WIERSZE_PLANU)
-    polaczenie = magazyn.polacz(sciezka)
+    polaczenie = magazyn.zmigruj_i_polacz(sciezka)
     wiersze = polaczenie.execute(
         "SELECT rok, miesiac, kategoria, kwota_planowana, opis, dzien, "
         "co_ile_miesiecy FROM plan_budzetu ORDER BY rok, miesiac").fetchall()

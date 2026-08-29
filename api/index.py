@@ -30,6 +30,8 @@ to najczestszy ksztalt wlasnej wady i ma zostac gloshy jako 500.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -49,8 +51,33 @@ from silnik.rdzen import magazyn
 # Obie roznice byly ciche. Straznik: `testy/test_kontrakt_dwa_nosniki.py`,
 # sekcja „serializacja".
 
+@asynccontextmanager
+async def cykl_zycia(_aplikacja: FastAPI):
+    """MIGRACJA RAZ, PRZY STARCIE PROCESU — nie raz na zadanie (W2).
+
+    Do 2026-08-29 `magazyn.polacz()` stawialo schemat samo, przy kazdym
+    otwarciu bazy. Poniewaz polaczenie jest zaleznoscia NA ZADANIE
+    (`api/wspolne.polaczenie`), znaczylo to pelny DDL przy kazdym zadaniu HTTP:
+    zmierzone sonda `set_trace_callback` — **98 polecen SQL, 59 piszacych**.
+    Przy pliku SQLite niewidoczne, przy PostgreSQL nie do utrzymania.
+
+    Po rozdzieleniu migracja jest tutaj i tylko tutaj. `polacz()` bazy
+    niezmigrowanej NIE naprawia po cichu — odmawia otwarcia i mowi, co
+    uruchomic. Gdyby ten uchwyt zniknal, aplikacja nie „dzialalaby na pustej
+    bazie": kazde zadanie konczylo by sie kodem 400 z instrukcja.
+
+    CO PRZEZ TO PRZESTAJE DZIALAC: proces, ktory otwiera baze z pominieciem
+    tego uchwytu (wlasny skrypt, wiersz polecen), musi zawolac migracje sam —
+    `./.venv/bin/python -m silnik.rdzen.magazyn`.
+    """
+    magazyn.zmigruj()
+    yield
+
+
 trasy = APIRouter(default_response_class=OdpowiedzJSON)
-aplikacja = FastAPI(title="Doradca Finansowy", default_response_class=OdpowiedzJSON)
+aplikacja = FastAPI(title="Doradca Finansowy",
+                    default_response_class=OdpowiedzJSON,
+                    lifespan=cykl_zycia)
 
 #: Trasy ZBUDOWANE, nie zapisane w spisie. Liczba wyprowadzona z routerow,
 #: a nie wpisana recznie — recznie wpisana rozjechalaby sie przy pierwszej

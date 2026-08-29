@@ -1060,3 +1060,80 @@ Parser sprawdzający sam siebie nie sprawdza niczego.
   `forma_opodatkowania.stawka_ryczaltu` i `zobowiazania.oprocentowanie` idą przez `Decimal`
   ręcznie, poza `_wczytaj`. Domyka je od drugiej strony
   `test_ZADNA_kolumna_nie_uzywa_typu_zmiennoprzecinkowego`.
+
+---
+
+## Przebieg 2026-08-29 — rozdział „otwórz" od „zmigruj" (W2)
+
+**Co pilnują strażnicy.** `magazyn.polacz()` do tego dnia stawiało cały schemat przy każdym
+wywołaniu, a połączenie jest zależnością **na żądanie HTTP** (`api/wspolne.polaczenie`). Pomiar
+sondą `sqlite3.set_trace_callback` na świeżej bazie, commit `65baac3`:
+
+```
+LACZNIE polecen: 98
+wg pierwszego slowa: {'PRAGMA': 12, 'SELECT': 21, 'CREATE': 15, 'BEGIN': 3, 'INSERT': 44, 'COMMIT': 3}
+PISZACYCH/DDL: 59
+```
+
+Po rozdzieleniu `polacz()` wykonuje **jedno** polecenie — `PRAGMA user_version`, odczyt.
+Plan sesji mówił o „dwunastu rzeczach"; pomiar mówi o 98 poleceniach, z czego 59 piszących.
+
+**Dlaczego strażnik nie jest `grep`-em.** DDL wchodziło do `polacz()` **przez wywołania w środku**
+(`_dopisz_kolumny`, `zasiej_kategorie`, `_przebuduj_plan_budzetu`), więc funkcja mogła nie zawierać
+ani jednego słowa `CREATE` i nadal stawiać czternaście tabel. Strażnik mierzy to, co **dotarło do
+sterownika**. Mutacja M3 poniżej odtwarza dokładnie ten kształt wady.
+
+**Jak wykonywano.** Kopia drzewa poza repozytorium (`scratchpad/mutW2`, `rsync` bez `.git`,
+`.venv`, `node_modules`), `PYTHONDONTWRITEBYTECODE=1` przy każdym przebiegu, jedna mutacja naraz,
+plik przywracany z kopii sprzed mutacji. Kontrola przed mutacjami: **953 passed, 3 deselected**.
+
+| # | Mutacja | Który test padł | Wynik |
+|---|---|---|---|
+| **M1** | `zmigruj()`: usunięty `polaczenie.executescript(_SCHEMAT)` — migracja przestaje stawiać tabele | `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` · `test_start_aplikacji_MIGRUJE_baze` · `test_polacz_PRZYJMUJE_baze_zmigrowana` + 50 dalszych | **czerwony** (53 failed, 616 passed, 284 errors) |
+| **M2** | `api/index.cykl_zycia`: usunięte `magazyn.zmigruj()` — uchwyt startowy przestaje migrować | `test_start_aplikacji_MIGRUJE_baze` | **czerwony** (1 failed, **952 passed**) |
+| **M3** | `polacz()`: DDL wraca **wywołaniem w środku** (`zmigruj(sciezka)` przed otwarciem) — bez słowa `CREATE` w funkcji | `test_polacz_NIE_WYKONUJE_ani_jednego_polecenia_piszacego` · `test_polacz_ODMAWIA_otwarcia_bazy_niezmigrowanej` · `test_bez_startu_zadanie_ODMAWIA_zamiast_pokazac_zera` · `test_zdejmowanie_kolumn_NIE_BIEGNIE_przy_otwarciu` | **czerwony** (4 failed, 949 passed) |
+| **M4** | `_wymagaj_zmigrowanej`: warunek `wersja == WERSJA_SCHEMATU` → `True` — bramka przestaje odmawiać | `test_polacz_ODMAWIA_otwarcia_bazy_niezmigrowanej` · `test_bez_startu_zadanie_ODMAWIA_zamiast_pokazac_zera` | **czerwony** (2 failed, 951 passed) |
+| **M5** | `_wymagaj_niesprzecznych_kolumn`: `sprzeczne = []` — strażnik nieodwracalnego `DROP COLUMN` milknie | `test_kolumna_naraz_dopisywana_i_zdejmowana_JEST_ODMOWA` | **czerwony** (1 failed, 952 passed) |
+| **M6** | `ustaw_aktywnosc_kategorii`: zdjęty `polaczenie.rollback()` przed `raise` | `test_ZADNA_funkcja_nie_zglasza_bledu_po_zapisie_bez_rollback` · `test_odmowa_dezaktywacji_NIE_ZOSTAWIA_otwartej_transakcji` | **czerwony** (2 failed, 951 passed) |
+| **M7** | `_podsluchaj` w strażniku zwraca pustą listę — **przyrząd pomiarowy ślepnie** | `test_polacz_NIE_WYKONUJE_ani_jednego_polecenia_piszacego` · `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` | **czerwony** (2 failed, 8 passed w pliku strażnika) |
+| **M8** | `zmigruj()`: `stawek = zasiej_rejestr_stawek(...)` → `stawek = 0` — zasiew rejestru znika | `test_zmigruj_STAWIA_pelny_schemat_i_zasiewa` · 7 testów `test_rejestr_sqlite.py` | **czerwony** (8 failed) |
+
+Kontrola po cofnięciu wszystkich ośmiu mutacji (`diff -q` wobec repozytorium — cztery pliki
+zgodne): **953 passed, 3 deselected, 0 skipped**.
+
+### Co pokazała M2 — najważniejsza pozycja tej tabeli
+
+**Migracja przy starcie aplikacji ma w całej suicie DOKŁADNIE JEDNEGO strażnika.** Po usunięciu
+`magazyn.zmigruj()` z uchwytu cyklu życia **952 testy z 953 pozostały zielone** — łącznie ze
+wszystkimi testami HTTP, bo budują one `TestClient(aplikacja)` **bez** `with`, więc uchwytu
+w ogóle nie uruchamiają, a bazę migrują sobie same w fiksturze.
+
+To jest dokładnie ten kształt awarii, przed którym ostrzegała bramka zadania: *rozdzielić tak, że
+migracja przestaje działać w produkcji, a suita jest zielona, bo fikstura stawia schemat inaczej*.
+Jedynym testem, który przechodzi przez uchwyt startowy, jest
+`test_start_aplikacji_MIGRUJE_baze` — i to on jako jedyny się zaczerwienił.
+
+**Wniosek do W4:** przy podmianie sterownika ten test zostaje jedynym pomiarem drogi produkcyjnej.
+Jeśli miałby zostać wyłączony albo przepisany, wyłączenie jest decyzją do zgłoszenia, nie
+porządkiem.
+
+### Co pokazała M3
+
+Mutacja przywraca DDL do `polacz()` **przez wywołanie w środku**, nie przez wpisanie polecenia SQL.
+Funkcja po mutacji nie zawiera ani jednego słowa `CREATE`, `ALTER` ani `INSERT` — `grep` na jej
+ciele daje zero trafień, a baza dostaje 101 poleceń przy każdym otwarciu. Łapie to wyłącznie pomiar
+na sterowniku.
+
+### Czego ten przebieg NIE objął
+
+- **Nie mutowano czterech z sześciu miejsc uzupełnionych o `rollback()`** (`zapisz_plan`,
+  `ustaw_ustawienie`, `zapisz_forme`, `zapisz_stan_konta`). Ich gałąź `except sqlite3.Error` jest
+  osiągalna tylko przez awarię sterownika. Pilnuje ich **strażnik źródłowy**
+  (`test_ZADNA_funkcja_nie_zglasza_bledu_po_zapisie_bez_rollback`), zaczerwieniony mutacją M6 na
+  piątym miejscu tej samej klasy — nie ich własną mutacją behawioralną. Luka nazwana.
+- **Nie mutowano zachowania na PostgreSQL.** Cały ten przebieg stoi na SQLite; baza w Neonie jest
+  pusta do W4. Zdanie „w PostgreSQL zachowanie będzie inne" pozostaje **niezweryfikowane
+  pomiarem** — jest przesłanką planu, nie ustaleniem tego przebiegu.
+- **Nie mutowano atomowości `zapisz_koszt` i `oznacz_fakture_zaplacona`** — świadomie odłożone do
+  W4, ze strażnikami opisującymi stan dzisiejszy i jawnym progiem
+  (`testy/test_transakcje_przed_postgresql.py`, nagłówek).
