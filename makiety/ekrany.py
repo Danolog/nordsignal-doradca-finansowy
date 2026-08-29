@@ -70,8 +70,11 @@ class Ekran:
 #: (nastawy aplikacji). Trzy pierwsze pozycje to pieniadze w czasie —
 #: przyszlosc, biezacy miesiac, postanowienia.
 PASEK = (
+    #: Wysokosc 1070 px (nie 900) od Z3 (2026-08-29) — karta „Co mam zrobic"
+    #: dolozona miedzy werdyktem a przyciskiem „Co mnie czeka" (`render.py`,
+    #: pomiar po zbudowaniu: `{"doc": 1070, ...}`).
     Ekran("plynnosc", "Płynność",
-          "Czy dam radę do końca okresu?", "Main.dc.html", 900),
+          "Czy dam radę do końca okresu?", "Main.dc.html", 1070),
     Ekran("miesiac", "Miesiąc",
           "Jak mi poszło w tym miesiącu?", "Miesiac.dc.html", 900),
     Ekran("budzet", "Budżet",
@@ -106,7 +109,7 @@ AKCJA = Ekran("ksiegowanie", "Księgowanie",
 
 #: TRZECIA KATEGORIA, obok `PASEK` i `AKCJA` — rozwiniecie, nie miejsce.
 #: „Co mnie czeka" nie jest pozycja paska (pasek ma dziewiec, decyzja P-3)
-#: i nie jest akcja przy znaku slownym jak `AKCJA` (nie stoi obok „AI CFO",
+#: i nie jest akcja przy znaku slownym jak `AKCJA` (nie stoi obok „FINANSE",
 #: nie ma wlasnego stanu „tu jestem" — na artboardzie `CoMnieCzeka.dc.html`
 #: pasek pokazuje czynna pozycje PLYNNOSC, bo `buduj-makiety.py` renderuje
 #: go z `pasek="plynnosc"`, nie z wlasnym kluczem). Dlatego NIE dolacza do

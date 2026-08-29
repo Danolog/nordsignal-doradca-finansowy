@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    a { color: #4A5267; } a:hover { color: #02143C; }
+  </style>
+</helmet>
+
+<div style="background: #FBECD5; color: #02143C; min-height: 900px; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: baseline; gap: 16px; padding: 14px 40px; border-bottom: 1px solid #02143C;">
+    <span style="font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">FINANSE</span>
+    <span style="font-size: 13px; color: #4A5267;">Specyfikacja karty „Co mam zrobić" — nie ekran, komponent osadzony na Płynności</span>
+  </div>
+
+  <div style="flex: 1; display: flex; justify-content: center; padding: 40px 40px 24px;">
+    <div style="width: 1040px; display: flex; flex-direction: column; gap: 40px;">
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <p style="margin: 0; font-size: 20px; line-height: 1.45;">Trzecie pytanie aplikacji, dziś bez odpowiedzi na ekranie.</p>
+        <p style="margin: 0; font-size: 15px; color: #4A5267;">„Doradca Finansowy” odpowiada na trzy pytania: czy mam pieniądze, co mnie zaraz uderzy, co mam z tym zrobić. Ramka Płynności miała pierwsze dwa. Ta karta jest trzecim — osadzona między werdyktem a przyciskiem „Co mnie czeka”, nigdy przed wierszem zamknięcia.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #4A5267;">Stan 1 — jest coś do zrobienia (dokładnie ta karta stoi dziś na `Main.dc.html`)</span>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; background: #FFF5E1; border: 1px solid #696C7A; border-radius: 3px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #4A5267;">Co mam zrobić</span>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <p style="margin: 0; font-size: 15px; line-height: 1.5;">Nie odkładaj nic w tym miesiącu — brakuje 210,67&nbsp;zł, żeby 25 września zostać na plusie. To ta sama kwota, co „Najniżej” wyżej.</p>
+            <p style="margin: 0; font-size: 13px; color: #4A5267;">Koszt: żadnej nowej poduszki do 25 września — pierwsza okazja na oszczędności wraca po tym dniu.</p>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 8px; padding-top: 6px; border-top: 1px solid #696C7A;">
+            <span style="font-size: 15px; color: #4A5267;">Ile mogę jeszcze rozdysponować we wrześniu?</span>
+            <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 20px;">−10&nbsp;131,46&nbsp;zł</span>
+            <span style="flex: 1;"></span>
+            <a href="#" style="font-size: 13px; color: #4A5267; text-decoration: none;">Miesiąc →</a>
+          </div>
+        </div>
+
+        <p style="margin: 0; font-size: 13px; color: #4A5267;">Moment użycia: zaraz po przeczytaniu werdyktu, tego samego spojrzenia — niepokój, 5 sekund, laptop. Pytanie w pierwszej osobie: „skoro brakuje pieniędzy 25 IX, co mam dziś zrobić, żeby było mniej źle?”. Kształt odpowiedzi: najwyżej trzy działania, każde z kwotą i nazwanym kosztem (K prawo trzecie — konkret, nie ostrzeżenie bez wyjścia); dziś silnik daje jedno (C1, ujemne), bo tylko ono ma pokrycie w danych tego miesiąca — C2 (nadpłata kredytu) nie pojawia się, gdy nie ma nadwyżki do nadpłaty.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #4A5267;">Stan 2 — wszystko w porządku (miesiąc bez deficytu, liczby ilustracyjne)</span>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; background: #FFF5E1; border: 1px solid #696C7A; border-radius: 3px;">
+          <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #4A5267;">Co mam zrobić</span>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <p style="margin: 0; font-size: 15px; line-height: 1.5;">Możesz odłożyć 850,00&nbsp;zł w tym miesiącu — linia ostrożna zostaje dodatnia do końca okna.</p>
+            <p style="margin: 0; font-size: 13px; color: #4A5267;">Koszt: o tyle mniej luzu w budżecie, gdyby w tym miesiącu wypadł nieplanowany wydatek.</p>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 8px; padding-top: 6px; border-top: 1px solid #696C7A;">
+            <span style="font-size: 15px; color: #4A5267;">Ile mogę jeszcze rozdysponować w październiku?</span>
+            <span style="font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', Times, serif; font-variant-numeric: tabular-nums; font-size: 20px;">1&nbsp;240,00&nbsp;zł</span>
+            <span style="flex: 1;"></span>
+            <a href="#" style="font-size: 13px; color: #4A5267; text-decoration: none;">Miesiąc →</a>
+          </div>
+        </div>
+
+        <p style="margin: 0; font-size: 13px; color: #4A5267;">Karta NIE znika, gdy wszystko jest w porządku — znikająca karta uczy odruchu nieotwierania aplikacji wtedy, gdy jest najbardziej potrzebna. Zostaje dokładnie jedna pozycja: „ile mogę w tym miesiącu odłożyć”, bez wymyślonego drugiego działania na siłę.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #4A5267;">Trzy rzeczy, które ta karta świadomie NIE robi</span>
+        <p style="margin: 0; font-size: 15px; color: #4A5267;">1. Nie powtarza werdyktu z wiersza „Najniżej” — nazywa DZIAŁANIE, nie fakt (fakt już stoi wyżej, 56&nbsp;px). 2. Nie odbiera pierwszeństwa wierszowi zamknięcia — największa liczba w karcie to 20&nbsp;px, cztery razy mniej niż hero. 3. Nie wymyśla trzeciej rekomendacji tam, gdzie silnik (C1–C4, „katalog zdolności” §C) nie ma jeszcze pokrycia — pusty slot jest uczciwszy niż zmyślona rada.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

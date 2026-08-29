@@ -111,7 +111,10 @@ ODSTEP_POZYCJI = 4              # gap miedzy pozycjami paska
 
 #: Elementy linii pierwszej naglowka — te, ktore juz sa w `Main.dc.html`,
 #: plus przycisk ksiegowania przeniesiony ze stopki (P-3).
-ZNAK_SLOWNY = ("AI CFO", 15, 0.16, "gruba", True)
+#: Zmieniony w Z3 (2026-08-29, D-47 + regula minus-zapasu): „FINANSE",
+#: swiatlo 0,12 em (jak pozycje paska), a nie 0,16 em jak przy „AI CFO" —
+#: patrz `buduj-makiety.py`, komentarz przy `ZNAK_I_ODSTEP`.
+ZNAK_SLOWNY = ("FINANSE", 15, 0.12, "gruba", True)
 IKONA_KSIEGOWANIA = 16 + 8      # znak plus (16 px) + odstep do napisu
 #: PO Z-17 I Z-18 LINIA NAGLOWKA NIE MA JUZ ZADNEJ KONTROLKI UZYTKOWEJ.
 #: „Stara aplikacja" zeszla najpierw do stopki (28.4), a potem znikla
